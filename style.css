@@ -138,6 +138,229 @@ uix-sidebar[collapsed] .sidebar-title {
   }
 }
 /**
+ * UIX Sidebar Component Styles
+ * Shadow DOM - Uses ::part() selectors for internal elements
+ */
+
+uix-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width, 256px);
+  height: 100%;
+  background-color: var(--sidebar-background, var(--color-surface, #ffffff));
+  border-right-width: var(--sidebar-border-width, 1px);
+  border-right-style: solid;
+  border-right-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
+  box-shadow: var(--sidebar-shadow, none);
+  overflow: hidden;
+  transition: width 0.3s ease;
+
+  /* Right-positioned sidebar */
+  &[position="right"] {
+    border-right: none;
+    border-left-width: var(--sidebar-border-width, 1px);
+    border-left-style: solid;
+    border-left-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
+  }
+
+  /* Collapsed state */
+  &[collapsed] {
+    width: var(--sidebar-collapsed-width, 80px);
+  }
+
+  /* Mobile behavior */
+  @media (max-width: 768px) {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transform: translateX(-100%);
+
+    &[position="left"] {
+      left: 0;
+    }
+
+    &[position="right"] {
+      right: 0;
+      transform: translateX(100%);
+    }
+
+    &[open] {
+      transform: translateX(0);
+    }
+  }
+
+  /* Desktop behavior */
+  @media (min-width: 769px) {
+    position: relative;
+    transform: none;
+  }
+}
+
+/* =============================================
+   SHADOW DOM PARTS - Use ::part() selectors
+   ============================================= */
+
+/* Header part */
+uix-sidebar::part(header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sidebar-header-padding, 1rem);
+  background: var(--sidebar-header-background, transparent);
+  border-bottom-width: var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));
+  border-bottom-style: solid;
+  border-bottom-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
+  min-height: var(--sidebar-header-min-height, auto);
+  flex-shrink: 0;
+}
+
+/* Toggle button part */
+uix-sidebar::part(toggle) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  background: var(--sidebar-toggle-background, transparent);
+  color: var(--sidebar-toggle-color, var(--text-muted, #6b7280));
+  cursor: pointer;
+  border-radius: var(--sidebar-toggle-border-radius, 0.5rem);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  flex-shrink: 0;
+}
+
+uix-sidebar::part(toggle):hover {
+  background-color: var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));
+  color: var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a));
+}
+
+/* Content part */
+uix-sidebar::part(content) {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sidebar-content-padding, 0.5rem 0);
+}
+
+/* Footer part */
+uix-sidebar::part(footer) {
+  padding: var(--sidebar-footer-padding, 1rem);
+  background: var(--sidebar-footer-background, transparent);
+  border-top-width: var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));
+  border-top-style: solid;
+  border-top-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
+  flex-shrink: 0;
+}
+
+uix-sidebar::part(footer):empty {
+  display: none;
+}
+
+/* =============================================
+   COLLAPSED STATE - Parts styling
+   ============================================= */
+
+uix-sidebar[collapsed]::part(header) {
+  justify-content: center;
+  padding: var(--sidebar-header-padding, 1rem) 0.5rem;
+}
+
+/* =============================================
+   SLOTTED CONTENT STYLING (Light DOM)
+   These styles apply to content slotted into the sidebar
+   ============================================= */
+
+uix-sidebar {
+  /* Hide text elements when collapsed */
+  &[collapsed] {
+    .sidebar-label,
+    .sidebar-title,
+    .sidebar-text {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    [slot="header"] span:not(.icon),
+    [slot="footer"] span:not(.icon) {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+    }
+  }
+
+  /* Nav container */
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sidebar-nav-gap, 0.25rem);
+    padding: var(--sidebar-nav-padding, 0 0.75rem);
+  }
+
+  /* Nav items (links, buttons) */
+  .sidebar-nav-item,
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sidebar-item-gap, 0.75rem);
+    padding: var(--sidebar-item-padding, 0.75rem 1rem);
+    border-radius: var(--sidebar-item-border-radius, 0.5rem);
+    color: var(--sidebar-item-color, var(--text-muted, #6b7280));
+    font-weight: var(--sidebar-item-font-weight, 500);
+    text-decoration: none;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-size: inherit;
+    font-family: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      background-color: var(--sidebar-item-hover-background, #f5f5f5);
+      color: var(--sidebar-item-hover-color, var(--text-color, #1a1a1a));
+    }
+
+    &.active,
+    &[aria-current="page"] {
+      background-color: var(--sidebar-item-active-background, #000000);
+      color: var(--sidebar-item-active-color, #ffffff);
+      font-weight: var(--sidebar-item-active-font-weight, 600);
+    }
+  }
+
+  /* Section dividers */
+  .sidebar-section {
+    padding-top: var(--sidebar-section-padding, 1rem);
+    margin-top: var(--sidebar-section-margin, 0.5rem);
+    border-top: 1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));
+  }
+
+  .sidebar-section-title {
+    padding: var(--sidebar-section-title-padding, 0.5rem 1rem);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: var(--sidebar-section-title-font-weight, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #6b7280);
+  }
+
+  /* Nested items (for accordion) */
+  .sidebar-nested {
+    padding-left: var(--sidebar-nested-indent, 1rem);
+  }
+
+  .sidebar-nested-item {
+    padding: var(--sidebar-nested-item-padding, 0.5rem 1rem);
+    font-size: var(--sidebar-nested-item-font-size, 0.875rem);
+  }
+}
+/**
  * Menu Component Styles
  */
 
@@ -369,229 +592,6 @@ uix-sidebar[collapsed] .sidebar-title {
   }
 }
 /**
- * UIX Sidebar Component Styles
- * Shadow DOM - Uses ::part() selectors for internal elements
- */
-
-uix-sidebar {
-  display: flex;
-  flex-direction: column;
-  width: var(--sidebar-width, 256px);
-  height: 100%;
-  background-color: var(--sidebar-background, var(--color-surface, #ffffff));
-  border-right-width: var(--sidebar-border-width, 1px);
-  border-right-style: solid;
-  border-right-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
-  box-shadow: var(--sidebar-shadow, none);
-  overflow: hidden;
-  transition: width 0.3s ease;
-
-  /* Right-positioned sidebar */
-  &[position="right"] {
-    border-right: none;
-    border-left-width: var(--sidebar-border-width, 1px);
-    border-left-style: solid;
-    border-left-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
-  }
-
-  /* Collapsed state */
-  &[collapsed] {
-    width: var(--sidebar-collapsed-width, 80px);
-  }
-
-  /* Mobile behavior */
-  @media (max-width: 768px) {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    z-index: 1000;
-    transform: translateX(-100%);
-
-    &[position="left"] {
-      left: 0;
-    }
-
-    &[position="right"] {
-      right: 0;
-      transform: translateX(100%);
-    }
-
-    &[open] {
-      transform: translateX(0);
-    }
-  }
-
-  /* Desktop behavior */
-  @media (min-width: 769px) {
-    position: relative;
-    transform: none;
-  }
-}
-
-/* =============================================
-   SHADOW DOM PARTS - Use ::part() selectors
-   ============================================= */
-
-/* Header part */
-uix-sidebar::part(header) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sidebar-header-padding, 1rem);
-  background: var(--sidebar-header-background, transparent);
-  border-bottom-width: var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));
-  border-bottom-style: solid;
-  border-bottom-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
-  min-height: var(--sidebar-header-min-height, auto);
-  flex-shrink: 0;
-}
-
-/* Toggle button part */
-uix-sidebar::part(toggle) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: none;
-  background: var(--sidebar-toggle-background, transparent);
-  color: var(--sidebar-toggle-color, var(--text-muted, #6b7280));
-  cursor: pointer;
-  border-radius: var(--sidebar-toggle-border-radius, 0.5rem);
-  transition: background-color 0.2s ease, color 0.2s ease;
-  flex-shrink: 0;
-}
-
-uix-sidebar::part(toggle):hover {
-  background-color: var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));
-  color: var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a));
-}
-
-/* Content part */
-uix-sidebar::part(content) {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: var(--sidebar-content-padding, 0.5rem 0);
-}
-
-/* Footer part */
-uix-sidebar::part(footer) {
-  padding: var(--sidebar-footer-padding, 1rem);
-  background: var(--sidebar-footer-background, transparent);
-  border-top-width: var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));
-  border-top-style: solid;
-  border-top-color: var(--sidebar-border-color, var(--color-border, #e5e7eb));
-  flex-shrink: 0;
-}
-
-uix-sidebar::part(footer):empty {
-  display: none;
-}
-
-/* =============================================
-   COLLAPSED STATE - Parts styling
-   ============================================= */
-
-uix-sidebar[collapsed]::part(header) {
-  justify-content: center;
-  padding: var(--sidebar-header-padding, 1rem) 0.5rem;
-}
-
-/* =============================================
-   SLOTTED CONTENT STYLING (Light DOM)
-   These styles apply to content slotted into the sidebar
-   ============================================= */
-
-uix-sidebar {
-  /* Hide text elements when collapsed */
-  &[collapsed] {
-    .sidebar-label,
-    .sidebar-title,
-    .sidebar-text {
-      opacity: 0;
-      width: 0;
-      overflow: hidden;
-      white-space: nowrap;
-    }
-
-    [slot="header"] span:not(.icon),
-    [slot="footer"] span:not(.icon) {
-      opacity: 0;
-      width: 0;
-      overflow: hidden;
-    }
-  }
-
-  /* Nav container */
-  .sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sidebar-nav-gap, 0.25rem);
-    padding: var(--sidebar-nav-padding, 0 0.75rem);
-  }
-
-  /* Nav items (links, buttons) */
-  .sidebar-nav-item,
-  .sidebar-item {
-    display: flex;
-    align-items: center;
-    gap: var(--sidebar-item-gap, 0.75rem);
-    padding: var(--sidebar-item-padding, 0.75rem 1rem);
-    border-radius: var(--sidebar-item-border-radius, 0.5rem);
-    color: var(--sidebar-item-color, var(--text-muted, #6b7280));
-    font-weight: var(--sidebar-item-font-weight, 500);
-    text-decoration: none;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    width: 100%;
-    text-align: left;
-    font-size: inherit;
-    font-family: inherit;
-    transition: background-color 0.2s ease, color 0.2s ease;
-
-    &:hover {
-      background-color: var(--sidebar-item-hover-background, #f5f5f5);
-      color: var(--sidebar-item-hover-color, var(--text-color, #1a1a1a));
-    }
-
-    &.active,
-    &[aria-current="page"] {
-      background-color: var(--sidebar-item-active-background, #000000);
-      color: var(--sidebar-item-active-color, #ffffff);
-      font-weight: var(--sidebar-item-active-font-weight, 600);
-    }
-  }
-
-  /* Section dividers */
-  .sidebar-section {
-    padding-top: var(--sidebar-section-padding, 1rem);
-    margin-top: var(--sidebar-section-margin, 0.5rem);
-    border-top: 1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));
-  }
-
-  .sidebar-section-title {
-    padding: var(--sidebar-section-title-padding, 0.5rem 1rem);
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: var(--sidebar-section-title-font-weight, 600);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted, #6b7280);
-  }
-
-  /* Nested items (for accordion) */
-  .sidebar-nested {
-    padding-left: var(--sidebar-nested-indent, 1rem);
-  }
-
-  .sidebar-nested-item {
-    padding: var(--sidebar-nested-item-padding, 0.5rem 1rem);
-    font-size: var(--sidebar-nested-item-font-size, 0.875rem);
-  }
-}
-/**
  * Navbar Component Styles
  */
 
@@ -772,6 +772,69 @@ uix-sidebar {
   }
 }
 /**
+ * Breadcrumbs Component Styles
+ */
+
+:where(.uix-breadcrumbs, uix-breadcrumbs) {
+  display: block;
+
+  .breadcrumbs {
+    padding: 0;
+  }
+
+  .breadcrumbs-list {
+    display: flex;
+    align-items: center;
+    gap: var(--breadcrumbs-gap, 0.5rem);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+
+  .breadcrumbs-item {
+    display: flex;
+    align-items: center;
+    gap: var(--breadcrumbs-gap, 0.5rem);
+
+    uix-link {
+      color: var(--breadcrumbs-link-color, var(--text-muted, #6b7280));
+      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
+
+      &:hover {
+        color: var(--breadcrumbs-link-hover-color, var(--color-primary));
+      }
+    }
+
+    .current {
+      color: var(--breadcrumbs-current-color, var(--text-color));
+      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
+      font-weight: var(--font-semibold, 600);
+    }
+
+    .separator {
+      color: var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));
+      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
+    }
+  }
+
+  /* Size variants */
+  &[size="sm"] {
+    --breadcrumbs-font-size: var(--text-xs, 0.75rem);
+    --breadcrumbs-gap: 0.375rem;
+  }
+
+  &[size="md"] {
+    --breadcrumbs-font-size: var(--text-sm, 0.875rem);
+    --breadcrumbs-gap: 0.5rem;
+  }
+
+  &[size="lg"] {
+    --breadcrumbs-font-size: var(--text-base, 1rem);
+    --breadcrumbs-gap: 0.625rem;
+  }
+}
+/**
  * Avatar Component Styles
  */
 
@@ -880,69 +943,6 @@ uix-sidebar {
 
   .status--away {
     background-color: var(--color-warning, #f59e0b);
-  }
-}
-/**
- * Breadcrumbs Component Styles
- */
-
-:where(.uix-breadcrumbs, uix-breadcrumbs) {
-  display: block;
-
-  .breadcrumbs {
-    padding: 0;
-  }
-
-  .breadcrumbs-list {
-    display: flex;
-    align-items: center;
-    gap: var(--breadcrumbs-gap, 0.5rem);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    flex-wrap: wrap;
-  }
-
-  .breadcrumbs-item {
-    display: flex;
-    align-items: center;
-    gap: var(--breadcrumbs-gap, 0.5rem);
-
-    uix-link {
-      color: var(--breadcrumbs-link-color, var(--text-muted, #6b7280));
-      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
-
-      &:hover {
-        color: var(--breadcrumbs-link-hover-color, var(--color-primary));
-      }
-    }
-
-    .current {
-      color: var(--breadcrumbs-current-color, var(--text-color));
-      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
-      font-weight: var(--font-semibold, 600);
-    }
-
-    .separator {
-      color: var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));
-      font-size: var(--breadcrumbs-font-size, var(--text-sm, 0.875rem));
-    }
-  }
-
-  /* Size variants */
-  &[size="sm"] {
-    --breadcrumbs-font-size: var(--text-xs, 0.75rem);
-    --breadcrumbs-gap: 0.375rem;
-  }
-
-  &[size="md"] {
-    --breadcrumbs-font-size: var(--text-sm, 0.875rem);
-    --breadcrumbs-gap: 0.5rem;
-  }
-
-  &[size="lg"] {
-    --breadcrumbs-font-size: var(--text-base, 1rem);
-    --breadcrumbs-gap: 0.625rem;
   }
 }
 /**
@@ -1135,6 +1135,85 @@ uix-sidebar {
   &[wfull] {
     width: 100%;
     display: flex;
+  }
+}
+:where(.uix-icon, uix-icon) {
+  display: inline-block;
+  vertical-align: middle;
+  --icon-size: calc(var(--spacing, 0.25rem) * 4);
+  width: var(--icon-size);
+  height: var(--icon-size);
+
+  svg {
+    height: inherit;
+    width: inherit;
+  }
+
+  &[solid] {
+    stroke: currentColor;
+    fill: currentColor;
+  }
+
+  /* --- Color Variants --- */
+  &[color="primary"] {
+    color: var(--color-primary);
+  }
+
+  &[color="secondary"] {
+    color: var(--color-secondary);
+  }
+
+  &[color="success"] {
+    color: var(--color-success);
+  }
+
+  &[color="danger"] {
+    color: var(--color-danger);
+  }
+
+  &[color="warning"] {
+    color: var(--color-warning);
+  }
+
+  &[color="info"] {
+    color: var(--color-info);
+  }
+
+  &[color="inverse"] {
+    color: var(--color-inverse);
+  }
+
+  /* --- Size Variants --- */
+  &[size="xs"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 3);
+  }
+
+  &[size="sm"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 4);
+  }
+
+  &[size="md"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 6);
+  }
+
+  &[size="lg"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 8);
+  }
+
+  &[size="xl"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 10);
+  }
+
+  &[size="2xl"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 14);
+  }
+
+  &[size="3xl"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 20);
+  }
+
+  &[size="4xl"] {
+    --icon-size: calc(var(--spacing, 0.25rem) * 30);
   }
 }
 /* Bundler UI Styles */
@@ -1337,85 +1416,6 @@ uix-sidebar {
   font-size: 0.875rem;
   color: var(--text-color, #374151);
   margin: 0.5rem 0 0 0;
-}
-:where(.uix-icon, uix-icon) {
-  display: inline-block;
-  vertical-align: middle;
-  --icon-size: calc(var(--spacing, 0.25rem) * 4);
-  width: var(--icon-size);
-  height: var(--icon-size);
-
-  svg {
-    height: inherit;
-    width: inherit;
-  }
-
-  &[solid] {
-    stroke: currentColor;
-    fill: currentColor;
-  }
-
-  /* --- Color Variants --- */
-  &[color="primary"] {
-    color: var(--color-primary);
-  }
-
-  &[color="secondary"] {
-    color: var(--color-secondary);
-  }
-
-  &[color="success"] {
-    color: var(--color-success);
-  }
-
-  &[color="danger"] {
-    color: var(--color-danger);
-  }
-
-  &[color="warning"] {
-    color: var(--color-warning);
-  }
-
-  &[color="info"] {
-    color: var(--color-info);
-  }
-
-  &[color="inverse"] {
-    color: var(--color-inverse);
-  }
-
-  /* --- Size Variants --- */
-  &[size="xs"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 3);
-  }
-
-  &[size="sm"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 4);
-  }
-
-  &[size="md"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 6);
-  }
-
-  &[size="lg"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 8);
-  }
-
-  &[size="xl"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 10);
-  }
-
-  &[size="2xl"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 14);
-  }
-
-  &[size="3xl"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 20);
-  }
-
-  &[size="4xl"] {
-    --icon-size: calc(var(--spacing, 0.25rem) * 30);
-  }
 }
 /**
  * UIX Tabs Styles
