@@ -717,625 +717,7 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/views/templates/app.js":{content:`import Router from "/$app/router/index.js";
-import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-export default {
-  class: "h-screen w-full bg-purple-50 flex flex-col font-sans",
-  properties: {
-    currentRoute: T.object({ sync: Router }),
-    currentLang: T.string("en"),
-    modalItem: T.object(null),
-    modalOpen: T.boolean(false),
-    userId: T.number({ sync: "local" }),
-  },
-  getActiveTabFromRoute() {
-    const rN = this.currentRoute?.name;
-    return ["profile", "meetups", "groups"].includes(rN) ? rN : "discover";
-  },
-  render() {
-    const tabs = [
-      { id: "discover", route: "/discover", icon: "house" },
-      { id: "groups", route: "/groups", icon: "users" },
-      { id: "meetups", route: "/meetups", icon: "map-pin" },
-      { id: "profile", route: "/profile", icon: "user" },
-    ];
-    const aT = this.getActiveTabFromRoute();
-
-    return html\`
-        <div class="flex-1 overflow-y-auto no-scrollbar">\${this.currentRoute.component}</div>
-        <uix-bottom-nav
-          class="flex-shrink-0 bg-white border-t-3 border-black p-2 z-30 flex justify-around items-center pt-4 mx-auto w-full"
-          style="--direction: column"
-        >
-          \${tabs.map(
-            (tab) => html\`
-              <uix-link href=\${tab.route} vertical class="flex flex-1 mt-2 flex-col items-center p-2 rounded-xl transition-all duration-200 \${aT === tab.id ? "bg-green-300 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transform -translate-y-2" : "hover:bg-gray-100"}">
-                <uix-icon size="lg" class="text-3xl mb-1 mx-auto" name=\${tab.icon}></uix-icon>
-                \${aT === tab.id ? html\`<div class="text-xs font-black uppercase">\${$APP.i18n.t(\`tabs.\${tab.id}\`)}</div>\` : null}
-              </uix-link>
-            \`,
-          )}
-        </uix-bottom-nav>
-        <view-item-modal .item=\${this.modalItem} .isOpen=\${this.modalOpen} @close=\${() => {
-          this.modalOpen = false;
-          this.modalItem = null;
-        }}></view-item-modal>
-      \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/app/bottom-nav.js":{content:`import T from "/$app/types/index.js";
-
-export default {
-  tag: "uix-bottom-nav",
-  properties: {
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "floating", "filled"],
-    }),
-    fixed: T.boolean(),
-  },
-  style: true,
-  role: "navigation",
-};
-
-/**
- * Bottom Navigation Component
- *
- * @component
- * @category navigation
- * @tag uix-bottom-nav
- *
- * A mobile-optimized bottom navigation bar with icon and label items.
- * Commonly used in mobile apps for primary navigation.
- *
- * @slot default - Navigation items
- *
- * @part nav - The navigation container
- *
- * @example Basic Navigation
- * \`\`\`html
- * <uix-bottom-nav>
- *   <a href="/">
- *     <uix-icon name="house"></uix-icon>
- *     <span>Home</span>
- *   </a>
- *   <a href="/search">
- *     <uix-icon name="search"></uix-icon>
- *     <span>Search</span>
- *   </a>
- *   <a href="/favorites">
- *     <uix-icon name="heart"></uix-icon>
- *     <span>Favorites</span>
- *   </a>
- *   <a href="/profile">
- *     <uix-icon name="user"></uix-icon>
- *     <span>Profile</span>
- *   </a>
- * </uix-bottom-nav>
- * \`\`\`
- *
- * @example With Badges
- * \`\`\`html
- * <uix-bottom-nav>
- *   <a href="/">
- *     <uix-icon name="house"></uix-icon>
- *     <span>Home</span>
- *   </a>
- *   <a href="/notifications">
- *     <uix-badge>3</uix-badge>
- *     <uix-icon name="bell"></uix-icon>
- *     <span>Notifications</span>
- *   </a>
- *   <a href="/messages">
- *     <uix-badge>12</uix-badge>
- *     <uix-icon name="message-circle"></uix-icon>
- *     <span>Messages</span>
- *   </a>
- *   <a href="/profile">
- *     <uix-icon name="user"></uix-icon>
- *     <span>Profile</span>
- *   </a>
- * </uix-bottom-nav>
- * \`\`\`
- *
- * @example Floating Variant
- * \`\`\`html
- * <uix-bottom-nav variant="floating">
- *   <a href="/">
- *     <uix-icon name="house"></uix-icon>
- *     <span>Home</span>
- *   </a>
- *   <a href="/explore">
- *     <uix-icon name="search"></uix-icon>
- *     <span>Explore</span>
- *   </a>
- *   <a href="/create">
- *     <uix-icon name="plus"></uix-icon>
- *     <span>Create</span>
- *   </a>
- *   <a href="/profile">
- *     <uix-icon name="user"></uix-icon>
- *     <span>Profile</span>
- *   </a>
- * </uix-bottom-nav>
- * \`\`\`
- *
- * @example Icons Only (No Labels)
- * \`\`\`html
- * <uix-bottom-nav>
- *   <a href="/" aria-label="Home">
- *     <uix-icon name="house"></uix-icon>
- *   </a>
- *   <a href="/search" aria-label="Search">
- *     <uix-icon name="search"></uix-icon>
- *   </a>
- *   <a href="/saved" aria-label="Saved">
- *     <uix-icon name="bookmark"></uix-icon>
- *   </a>
- *   <a href="/settings" aria-label="Settings">
- *     <uix-icon name="settings"></uix-icon>
- *   </a>
- * </uix-bottom-nav>
- * \`\`\`
- *
- * @example Filled Variant
- * \`\`\`html
- * <uix-bottom-nav variant="filled">
- *   <a href="/">
- *     <uix-icon name="grid"></uix-icon>
- *     <span>Dashboard</span>
- *   </a>
- *   <a href="/shop">
- *     <uix-icon name="shopping-cart"></uix-icon>
- *     <span>Shop</span>
- *   </a>
- *   <a href="/wishlist">
- *     <uix-icon name="heart"></uix-icon>
- *     <span>Wishlist</span>
- *   </a>
- *   <a href="/account">
- *     <uix-icon name="user"></uix-icon>
- *     <span>Account</span>
- *   </a>
- * </uix-bottom-nav>
- * \`\`\`
- *
- * @example Non-Fixed Position
- * \`\`\`html
- * <uix-bottom-nav fixed="false">
- *   <a href="/"><uix-icon name="house"></uix-icon><span>Home</span></a>
- *   <a href="/search"><uix-icon name="search"></uix-icon><span>Search</span></a>
- *   <a href="/profile"><uix-icon name="user"></uix-icon><span>Profile</span></a>
- * </uix-bottom-nav>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/views/discover-view.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { NBS } from "./utils.js";
-
-export default {
-  style: true,
-
-  properties: {
-    userId: T.string({ defaultValue: "guest" }),
-    currentUser: T.object({
-      sync: $APP.Model.users,
-      query: (inst) => ({
-        id: inst.userId,
-        includes: [
-          "likedPlaces",
-          "likedEvents",
-          "likedMeetups",
-          "likedGroups",
-          "interestedEvents",
-          "interestedMeetups",
-        ],
-      }),
-      dependsOn: ["userId"],
-    }),
-    places: T.array({ sync: $APP.Model.places, query: {} }),
-    events: T.array({ sync: $APP.Model.events, query: {} }),
-    meetups: T.array({ sync: $APP.Model.meetups, query: {} }),
-    groups: T.array({ sync: $APP.Model.groups, query: {} }),
-    meetupAttendance: T.array({ defaultValue: [] }),
-    searchQuery: T.string({ defaultValue: "" }),
-  },
-  async connected() {
-    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
-    // Load meetup attendance for current user
-    this.meetupAttendance = await $APP.Model.meetup_attendance.getAll({
-      where: { user: this.userId },
-    });
-  },
-  isLoading() {
-    return (
-      !this.currentUser ||
-      !this.places ||
-      !this.events ||
-      !this.meetups ||
-      !this.groups
-    );
-  },
-  isJoined(meetupId) {
-    return this.meetupAttendance?.some((a) => a.meetup === meetupId) || false;
-  },
-  getNextEvents() {
-    return (this.events || []).sort(
-      (a, b) => new Date(a.date) - new Date(b.date),
-    );
-  },
-  getMyMeetups() {
-    const joinedMeetupIds = new Set(
-      (this.meetupAttendance || []).map((a) => a.meetup),
-    );
-    return (this.meetups || []).filter((m) => joinedMeetupIds.has(m.id));
-  },
-  render() {
-    if (this.isLoading()) return NBS.SPINNER;
-
-    const nE = this.events ?? [];
-    const mMs = this.meetups ?? [];
-    const nY = this.places ?? [];
-    return html\`
-      <div class="space-y-8 pb-8">
-        <div class="flex items-center justify-between px-6 pt-6">
-          <h1 class="text-4xl font-black text-black tracking-tight">Discover</h1>
-          <button class="w-12 h-12 flex items-center justify-center bg-accent border-3 border-black rounded-xl shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
-             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </button>
-        </div>
-        <div class="px-6 overflow-hidden  max-w-screen">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">Today in Rio</h2>
-            <button @click=\${() => $APP.Router.go("calendar")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
-          </div>
-          <div class="flex gap-4 overflow-x-auto pb-4">
-            \${
-              nE.length === 0
-                ? html\`<div class="text-sm font-bold text-gray-500 italic">No upcoming events found.</div>\`
-                : nE.map(
-                    (event) => html\`
-                <view-story-circle .content=\${event} .onClick=\${(e) => $APP.Router.go("event-detail", { slug: e.slug })}></view-story-circle>
-              \`,
-                  )
-            }
-          </div>
-        </div>
-        <div class="px-6 overflow-hidden">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">My Meetups</h2>
-            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
-          </div>
-          <div class="flex gap-4 overflow-x-auto pb-4 px-6">
-            \${
-              mMs.length === 0
-                ? html\`
-              <div class="w-full bg-white border-3 border-dashed border-gray-300 rounded-2xl p-6 text-center">
-                <p class="text-sm font-bold text-gray-400">You haven't joined any meetups yet.</p>
-                <button class="mt-2 text-xs font-black text-black underline">Explore below</button>
-              </div>
-            \`
-                : mMs.map(
-                    (meetup) => html\`
-                <view-meetup-card-horizontal .content=\${meetup} .onClick=\${(m) => $APP.Router.go("meetup-detail", { slug: m.slug })}></view-meetup-card-horizontal>
-              \`,
-                  )
-            }
-          </div>
-        </div>
-        <div class="px-6">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">Near You</h2>
-            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">Filter</button>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 p-2 md:p-4 lg:p-8">
-            \${nY.map(
-              (place) => html\`
-                <view-meetup-card-compact .content=\${place} type="place" .onClick=\${(p) => $APP.Router.go("place-detail", { slug: p.slug })}></view-meetup-card-compact>
-              \`,
-            )}
-          </div>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-
-export default {
-  style: true,
-  properties: {
-    item: T.object({ attribute: false }),
-    isOpen: T.boolean({ defaultValue: false }),
-  },
-  handleClose() {
-    this.isOpen = false;
-    this.item = null;
-    this.dispatchEvent(
-      new CustomEvent("close", { bubbles: true, composed: true }),
-    );
-  },
-  render() {
-    if (!this.item) return null;
-
-    return html\`
-      <uix-modal
-        .open=\${this.isOpen}
-        @modal-close=\${this.handleClose.bind(this)}
-        @modal-cancel=\${this.handleClose.bind(this)}
-      >
-        <view-content-card .content=\${this.item}></view-content-card>
-        <div slot="footer" class="pt-4">
-          <button
-            data-close
-            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
-          >
-            \u2715 \${$APP.i18n.t("actions.close")}
-          </button>
-        </div>
-      </uix-modal>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
-
-// Category definitions
-export const CATEGORIES = {
-  all: { id: "all", color: "gray-200", icon: "\u{1F4CD}" },
-  beaches: { id: "beaches", color: "blue-300", icon: "\u{1F3D6}\uFE0F" },
-  nightlife: { id: "nightlife", color: "purple-300", icon: "\u{1F389}" },
-  food: { id: "food", color: "orange-300", icon: "\u{1F37D}\uFE0F" },
-  attractions: { id: "attractions", color: "emerald-300", icon: "\u2728" },
-  groups: { id: "groups", color: "pink-300", icon: "\u{1F4AC}" },
-};
-
-// Neubrutalist Shadow styles
-export const NBS = {
-  S: "border-3 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
-  M: "border-3 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all",
-  L: "border-3 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
-  ACTIVE_SM:
-    "active:shadow-none active:translate-x-[2px] active:translate-y-[2px]",
-  ACTIVE_LG:
-    "active:shadow-none active:translate-x-[4px] active:translate-y-[4px]",
-  SPINNER: html\`<div class="flex items-center justify-center min-h-screen"><uix-spinner></uix-spinner></div>\`,
-};
-
-// Helper functions
-export const getCategoryColor = (category) =>
-  CATEGORIES[category]?.color
-    ? \`bg-\${CATEGORIES[category].color}\`
-    : "bg-gray-200";
-
-export const getUser = () => $APP.Auth?.user || null;
-
-export const isGuest = () => $APP.Auth?.isGuest ?? true;
-
-export const styleTag = (css) => html\`<style>\${css}</style>\`;
-`,mimeType:"text/javascript"},"/$app/uix/app/bottom-nav.css":{content:`:where(.uix-bottom-nav,uix-bottom-nav){--icon-size: 36px;display:flex;flex-direction:row;width:100%;align-items:center;justify-content:space-around;gap:var(--bottom-nav-gap, var(--spacing-xs, .5rem));min-height:var(--bottom-nav-height, 56px);padding:var(--bottom-nav-padding-y, var(--spacing-xs, .5rem)) var(--bottom-nav-padding-x, var(--spacing-sm, .75rem));background:var(--bottom-nav-background, var(--color-surface, white));padding-bottom:calc(var(--bottom-nav-padding-y, var(--spacing-xs, .5rem)) + env(safe-area-inset-bottom));padding-left:calc(var(--bottom-nav-padding-x, var(--spacing-sm, .75rem)) + env(safe-area-inset-left));padding-right:calc(var(--bottom-nav-padding-x, var(--spacing-sm, .75rem)) + env(safe-area-inset-right));&[fixed]{position:fixed;bottom:0;left:0;right:0;z-index:100}&[variant=floating]{--bottom-nav-background: var(--color-surface);--bottom-nav-border-radius: var(--radius-xl);margin:var(--bottom-nav-margin, var(--spacing-md));margin-bottom:calc(var(--bottom-nav-margin, var(--spacing-md)) + env(safe-area-inset-bottom));border-radius:var(--bottom-nav-border-radius)}&[variant=filled]{--bottom-nav-item-active-background: var(--color-primary);--bottom-nav-item-active-color: white}}:where(.uix-bottom-nav,uix-bottom-nav)>*{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;--justify-content: center;gap:var(--bottom-nav-item-gap, var(--spacing-xs, .25rem));padding:var( --bottom-nav-item-padding, var(--spacing-xs, .5rem) var(--spacing-sm, .75rem) );flex:1;min-width:0;color:var(--bottom-nav-item-color, var(--color-text-muted));text-decoration:none;border-radius:var(--bottom-nav-item-radius, var(--radius-sm, .25rem));transition:var(--bottom-nav-item-transition, all .2s ease);cursor:pointer;&:hover{background:var(--bottom-nav-item-hover-background, var(--color-primary-lighter));color:var(--bottom-nav-item-hover-color, var(--color-text))}&.active,&[aria-current]{color:var(--bottom-nav-item-active-color, var(--color-primary))}}:where(.uix-bottom-nav[variant=filled],uix-bottom-nav[variant=filled])>*.active,:where(.uix-bottom-nav[variant=filled],uix-bottom-nav[variant=filled])>*[aria-current]{background:var(--bottom-nav-item-active-background, var(--color-primary));color:var(--bottom-nav-item-active-color, white)}:where(.uix-bottom-nav,uix-bottom-nav) uix-icon,:where(.uix-bottom-nav,uix-bottom-nav) svg{width:var(--icon-size);height:var(--icon-size);flex-shrink:0}:where(.uix-bottom-nav,uix-bottom-nav) span{font-size:var(--bottom-nav-text-size, var(--text-xs, .75rem));font-weight:var(--bottom-nav-text-weight, var(--font-medium, 500));text-align:center}
-`,mimeType:"text/css"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
-`,mimeType:"text/css"},"/views/discover-view.css":{content:`.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}.scrollbar-hide::-webkit-scrollbar{display:none}
-`,mimeType:"text/css"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/house.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map-pin.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/feedback/spinner.js":{content:`/**
- * Spinner Component
- *
- * @component
- * @category feedback
- * @tag uix-spinner
- *
- * A loading spinner component with multiple animation variants and sizes.
- * Uses pure CSS animations for performance.
- *
- * @example Basic Spinner
- * \`\`\`html
- * <uix-spinner></uix-spinner>
- * \`\`\`
- *
- * @example Spinner Variants
- * Different animation styles
- * \`\`\`html
- * <div class="flex gap-4">
- *   <uix-spinner variant="circular"></uix-spinner>
- *   <uix-spinner variant="dots"></uix-spinner>
- *   <uix-spinner variant="bars"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Spinner Sizes
- * \`\`\`html
- * <div class="flex gap-4 items-center">
- *   <uix-spinner size="xs"></uix-spinner>
- *   <uix-spinner size="sm"></uix-spinner>
- *   <uix-spinner size="md"></uix-spinner>
- *   <uix-spinner size="lg"></uix-spinner>
- *   <uix-spinner size="xl"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Colored Spinner
- * \`\`\`html
- * <uix-spinner primary></uix-spinner>
- * <uix-spinner secondary></uix-spinner>
- * <uix-spinner success></uix-spinner>
- * <uix-spinner danger></uix-spinner>
- * \`\`\`
- *
- * @example Custom Color
- * \`\`\`html
- * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
- * \`\`\`
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-spinner",
-  properties: {
-    variant: T.string({
-      defaultValue: "circular",
-      enum: ["circular", "dots", "bars"],
-    }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    primary: T.boolean(),
-    secondary: T.boolean(),
-    success: T.boolean(),
-    danger: T.boolean(),
-    warning: T.boolean(),
-    info: T.boolean(),
-  },
-  style: true,
-  render() {
-    // Circular variant uses CSS ::before pseudo-element
-    if (this.variant === "circular") {
-      return html\`\`;
-    }
-
-    // Dots and bars variants need 3 elements
-    if (this.variant === "dots") {
-      return html\`
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      \`;
-    }
-
-    if (this.variant === "bars") {
-      return html\`
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-      \`;
-    }
-
-    return html\`\`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/story-circle.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  properties: {
-    content: T.object({ attribute: false }),
-    onClick: T.function({ attribute: false }),
-  },
-  render() {
-    if (!this.content) return null;
-    return html\`
-      <div
-        class="flex flex-col items-center gap-1 cursor-pointer group min-w-[72px]"
-        @click=\${() => this.onClick && this.onClick(this.content)}
-      >
-        <div class="p-[3px] rounded-full bg-gradient-to-tr from-accent to-primary border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] group-hover:shadow-none transition-all">
-          <div class="w-16 h-16 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
-             <img src="\${this.content.image}" class="w-full h-full object-cover" />
-          </div>
-        </div>
-        <uix-link href="/event/\${this.content.slug}" class="text-xs font-black uppercase text-center max-w-[80px] truncate leading-tight">
-          \${this.content.name}
-        </uix-link>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/meetup-card-horizontal.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import { getCategoryColor, NBS } from "./utils.js";
-
-export default {
-  properties: {
-    content: T.object({ attribute: false }),
-    onClick: T.function({ attribute: false }),
-  },
-  render() {
-    if (!this.content) return null;
-    return html\`
-      <div
-        class="min-w-[160px] w-[160px] \${getCategoryColor(this.content.category)} border-3 border-black rounded-2xl p-3 \${NBS.S} cursor-pointer flex flex-col gap-2"
-        @click=\${() => this.onClick && this.onClick(this.content)}
-      >
-        <div class="w-12 h-12 rounded-full border-2 border-black bg-white overflow-hidden mx-auto shadow-sm">
-           <img src="\${this.content.image}" class="w-full h-full object-cover" />
-        </div>
-        <div class="text-center">
-          <uix-link href="/meetup/\${this.content.slug}" class="font-black text-xs uppercase leading-tight line-clamp-2 mb-1">
-            \${this.content.name}
-          </uix-link>
-          <div class="text-[10px] font-bold opacity-70">
-            \u{1F4CD} \${this.content.address || this.content.venue || "Rio"}
-          </div>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/meetup-card-compact.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import { CATEGORIES, getCategoryColor } from "./utils.js";
-
-export default {
-  style: true,
-  properties: {
-    content: T.object({ attribute: false }),
-    onClick: T.function({ attribute: false }),
-    type: T.string({ defaultValue: "" }), // e.g., "place", "event", "meetup", "group"
-  },
-  getCategoryEmoji() {
-    return CATEGORIES[this.content?.category]?.icon || "\u{1F4CD}";
-  },
-  handleCardClick(e) {
-    if (e.target.closest(".join-button")) return;
-    if (this.onClick) this.onClick(this.content);
-  },
-  handleJoinClick(e) {
-    e.stopPropagation();
-  },
-  render() {
-    if (!this.content) return null;
-    const isJoined = this.content.joined;
-    const btnCls = \`join-button w-full py-2 px-4 border-2 border-black rounded-lg font-black uppercase text-xs transition-all duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] \${isJoined ? "bg-primary text-black hover:bg-primary-dark" : "bg-accent text-black hover:bg-accent"}\`;
-
-    return html\`
-      <uix-card
-        class="meetup-card-compact"
-        shadow="md"
-        hover
-        borderWidth="3"
-        padding="none"
-        @click=\${(e) => this.handleCardClick(e)}
-      >
-        <div slot="header" class="w-full h-48 bg-gray-100"
-          style="background-image: url(\${this.content.image}); background-size: cover; background-position: center;"
-        ></div>
-        <div class="p-3 space-y-2 flex-1 flex flex-col">
-          <div>
-            <div class="inline-flex items-center gap-1 px-2 py-1 \${getCategoryColor(this.content.category)} border-2 border-black rounded-lg font-black text-xs uppercase text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              \${this.getCategoryEmoji()} \${$APP.i18n.t(\`categories.\${this.content.category}\`)}
-            </div>
-          </div>
-          <uix-link href="/\${this.type || this.content._type || 'place'}/\${this.content.slug}" class="text-lg font-black leading-tight line-clamp-2 uppercase">\${this.content.name}</uix-link>
-          <div class="flex-1"></div>
-        </div>
-        <div slot="footer" class="p-3 pt-0">
-          <button class="\${btnCls}" @click=\${(e) => this.handleJoinClick(e)}>
-            \${isJoined ? html\`\u2713 \${$APP.i18n.t("actions.joined")}\` : html\`\u2764\uFE0F \${$APP.i18n.t("actions.join")}\`}
-          </button>
-        </div>
-      </uix-card>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/feedback/spinner.css":{content:`:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}
-`,mimeType:"text/css"},"/views/meetup-card-compact.css":{content:`.meetup-card-compact.uix-card{cursor:pointer;height:100%;background:#fff;border-color:var(--card-border-color, black);border-radius:1rem}.meetup-card-compact.uix-card>[slot=header]{border-bottom:3px solid var(--card-border-color, black);padding:0}.meetup-card-compact.uix-card>[slot=footer]{justify-content:stretch}.meetup-card-compact.uix-card>[slot=footer]>button{width:100%}
-`,mimeType:"text/css"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
+`,mimeType:"text/javascript"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
 import $APP from "/$app.js";
 
 try {
@@ -1395,7 +777,34 @@ if ($APP.settings.dev) {
     console.warn("WebSocket connection to dev server failed:", e);
   }
 }
-`,mimeType:"text/javascript"},"/$app/base/frontend.js":{content:`import $APP from "/$app.js";
+`,mimeType:"text/javascript"},"/manifest.json":{content:`{
+  "name": "meetup.rio",
+  "short_name": "meetup.rio",
+  "description": "Discover the best of Rio de Janeiro - Places, Events, and Things to Do",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fef3c7",
+  "theme_color": "#facc15",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}
+`,mimeType:"application/json"},"/$app/base/frontend.js":{content:`import $APP from "/$app.js";
 import { html } from "/npm/lit-html";
 
 import "/$app/base/apploader.js";
@@ -2275,261 +1684,6 @@ class View extends HTMLElement {
 }
 
 export default View;
-`,mimeType:"text/javascript"},"/$app/base/backend/frontend.js":{content:`import T from "/$app/types/index.js";
-import View from "/$app/view/index.js";
-import $APP from "/$app.js";
-
-let appWorker;
-let wwPort;
-const pendingRequests = {};
-
-const handleWWMessage = async (message = {}) => {
-  const { data } = message;
-  const { eventId, type, payload, connection } = data;
-  const response = payload;
-  const respond =
-    eventId &&
-    ((responsePayload) =>
-      wwPort.postMessage({
-        eventId,
-        payload: responsePayload,
-        connection,
-      }));
-  await $APP.events.emit(type, { respond, payload, eventId });
-
-  if (eventId && pendingRequests[eventId]) {
-    try {
-      pendingRequests[data.eventId].resolve(response);
-    } catch (error) {
-      pendingRequests[data.eventId].reject(new Error(error));
-    } finally {
-      delete pendingRequests[eventId];
-    }
-  }
-  if (respond) return respond(response);
-};
-
-const initBackend = async () => {
-  try {
-    appWorker = new Worker(\`/backend.js\`, {
-      type: "module",
-    });
-    const wwChannel = new MessageChannel();
-    wwPort = wwChannel.port1;
-    wwPort.onmessage = handleWWMessage;
-    wwPort.onmessageerror = (e) => {
-      console.error("Worker message error:", e);
-    };
-    appWorker.postMessage({ type: "APP:BACKEND:START" }, [wwChannel.port2]);
-    //await navigator.storage.persist();
-    $APP.events.on("APP:BACKEND:READY", async () => {
-      await $APP.events.emit("APP:READY");
-    });
-  } catch (error) {
-    console.error("Failed to initialize backend:", error);
-    throw error;
-  }
-};
-
-$APP.events.on("APP:INIT", initBackend);
-
-const postMessageToPort = (port, params, retryFn) => {
-  if (!port) {
-    setTimeout(() => retryFn(params), 100);
-    return;
-  }
-  port.postMessage(params);
-};
-
-const postMessageToWW = (params) =>
-  postMessageToPort(wwPort, params, postMessageToWW);
-const fetchDataQuery = async (instance) => {
-  const query = instance["data-query"];
-  if (!query) return;
-
-  const {
-    model,
-    id,
-    limit,
-    offset = 0,
-    order,
-    where,
-    includes,
-    key,
-    single,
-  } = query;
-
-  if (!model) return console.warn("data-query: 'model' is required");
-  if (!key)
-    return console.warn(
-      "data-query: 'key' is required to know where to store data",
-    );
-  if (!$APP.Model || !$APP.Model[model])
-    return console.error(\`data-query: Model "\${model}" does not exist\`);
-
-  const isMany = query.many ?? (!id && !single);
-  const opts = { limit: single ? 1 : limit, offset, includes, order, where };
-  console.error({ isMany, opts });
-  if (instance._dataQuerySub && instance._dataQuerySubHandler) {
-    instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
-    instance._dataQuerySub = null;
-  }
-  instance._paginationInfo = null;
-  instance._dataQuerySubHandler = (data) => {
-    const oldValue = instance.state[key];
-    instance.state[key] = data;
-    instance.requestUpdate(key, oldValue);
-    instance.emit("dataLoaded", {
-      instance,
-      rows: isMany ? data : undefined,
-      row: !isMany ? data : undefined,
-      ...(instance._paginationInfo || {}),
-      component: instance.constructor,
-    });
-  };
-
-  try {
-    if (isMany) {
-      const result = await $APP.Model[model].getAll(opts);
-      const oldValue = instance.state[key];
-      instance.state[key] = result;
-      instance._paginationInfo =
-        result.limit !== undefined
-          ? {
-              total: result.total,
-              limit: result.limit,
-              offset: result.offset,
-              count: result.count,
-            }
-          : null;
-      instance.requestUpdate(key, oldValue);
-      result.subscribe?.(instance._dataQuerySubHandler);
-      instance._dataQuerySub = result;
-    } else if (single && where) {
-      const result = await $APP.Model[model].getAll(opts);
-
-      const oldValue = instance.state[key];
-      instance.state[key] = result[0] || null;
-      instance.requestUpdate(key, oldValue);
-
-      // Subscribe to array, extract first item on updates
-      result.subscribe?.((data) => {
-        instance._dataQuerySubHandler(data[0] || null);
-      });
-      instance._dataQuerySub = result;
-    } else {
-      // Single record via id
-      const reactiveRow = await $APP.Model[model].get(id);
-      const oldValue = instance.state[key];
-      instance.state[key] = reactiveRow;
-      instance.requestUpdate(key, oldValue);
-
-      // Subscribe to updates - handle both array and single row formats
-      reactiveRow.subscribe?.((data) => {
-        const row = Array.isArray(data) ? data[0] : data;
-        instance._dataQuerySubHandler(row);
-      });
-      instance._dataQuerySub = reactiveRow;
-    }
-    instance.emit("dataLoaded", {
-      instance,
-      rows: isMany ? instance.state[key] : undefined,
-      row: !isMany ? instance.state[key] : undefined,
-      ...(instance._paginationInfo || {}),
-      component: instance.constructor,
-    });
-  } catch (error) {
-    console.error(
-      \`data-query: Failed to load data for model "\${model}":\`,
-      error,
-    );
-    instance.emit("dataError", { instance, error, model, id });
-  }
-
-  instance.syncable = true;
-};
-
-View.plugins.push({
-  name: "dataQuery",
-  test: ({ component }) => !!component.dataQuery,
-  init: ({ View }) => {
-    View.properties["data-query"] = T.object({
-      properties: {
-        model: T.string(),
-        id: T.string(),
-        where: T.object(),
-        includes: T.string(),
-        order: T.string(),
-        limit: T.number(),
-        offset: T.number(),
-        count: T.number(),
-        key: T.string(),
-        single: T.boolean(),
-      },
-    });
-  },
-  events: {
-    connected: async ({ instance }) => {
-      // Initial data fetch
-      await fetchDataQuery(instance);
-
-      // Listen for data-query prop changes to re-fetch
-      instance._dataQueryChangeHandler = async () => {
-        await fetchDataQuery(instance);
-      };
-      instance.on("data-queryChanged", instance._dataQueryChangeHandler);
-    },
-    disconnected: ({ instance }) => {
-      // Clean up subscription
-      if (instance._dataQuerySub && instance._dataQuerySubHandler)
-        instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
-      instance._dataQuerySub = null;
-      instance._dataQuerySubHandler = null;
-      if (instance._dataQueryChangeHandler) {
-        instance.off("data-queryChanged", instance._dataQueryChangeHandler);
-        instance._dataQueryChangeHandler = null;
-      }
-    },
-  },
-});
-
-const backend = (type, payload = {}, connection = null, timeout = 10000) => {
-  if (!type) {
-    return Promise.reject(new Error("backend: type parameter is required"));
-  }
-  const eventId =
-    Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const params = { type, payload, eventId };
-  return new Promise((resolve, reject) => {
-    if (connection) params.connection = connection;
-    const timeoutId = setTimeout(() => {
-      if (pendingRequests[eventId]) {
-        delete pendingRequests[eventId];
-        reject(
-          new Error(
-            \`Backend request timeout after \${timeout}ms for type: \${type}\`,
-          ),
-        );
-      }
-    }, timeout);
-
-    pendingRequests[eventId] = {
-      resolve: (value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      },
-      reject: (error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      },
-    };
-
-    postMessageToWW(params);
-  });
-};
-const Backend = { request: backend, init: initBackend };
-$APP.addModule({ name: "Backend", base: Backend });
-export default Backend;
 `,mimeType:"text/javascript"},"/$app/view/loader.js":{content:`/**
  * @file Component Loader (Core)
  * @description Handles dynamic loading, caching, registration of components,
@@ -2785,6 +1939,261 @@ const getComponentPath = (tag) => {
 View.getComponentPath = getComponentPath;
 
 export default Loader;
+`,mimeType:"text/javascript"},"/$app/base/backend/frontend.js":{content:`import T from "/$app/types/index.js";
+import View from "/$app/view/index.js";
+import $APP from "/$app.js";
+
+let appWorker;
+let wwPort;
+const pendingRequests = {};
+
+const handleWWMessage = async (message = {}) => {
+  const { data } = message;
+  const { eventId, type, payload, connection } = data;
+  const response = payload;
+  const respond =
+    eventId &&
+    ((responsePayload) =>
+      wwPort.postMessage({
+        eventId,
+        payload: responsePayload,
+        connection,
+      }));
+  await $APP.events.emit(type, { respond, payload, eventId });
+
+  if (eventId && pendingRequests[eventId]) {
+    try {
+      pendingRequests[data.eventId].resolve(response);
+    } catch (error) {
+      pendingRequests[data.eventId].reject(new Error(error));
+    } finally {
+      delete pendingRequests[eventId];
+    }
+  }
+  if (respond) return respond(response);
+};
+
+const initBackend = async () => {
+  try {
+    appWorker = new Worker(\`/backend.js\`, {
+      type: "module",
+    });
+    const wwChannel = new MessageChannel();
+    wwPort = wwChannel.port1;
+    wwPort.onmessage = handleWWMessage;
+    wwPort.onmessageerror = (e) => {
+      console.error("Worker message error:", e);
+    };
+    appWorker.postMessage({ type: "APP:BACKEND:START" }, [wwChannel.port2]);
+    //await navigator.storage.persist();
+    $APP.events.on("APP:BACKEND:READY", async () => {
+      await $APP.events.emit("APP:READY");
+    });
+  } catch (error) {
+    console.error("Failed to initialize backend:", error);
+    throw error;
+  }
+};
+
+$APP.events.on("APP:INIT", initBackend);
+
+const postMessageToPort = (port, params, retryFn) => {
+  if (!port) {
+    setTimeout(() => retryFn(params), 100);
+    return;
+  }
+  port.postMessage(params);
+};
+
+const postMessageToWW = (params) =>
+  postMessageToPort(wwPort, params, postMessageToWW);
+const fetchDataQuery = async (instance) => {
+  const query = instance["data-query"];
+  if (!query) return;
+
+  const {
+    model,
+    id,
+    limit,
+    offset = 0,
+    order,
+    where,
+    includes,
+    key,
+    single,
+  } = query;
+
+  if (!model) return console.warn("data-query: 'model' is required");
+  if (!key)
+    return console.warn(
+      "data-query: 'key' is required to know where to store data",
+    );
+  if (!$APP.Model || !$APP.Model[model])
+    return console.error(\`data-query: Model "\${model}" does not exist\`);
+
+  const isMany = query.many ?? (!id && !single);
+  const opts = { limit: single ? 1 : limit, offset, includes, order, where };
+  console.error({ isMany, opts });
+  if (instance._dataQuerySub && instance._dataQuerySubHandler) {
+    instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
+    instance._dataQuerySub = null;
+  }
+  instance._paginationInfo = null;
+  instance._dataQuerySubHandler = (data) => {
+    const oldValue = instance.state[key];
+    instance.state[key] = data;
+    instance.requestUpdate(key, oldValue);
+    instance.emit("dataLoaded", {
+      instance,
+      rows: isMany ? data : undefined,
+      row: !isMany ? data : undefined,
+      ...(instance._paginationInfo || {}),
+      component: instance.constructor,
+    });
+  };
+
+  try {
+    if (isMany) {
+      const result = await $APP.Model[model].getAll(opts);
+      const oldValue = instance.state[key];
+      instance.state[key] = result;
+      instance._paginationInfo =
+        result.limit !== undefined
+          ? {
+              total: result.total,
+              limit: result.limit,
+              offset: result.offset,
+              count: result.count,
+            }
+          : null;
+      instance.requestUpdate(key, oldValue);
+      result.subscribe?.(instance._dataQuerySubHandler);
+      instance._dataQuerySub = result;
+    } else if (single && where) {
+      const result = await $APP.Model[model].getAll(opts);
+
+      const oldValue = instance.state[key];
+      instance.state[key] = result[0] || null;
+      instance.requestUpdate(key, oldValue);
+
+      // Subscribe to array, extract first item on updates
+      result.subscribe?.((data) => {
+        instance._dataQuerySubHandler(data[0] || null);
+      });
+      instance._dataQuerySub = result;
+    } else {
+      // Single record via id
+      const reactiveRow = await $APP.Model[model].get(id);
+      const oldValue = instance.state[key];
+      instance.state[key] = reactiveRow;
+      instance.requestUpdate(key, oldValue);
+
+      // Subscribe to updates - handle both array and single row formats
+      reactiveRow.subscribe?.((data) => {
+        const row = Array.isArray(data) ? data[0] : data;
+        instance._dataQuerySubHandler(row);
+      });
+      instance._dataQuerySub = reactiveRow;
+    }
+    instance.emit("dataLoaded", {
+      instance,
+      rows: isMany ? instance.state[key] : undefined,
+      row: !isMany ? instance.state[key] : undefined,
+      ...(instance._paginationInfo || {}),
+      component: instance.constructor,
+    });
+  } catch (error) {
+    console.error(
+      \`data-query: Failed to load data for model "\${model}":\`,
+      error,
+    );
+    instance.emit("dataError", { instance, error, model, id });
+  }
+
+  instance.syncable = true;
+};
+
+View.plugins.push({
+  name: "dataQuery",
+  test: ({ component }) => !!component.dataQuery,
+  init: ({ View }) => {
+    View.properties["data-query"] = T.object({
+      properties: {
+        model: T.string(),
+        id: T.string(),
+        where: T.object(),
+        includes: T.string(),
+        order: T.string(),
+        limit: T.number(),
+        offset: T.number(),
+        count: T.number(),
+        key: T.string(),
+        single: T.boolean(),
+      },
+    });
+  },
+  events: {
+    connected: async ({ instance }) => {
+      // Initial data fetch
+      await fetchDataQuery(instance);
+
+      // Listen for data-query prop changes to re-fetch
+      instance._dataQueryChangeHandler = async () => {
+        await fetchDataQuery(instance);
+      };
+      instance.on("data-queryChanged", instance._dataQueryChangeHandler);
+    },
+    disconnected: ({ instance }) => {
+      // Clean up subscription
+      if (instance._dataQuerySub && instance._dataQuerySubHandler)
+        instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
+      instance._dataQuerySub = null;
+      instance._dataQuerySubHandler = null;
+      if (instance._dataQueryChangeHandler) {
+        instance.off("data-queryChanged", instance._dataQueryChangeHandler);
+        instance._dataQueryChangeHandler = null;
+      }
+    },
+  },
+});
+
+const backend = (type, payload = {}, connection = null, timeout = 10000) => {
+  if (!type) {
+    return Promise.reject(new Error("backend: type parameter is required"));
+  }
+  const eventId =
+    Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  const params = { type, payload, eventId };
+  return new Promise((resolve, reject) => {
+    if (connection) params.connection = connection;
+    const timeoutId = setTimeout(() => {
+      if (pendingRequests[eventId]) {
+        delete pendingRequests[eventId];
+        reject(
+          new Error(
+            \`Backend request timeout after \${timeout}ms for type: \${type}\`,
+          ),
+        );
+      }
+    }, timeout);
+
+    pendingRequests[eventId] = {
+      resolve: (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      reject: (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    };
+
+    postMessageToWW(params);
+  });
+};
+const Backend = { request: backend, init: initBackend };
+$APP.addModule({ name: "Backend", base: Backend });
+export default Backend;
 `,mimeType:"text/javascript"},"/$app/controller/app.js":{content:`/**
  * @bootstrapp/controller - App Integration
  * Bridges Controller to $APP framework features (Service Worker integration)
@@ -4241,186 +3650,15 @@ export const createRouterCore = (adapter) => {
 
   return router;
 };
-`,mimeType:"text/javascript"},"/$app/i18n/index.js":{content:`/**
- * i18n Module
- * Provides internationalization support for Bootstrapp apps
- */
-import Controller from "/$app/controller/index.js";
-import View from "/$app/view/index.js";
-import { I18n } from "./base.js";
-import i18nViewPlugin from "./view-plugin.js";
+`,mimeType:"text/javascript"},"/$app/uix/app.js":{content:`import Theme from "/$app/theme/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import UIX from "./index.js";
 
-// Initialize i18n instance
-const i18nInstance = new I18n();
+$APP.routes.set({ "/showcase": () => html\`<uix-showcase></uix-showcase>\` });
+Theme.loadCSS("/$app/uix/theme.css", true);
 
-// Register view plugin for component-level i18n
-View.plugins.push(i18nViewPlugin);
-const base = {
-  /**
-   * Translate a key (with pluralization support)
-   * @param {string} key - Translation key (dot-separated)
-   * @param {Object} params - Parameters for interpolation (use 'n' or 'count' for plurals)
-   * @example
-   * $APP.i18n.t('welcome.title')
-   * $APP.i18n.t('pushup', { n: 5 })  // "5 pushups"
-   * $APP.i18n.t('greeting', { name: 'John' })  // "Hello, John!"
-   */
-  t: (key, params) => i18nInstance.t(key, params),
-
-  /**
-   * Format a number according to current locale
-   * @param {number} number - Number to format
-   * @param {Object} options - Intl.NumberFormat options
-   * @example
-   * $APP.i18n.n(1000)  // "1,000" (en) or "1.000" (pt)
-   * $APP.i18n.n(0.5, { style: 'percent' })  // "50%"
-   * $APP.i18n.n(99.99, { style: 'currency', currency: 'USD' })  // "$99.99"
-   */
-  n: (number, options) => i18nInstance.formatNumber(number, options),
-
-  /**
-   * Format a date according to current locale
-   * @param {Date|string|number} date - Date to format
-   * @param {Object} options - Intl.DateTimeFormat options
-   * @example
-   * $APP.i18n.d(new Date())  // "Jan 15, 2025"
-   * $APP.i18n.d(date, { dateStyle: 'full' })  // "Wednesday, January 15, 2025"
-   * $APP.i18n.d(date, { timeStyle: 'short' })  // "2:30 PM"
-   */
-  d: (date, options) => i18nInstance.formatDate(date, options),
-
-  /**
-   * Format a relative date (today, yesterday, X days ago)
-   * @param {Date|string|number} date - Date to format
-   * @example
-   * $APP.i18n.r(new Date())  // "today"
-   * $APP.i18n.r(yesterdayDate)  // "yesterday"
-   * $APP.i18n.r(twoDaysAgo)  // "2 days ago"
-   */
-  r: (date) => i18nInstance.formatRelativeDate(date),
-
-  /**
-   * Set current language (with lazy loading)
-   * @param {string} locale - Locale code
-   */
-  setLanguage: async (locale) => {
-    console.log("i18n setLanguage called with:", locale);
-    const newLocale = await i18nInstance.setLanguage(locale);
-    console.log("Locale loaded:", newLocale);
-
-    // Persist to localStorage via Controller
-    if (Controller?.i18n) {
-      Controller.i18n.set("currentLocale", newLocale);
-    }
-
-    // Auto re-render root component if enabled
-    const autoRerender = $APP.settings.i18n.autoRerender;
-    const rootComponent = $APP.settings.i18n.rootComponent;
-    console.log("Auto-rerender settings:", { autoRerender, rootComponent });
-
-    if (autoRerender && rootComponent) {
-      try {
-        const oldContainer = document.querySelector(rootComponent);
-        console.log("Found container:", oldContainer);
-        if (oldContainer) {
-          // Use innerHTML to create custom element (createElement doesn't work for custom elements)
-          const temp = document.createElement('div');
-          temp.innerHTML = \`<\${rootComponent}></\${rootComponent}>\`;
-          oldContainer.replaceWith(temp.firstElementChild);
-          console.log("Replaced container");
-        }
-      } catch (error) {
-        console.warn("Failed to auto-rerender root component:", error);
-        console.warn("You may need to manually trigger re-render");
-      }
-    }
-
-    return newLocale;
-  },
-
-  /**
-   * Get current language
-   */
-  getLanguage: () => i18nInstance.getLanguage(),
-
-  /**
-   * Get available locales
-   */
-  getAvailableLocales: () => i18nInstance.getAvailableLocales(),
-
-  /**
-   * Register a locale loader for lazy loading
-   * @param {string} locale - Locale code
-   * @param {Function} loader - Function that returns Promise<translations>
-   */
-  registerLocale: (locale, loader) =>
-    i18nInstance.registerLocale(locale, loader),
-
-  /**
-   * Add translations for a locale (used by modules)
-   * @param {string} locale - Locale code
-   * @param {Object} translations - Translation object
-   */
-  addTranslations: (locale, translations) =>
-    i18nInstance.addTranslations(locale, translations),
-
-  /**
-   * Internal: Get i18n instance (for advanced use cases)
-   */
-  _instance: i18nInstance,
-};
-// Register module with Bootstrapp
-$APP.addModule({
-  name: "i18n",
-  base,
-
-  settings: {
-    defaultLocale: "en",
-    fallbackLocale: "en",
-    persistLocale: true,
-    autoRerender: true,
-    rootComponent: "app-container",
-  },
-
-  events: () => ({
-    /**
-     * When a module is added, merge its i18n translations
-     */
-    moduleAdded({ module }) {
-      if (module.i18n) {
-        // Module provides translations: { locale: translations }
-        for (const [locale, translations] of Object.entries(module.i18n)) {
-          i18nInstance.addTranslations(locale, translations);
-        }
-      }
-    },
-
-    /**
-     * On app init, restore saved language preference
-     */
-    async "APP:INIT"() {
-      // Set up Controller adapter for persistence
-      if (Controller && !Controller.i18n) {
-        Controller.createAdapter("i18n", {
-          storage: "localStorage",
-          prefix: "i18n:",
-        });
-      }
-
-      // Restore saved locale
-      const savedLocale = Controller?.i18n?.get("currentLocale");
-      if (savedLocale) {
-        await i18nInstance.setLanguage(savedLocale);
-      } else {
-        // Use default locale from settings
-        const defaultLocale = $APP.settings.get("i18n.defaultLocale") || "en";
-        await i18nInstance.setLanguage(defaultLocale);
-      }
-    },
-  }),
-});
-
-export default base;
+$APP.addModule(UIX);
 `,mimeType:"text/javascript"},"/$app/theme/index.js":{content:`import View, { settings } from "/$app/view/index.js";
 
 View.plugins.push({
@@ -4876,6 +4114,186 @@ export {
   adjustLightness,
   mixWithColor,
 };
+`,mimeType:"text/javascript"},"/$app/i18n/index.js":{content:`/**
+ * i18n Module
+ * Provides internationalization support for Bootstrapp apps
+ */
+import Controller from "/$app/controller/index.js";
+import View from "/$app/view/index.js";
+import { I18n } from "./base.js";
+import i18nViewPlugin from "./view-plugin.js";
+
+// Initialize i18n instance
+const i18nInstance = new I18n();
+
+// Register view plugin for component-level i18n
+View.plugins.push(i18nViewPlugin);
+const base = {
+  /**
+   * Translate a key (with pluralization support)
+   * @param {string} key - Translation key (dot-separated)
+   * @param {Object} params - Parameters for interpolation (use 'n' or 'count' for plurals)
+   * @example
+   * $APP.i18n.t('welcome.title')
+   * $APP.i18n.t('pushup', { n: 5 })  // "5 pushups"
+   * $APP.i18n.t('greeting', { name: 'John' })  // "Hello, John!"
+   */
+  t: (key, params) => i18nInstance.t(key, params),
+
+  /**
+   * Format a number according to current locale
+   * @param {number} number - Number to format
+   * @param {Object} options - Intl.NumberFormat options
+   * @example
+   * $APP.i18n.n(1000)  // "1,000" (en) or "1.000" (pt)
+   * $APP.i18n.n(0.5, { style: 'percent' })  // "50%"
+   * $APP.i18n.n(99.99, { style: 'currency', currency: 'USD' })  // "$99.99"
+   */
+  n: (number, options) => i18nInstance.formatNumber(number, options),
+
+  /**
+   * Format a date according to current locale
+   * @param {Date|string|number} date - Date to format
+   * @param {Object} options - Intl.DateTimeFormat options
+   * @example
+   * $APP.i18n.d(new Date())  // "Jan 15, 2025"
+   * $APP.i18n.d(date, { dateStyle: 'full' })  // "Wednesday, January 15, 2025"
+   * $APP.i18n.d(date, { timeStyle: 'short' })  // "2:30 PM"
+   */
+  d: (date, options) => i18nInstance.formatDate(date, options),
+
+  /**
+   * Format a relative date (today, yesterday, X days ago)
+   * @param {Date|string|number} date - Date to format
+   * @example
+   * $APP.i18n.r(new Date())  // "today"
+   * $APP.i18n.r(yesterdayDate)  // "yesterday"
+   * $APP.i18n.r(twoDaysAgo)  // "2 days ago"
+   */
+  r: (date) => i18nInstance.formatRelativeDate(date),
+
+  /**
+   * Set current language (with lazy loading)
+   * @param {string} locale - Locale code
+   */
+  setLanguage: async (locale) => {
+    console.log("i18n setLanguage called with:", locale);
+    const newLocale = await i18nInstance.setLanguage(locale);
+    console.log("Locale loaded:", newLocale);
+
+    // Persist to localStorage via Controller
+    if (Controller?.i18n) {
+      Controller.i18n.set("currentLocale", newLocale);
+    }
+
+    // Auto re-render root component if enabled
+    const autoRerender = $APP.settings.i18n.autoRerender;
+    const rootComponent = $APP.settings.i18n.rootComponent;
+    console.log("Auto-rerender settings:", { autoRerender, rootComponent });
+
+    if (autoRerender && rootComponent) {
+      try {
+        const oldContainer = document.querySelector(rootComponent);
+        console.log("Found container:", oldContainer);
+        if (oldContainer) {
+          // Use innerHTML to create custom element (createElement doesn't work for custom elements)
+          const temp = document.createElement('div');
+          temp.innerHTML = \`<\${rootComponent}></\${rootComponent}>\`;
+          oldContainer.replaceWith(temp.firstElementChild);
+          console.log("Replaced container");
+        }
+      } catch (error) {
+        console.warn("Failed to auto-rerender root component:", error);
+        console.warn("You may need to manually trigger re-render");
+      }
+    }
+
+    return newLocale;
+  },
+
+  /**
+   * Get current language
+   */
+  getLanguage: () => i18nInstance.getLanguage(),
+
+  /**
+   * Get available locales
+   */
+  getAvailableLocales: () => i18nInstance.getAvailableLocales(),
+
+  /**
+   * Register a locale loader for lazy loading
+   * @param {string} locale - Locale code
+   * @param {Function} loader - Function that returns Promise<translations>
+   */
+  registerLocale: (locale, loader) =>
+    i18nInstance.registerLocale(locale, loader),
+
+  /**
+   * Add translations for a locale (used by modules)
+   * @param {string} locale - Locale code
+   * @param {Object} translations - Translation object
+   */
+  addTranslations: (locale, translations) =>
+    i18nInstance.addTranslations(locale, translations),
+
+  /**
+   * Internal: Get i18n instance (for advanced use cases)
+   */
+  _instance: i18nInstance,
+};
+// Register module with Bootstrapp
+$APP.addModule({
+  name: "i18n",
+  base,
+
+  settings: {
+    defaultLocale: "en",
+    fallbackLocale: "en",
+    persistLocale: true,
+    autoRerender: true,
+    rootComponent: "app-container",
+  },
+
+  events: () => ({
+    /**
+     * When a module is added, merge its i18n translations
+     */
+    moduleAdded({ module }) {
+      if (module.i18n) {
+        // Module provides translations: { locale: translations }
+        for (const [locale, translations] of Object.entries(module.i18n)) {
+          i18nInstance.addTranslations(locale, translations);
+        }
+      }
+    },
+
+    /**
+     * On app init, restore saved language preference
+     */
+    async "APP:INIT"() {
+      // Set up Controller adapter for persistence
+      if (Controller && !Controller.i18n) {
+        Controller.createAdapter("i18n", {
+          storage: "localStorage",
+          prefix: "i18n:",
+        });
+      }
+
+      // Restore saved locale
+      const savedLocale = Controller?.i18n?.get("currentLocale");
+      if (savedLocale) {
+        await i18nInstance.setLanguage(savedLocale);
+      } else {
+        // Use default locale from settings
+        const defaultLocale = $APP.settings.get("i18n.defaultLocale") || "en";
+        await i18nInstance.setLanguage(defaultLocale);
+      }
+    },
+  }),
+});
+
+export default base;
 `,mimeType:"text/javascript"},"/$app/tailwind/index.js":{content:`import presetWind4 from "https://cdn.jsdelivr.net/npm/@unocss/preset-wind4@66.3.3/+esm";
 import $APP from "/$app.js";
 
@@ -4993,15 +4411,6 @@ window.__unocss = {
 };
 
 await import("https://cdn.jsdelivr.net/npm/@unocss/runtime/core.global.js");
-`,mimeType:"text/javascript"},"/$app/uix/app.js":{content:`import Theme from "/$app/theme/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import UIX from "./index.js";
-
-$APP.routes.set({ "/showcase": () => html\`<uix-showcase></uix-showcase>\` });
-Theme.loadCSS("/$app/uix/theme.css", true);
-
-$APP.addModule(UIX);
 `,mimeType:"text/javascript"},"/$app/icon-lucide/app.js":{content:`import $APP from "/$app.js";
 
 $APP.addModule({ name: "icon-lucide", icon: true });
@@ -5743,34 +5152,7 @@ $APP.routes.set({
   },
 });
 console.log($APP.routes);
-`,mimeType:"text/javascript"},"/manifest.json":{content:`{
-  "name": "meetup.rio",
-  "short_name": "meetup.rio",
-  "description": "Discover the best of Rio de Janeiro - Places, Events, and Things to Do",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#fef3c7",
-  "theme_color": "#facc15",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["travel", "lifestyle"],
-  "lang": "en",
-  "dir": "ltr"
-}
-`,mimeType:"application/json"},"/$app/auth/frontend.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/auth/frontend.js":{content:`/**
  * @file Frontend Auth Module
  * @description Handles user authentication state, session persistence, and cross-tab sync
  */
@@ -6343,6 +5725,109 @@ export function initAuthFrontend($APP) {
 }
 
 export default { AuthSession, createAuth, initAuthFrontend };
+`,mimeType:"text/javascript"},"/$app/i18n/view-plugin.js":{content:`/**
+ * i18n View Plugin
+ * Adds component-level i18n support to View components
+ *
+ * Features:
+ * - Extracts inline i18n from component definitions (serves as English default)
+ * - Auto-namespaces translations by component tag name
+ * - Injects helper methods: $t(), $n(), $d(), $r()
+ * - Auto-updates components when language changes
+ */
+
+export default {
+  name: "i18n",
+
+  /**
+   * Called when component is registered via $APP.define()
+   * Extracts inline i18n and registers as English translations
+   */
+  init: ({ component, definition, tag }) => {
+    // Extract inline i18n (this IS the English/default translation)
+    if (definition.i18n && typeof definition.i18n === "object") {
+      // Register under component tag name namespace
+      const translations = { [tag]: definition.i18n };
+
+      // Add to English locale (inline i18n is the source of truth for English)
+      if (typeof $APP !== "undefined" && $APP.i18n) {
+        $APP.i18n.addTranslations("en", translations);
+      }
+    }
+
+    // Inject helper methods into component prototype
+
+    /**
+     * Translate a key with auto-namespacing
+     * @param {string} key - Translation key (auto-prefixed with component name)
+     * @param {Object} params - Parameters for interpolation/pluralization
+     * @example
+     * this.$t('submit')  // \u2192 'my-component.submit'
+     * this.$t('count', { n: 5 })  // \u2192 Pluralized translation
+     */
+    component.prototype.$t = function (key, params) {
+      const componentName = this.tagName.toLowerCase();
+      return $APP.i18n.t(\`\${componentName}.\${key}\`, params);
+    };
+
+    /**
+     * Format a number with current locale
+     * @param {number} number - Number to format
+     * @param {Object} options - Intl.NumberFormat options
+     */
+    component.prototype.$n = (number, options) => $APP.i18n.n(number, options);
+
+    /**
+     * Format a date with current locale
+     * @param {Date|string|number} date - Date to format
+     * @param {Object} options - Intl.DateTimeFormat options
+     */
+    component.prototype.$d = (date, options) => $APP.i18n.d(date, options);
+
+    /**
+     * Format a relative date (today, yesterday, X days ago)
+     * @param {Date|string|number} date - Date to format
+     */
+    component.prototype.$r = (date) => $APP.i18n.r(date);
+  },
+
+  /**
+   * Component lifecycle events
+   */
+  events: {
+    /**
+     * Called when component instance connects to DOM
+     * Sets up auto-update on language change
+     */
+    connected: function () {
+      // Create handler that triggers re-render on language change
+      this._i18nUpdateHandler = () => {
+        this.requestUpdate();
+      };
+
+      // Listen to language change events
+      if (typeof $APP !== "undefined" && $APP.events) {
+        $APP.events.on("i18n:language-changed", this._i18nUpdateHandler);
+      }
+    },
+
+    /**
+     * Called when component instance disconnects from DOM
+     * Cleans up event listeners
+     */
+    disconnected: function () {
+      // Remove language change listener
+      if (
+        this._i18nUpdateHandler &&
+        typeof $APP !== "undefined" &&
+        $APP.events
+      ) {
+        $APP.events.off("i18n:language-changed", this._i18nUpdateHandler);
+        this._i18nUpdateHandler = null;
+      }
+    },
+  },
+};
 `,mimeType:"text/javascript"},"/$app/i18n/base.js":{content:`/**
  * Core i18n Engine
  * Provides translation management with lazy loading support
@@ -6691,109 +6176,6 @@ export class I18n {
 }
 
 export default I18n;
-`,mimeType:"text/javascript"},"/$app/i18n/view-plugin.js":{content:`/**
- * i18n View Plugin
- * Adds component-level i18n support to View components
- *
- * Features:
- * - Extracts inline i18n from component definitions (serves as English default)
- * - Auto-namespaces translations by component tag name
- * - Injects helper methods: $t(), $n(), $d(), $r()
- * - Auto-updates components when language changes
- */
-
-export default {
-  name: "i18n",
-
-  /**
-   * Called when component is registered via $APP.define()
-   * Extracts inline i18n and registers as English translations
-   */
-  init: ({ component, definition, tag }) => {
-    // Extract inline i18n (this IS the English/default translation)
-    if (definition.i18n && typeof definition.i18n === "object") {
-      // Register under component tag name namespace
-      const translations = { [tag]: definition.i18n };
-
-      // Add to English locale (inline i18n is the source of truth for English)
-      if (typeof $APP !== "undefined" && $APP.i18n) {
-        $APP.i18n.addTranslations("en", translations);
-      }
-    }
-
-    // Inject helper methods into component prototype
-
-    /**
-     * Translate a key with auto-namespacing
-     * @param {string} key - Translation key (auto-prefixed with component name)
-     * @param {Object} params - Parameters for interpolation/pluralization
-     * @example
-     * this.$t('submit')  // \u2192 'my-component.submit'
-     * this.$t('count', { n: 5 })  // \u2192 Pluralized translation
-     */
-    component.prototype.$t = function (key, params) {
-      const componentName = this.tagName.toLowerCase();
-      return $APP.i18n.t(\`\${componentName}.\${key}\`, params);
-    };
-
-    /**
-     * Format a number with current locale
-     * @param {number} number - Number to format
-     * @param {Object} options - Intl.NumberFormat options
-     */
-    component.prototype.$n = (number, options) => $APP.i18n.n(number, options);
-
-    /**
-     * Format a date with current locale
-     * @param {Date|string|number} date - Date to format
-     * @param {Object} options - Intl.DateTimeFormat options
-     */
-    component.prototype.$d = (date, options) => $APP.i18n.d(date, options);
-
-    /**
-     * Format a relative date (today, yesterday, X days ago)
-     * @param {Date|string|number} date - Date to format
-     */
-    component.prototype.$r = (date) => $APP.i18n.r(date);
-  },
-
-  /**
-   * Component lifecycle events
-   */
-  events: {
-    /**
-     * Called when component instance connects to DOM
-     * Sets up auto-update on language change
-     */
-    connected: function () {
-      // Create handler that triggers re-render on language change
-      this._i18nUpdateHandler = () => {
-        this.requestUpdate();
-      };
-
-      // Listen to language change events
-      if (typeof $APP !== "undefined" && $APP.events) {
-        $APP.events.on("i18n:language-changed", this._i18nUpdateHandler);
-      }
-    },
-
-    /**
-     * Called when component instance disconnects from DOM
-     * Cleans up event listeners
-     */
-    disconnected: function () {
-      // Remove language change listener
-      if (
-        this._i18nUpdateHandler &&
-        typeof $APP !== "undefined" &&
-        $APP.events
-      ) {
-        $APP.events.off("i18n:language-changed", this._i18nUpdateHandler);
-        this._i18nUpdateHandler = null;
-      }
-    },
-  },
-};
 `,mimeType:"text/javascript"},"/$app/uix/index.js":{content:`export default {
   name: "uix",
   path: "/$app",
@@ -6923,7 +6305,7 @@ export default {
     ],
   },
 };
-`,mimeType:"text/javascript"},"/$app/admin/plugins.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/bundler/index.js":{content:"export default {}"},"/$app/admin/plugins.js":{content:`/**
  * @bootstrapp/admin - Plugin System
  * Simple function-based plugin registry for admin extensibility
  */
@@ -6989,7 +6371,7 @@ export const getSidebarItems = () =>
  */
 export const getPluginRoutes = () =>
   getPlugins().reduce((acc, p) => ({ ...acc, ...p.routes }), {});
-`,mimeType:"text/javascript"},"/$app/bundler/index.js":{content:"export default {}"},"/$app/bundler/plugin.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/bundler/plugin.js":{content:`/**
  * Bundler Admin Plugin
  * Registers the bundler/release manager in the admin sidebar
  */
@@ -7033,49 +6415,6 @@ registerPlugin("theme", {
       name: "admin-theme",
       component: () => html\`<uix-showcase></uix-showcase>\`,
       title: "Admin - Theme",
-      template: "admin-layout",
-    },
-  },
-});
-`,mimeType:"text/javascript"},"/$app/extension/admin/plugin.js":{content:`/**
- * Extension Admin Plugin
- * Registers the browser extension manager in the admin sidebar
- */
-import { registerPlugin } from "/$app/admin/plugins.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-$APP.addModule({ name: "extension", path: "/$app/extension/admin" });
-registerPlugin("extension", {
-  sidebar: [
-    {
-      label: "Extension",
-      icon: "puzzle",
-      href: "/admin/extension",
-    },
-  ],
-  actions: {
-    _global: [
-      {
-        label: "Browser Extension",
-        icon: "puzzle",
-        handler: (context) => context.openModal("extension-manager"),
-      },
-    ],
-  },
-
-  modals: {
-    "extension-manager": {
-      title: "Browser Extension",
-      component: () => html\`<extension-manager></extension-manager>\`,
-    },
-  },
-
-  routes: {
-    "/admin/extension": {
-      name: "admin-extension",
-      component: () => html\`<extension-manager></extension-manager>\`,
-      title: "Admin - Extension",
       template: "admin-layout",
     },
   },
@@ -7159,6 +6498,49 @@ export default {
     \`;
   },
 };
+`,mimeType:"text/javascript"},"/$app/extension/admin/plugin.js":{content:`/**
+ * Extension Admin Plugin
+ * Registers the browser extension manager in the admin sidebar
+ */
+import { registerPlugin } from "/$app/admin/plugins.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+
+$APP.addModule({ name: "extension", path: "/$app/extension/admin" });
+registerPlugin("extension", {
+  sidebar: [
+    {
+      label: "Extension",
+      icon: "puzzle",
+      href: "/admin/extension",
+    },
+  ],
+  actions: {
+    _global: [
+      {
+        label: "Browser Extension",
+        icon: "puzzle",
+        handler: (context) => context.openModal("extension-manager"),
+      },
+    ],
+  },
+
+  modals: {
+    "extension-manager": {
+      title: "Browser Extension",
+      component: () => html\`<extension-manager></extension-manager>\`,
+    },
+  },
+
+  routes: {
+    "/admin/extension": {
+      name: "admin-extension",
+      component: () => html\`<extension-manager></extension-manager>\`,
+      title: "Admin - Extension",
+      template: "admin-layout",
+    },
+  },
+});
 `,mimeType:"text/javascript"},"/$app/extension/extension-bridge.js":{content:`/**
  * Shared Extension Bridge Singleton
  * Single connection instance shared across all admin components
@@ -7740,32 +7122,6 @@ export default (settings) => minifyHTML(\`<!DOCTYPE html>
   const sitemapURL = new URL("sitemap.xml", settings.url).href;
   return \`User-agent: *\\nAllow: /\\nSitemap: \${sitemapURL}\`;
 };
-`,mimeType:"text/javascript"},"/$app/bundler/templates/sitemap.xml.js":{content:`export default (settings, pages) => {
-  if (!settings.url) {
-    console.warn("Cannot generate sitemap.xml: settings.url is not defined.");
-    return \`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\`;
-  }
-  const today = new Date().toISOString().split("T")[0];
-  const urls = pages
-    .map((page) => {
-      let urlPath = page.path.replace(/index\\.html$/, "");
-      if (urlPath === "") urlPath = "/";
-      if (!urlPath.startsWith("/")) urlPath = \`/\${urlPath}\`;
-      const loc = new URL(urlPath, settings.url).href;
-      const priority = urlPath === "/" ? "1.0" : "0.8";
-      return \`
-    <url>
-        <loc>\${loc}</loc>
-        <lastmod>\${today}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>\${priority}</priority>
-    </url>\`;
-    })
-    .join("");
-  return \`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\${urls}
-</urlset>\`.trim();
-};
 `,mimeType:"text/javascript"},"/$app/bundler/templates/static-page.html.js":{content:`import hydrationScript from "./hydration-script.js";
 
 const minifyHTML = (content) => {
@@ -7801,6 +7157,32 @@ export default ({ headContent, content, settings, needsHydration }) => {
       \${script}
     </body>
 </html>\`);
+};
+`,mimeType:"text/javascript"},"/$app/bundler/templates/sitemap.xml.js":{content:`export default (settings, pages) => {
+  if (!settings.url) {
+    console.warn("Cannot generate sitemap.xml: settings.url is not defined.");
+    return \`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\`;
+  }
+  const today = new Date().toISOString().split("T")[0];
+  const urls = pages
+    .map((page) => {
+      let urlPath = page.path.replace(/index\\.html$/, "");
+      if (urlPath === "") urlPath = "/";
+      if (!urlPath.startsWith("/")) urlPath = \`/\${urlPath}\`;
+      const loc = new URL(urlPath, settings.url).href;
+      const priority = urlPath === "/" ? "1.0" : "0.8";
+      return \`
+    <url>
+        <loc>\${loc}</loc>
+        <lastmod>\${today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>\${priority}</priority>
+    </url>\`;
+    })
+    .join("");
+  return \`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\${urls}
+</urlset>\`.trim();
 };
 `,mimeType:"text/javascript"},"/$app/bundler/templates/sw.js.js":{content:`export default ({ fileMap }) =>
   "const FILE_BUNDLE = " +
@@ -8286,7 +7668,18 @@ export default createExtensionBridge;
 
         startApp();\`;
 `,mimeType:"text/javascript"},"/$app/uix/theme.css":{content:`html,body{font-family:var(--font-family);background-color:var(--background-color);color:var(--text-color);width:100%;min-height:100%;height:100%;padding:0;margin:0}a{color:inherit;text-decoration:none;cursor:pointer}html{font-size:14px}@media (max-width: 768px){html{font-size:18px}}@media (max-width: 480px){html{font-size:20px}}textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}:root{box-sizing:border-box;text-size-adjust:none;line-height:1.2}*,*:before,*:after{box-sizing:border-box}*{margin:0}body{font-family:var(--font-family)}button,textarea,select{background-color:inherit;border-width:0;color:inherit}img,picture,video,canvas,svg{display:block;max-width:100%}input,button,textarea,select{font:inherit;background:inherit;border:inherit}p,h1,h2,h3,h4,h5,h6{font-family:var(--font-family);overflow-wrap:break-word}dialog::backdrop{background-color:#000c}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#79797966;border-radius:0}::-webkit-scrollbar-thumb:hover{background:#646464b3}::-webkit-scrollbar-thumb:active{background:#555c}::-webkit-scrollbar-corner{background:transparent}*{scrollbar-width:thin;scrollbar-color:rgba(121,121,121,.4) transparent}*:not(:defined){display:block;height:100%;opacity:0;transition:opacity .5s ease-in-out;border:1px solid red}.dark{filter:invert(1) hue-rotate(180deg)}.dark img,.dark dialog,.dark video,.dark iframe{filter:invert(1) hue-rotate(180deg)}[direction=horizontal]{--flex-direction: row;flex-direction:row}[direction=vertical]{--flex-direction: column;flex-direction:row}[cursor-pointer]{cursor:pointer}[w-full]{width:100%}[h-full]{height:100%}[min-h-0]{min-height:0}[min-w-0]{min-width:0}[flex]{display:flex}[flex-col]{flex-direction:column}[flex-1]{flex:1}[flex-grow]{flex-grow:1}[flex-shrink-0]{flex-shrink:0}
-`,mimeType:"text/css"},"/locales/en.js":{content:`/**
+`,mimeType:"text/css"},"/backend.js":{content:`$APP.databaseConfig = {
+  type: "indexeddb",
+  url: "http://127.0.0.1:8090",
+  adminEmail: "alanmeira@gmail.com",
+  adminPassword: "1234567890",
+  autoAuth: true,
+  syncOnInit: false,
+  conflictStrategy: "local-wins",
+};
+
+import "/$app/base/backend.js";
+`,mimeType:"text/javascript"},"/locales/en.js":{content:`/**
  * English translations for meetup.rio
  */
 export default {
@@ -8412,17 +7805,43 @@ export default {
     getDirections: "Get Directions",
   },
 };
-`,mimeType:"text/javascript"},"/backend.js":{content:`$APP.databaseConfig = {
-  type: "indexeddb",
-  url: "http://127.0.0.1:8090",
-  adminEmail: "alanmeira@gmail.com",
-  adminPassword: "1234567890",
-  autoAuth: true,
-  syncOnInit: false,
-  conflictStrategy: "local-wins",
-};
+`,mimeType:"text/javascript"},"/$app/router/ui.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import { keyed } from "/npm/lit-html/directives/keyed.js";
+import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
+import Router from "./index.js";
 
-import "/$app/base/backend.js";
+export default {
+  tag: "router-ui",
+  properties: {
+    currentRoute: T.object({
+      sync: Router,
+    }),
+  },
+  renderRoute(route, params) {
+    const component =
+      typeof route.component === "function"
+        ? route.component(params)
+        : route.component;
+    return route.template
+      ? staticHTML\`<\${unsafeStatic(route.template)} .component=\${component}>
+			</\${unsafeStatic(route.template)}>\`
+      : component;
+  },
+
+  render() {
+    const { route, params } = this.currentRoute || {};
+    return route
+      ? keyed(
+          route.name ?? route.path,
+          this.renderRoute(
+            typeof route === "function" ? { component: route } : route,
+            params,
+          ),
+        )
+      : html\`404: Page not found\`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/theme/themes/nbs.js":{content:`/**
  * Neobrutalist (NBS) Theme
  * Bold borders, hard shadows, vibrant colors
@@ -8819,43 +8238,6 @@ export default {
     "item-active-font-weight": "600",
   },
 };
-`,mimeType:"text/javascript"},"/$app/router/ui.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import { keyed } from "/npm/lit-html/directives/keyed.js";
-import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
-import Router from "./index.js";
-
-export default {
-  tag: "router-ui",
-  properties: {
-    currentRoute: T.object({
-      sync: Router,
-    }),
-  },
-  renderRoute(route, params) {
-    const component =
-      typeof route.component === "function"
-        ? route.component(params)
-        : route.component;
-    return route.template
-      ? staticHTML\`<\${unsafeStatic(route.template)} .component=\${component}>
-			</\${unsafeStatic(route.template)}>\`
-      : component;
-  },
-
-  render() {
-    const { route, params } = this.currentRoute || {};
-    return route
-      ? keyed(
-          route.name ?? route.path,
-          this.renderRoute(
-            typeof route === "function" ? { component: route } : route,
-            params,
-          ),
-        )
-      : html\`404: Page not found\`;
-  },
-};
 `,mimeType:"text/javascript"},"/$app/base/backend.js":{content:`import config from "/$app/base/config.js";
 import createEventHandler from "/$app/events/index.js";
 import { initSWBackend } from "/$app/sw/backend.js";
@@ -8864,6 +8246,79 @@ import $APP from "/$app.js";
 $APP.addModule({ name: "events", base: createEventHandler({}) });
 initSWBackend($APP, config);
 import "/$app/base/backend/workers/database.js";
+`,mimeType:"text/javascript"},"/$app/base/config.js":{content:`/**
+ * Bootstrapp Framework Configuration
+ *
+ * Central configuration for framework constants and settings
+ * @module config
+ */
+
+/**
+ * Service Worker configuration
+ */
+export const serviceWorker = {
+  /** Timeout in milliseconds for Service Worker initialization */
+  initTimeout: 200,
+  /** Maximum number of retries for Service Worker registration */
+  maxRetries: 5,
+};
+
+/**
+ * Cache configuration for Service Worker file caching
+ */
+export const cache = {
+  /** Cache name for local files */
+  localFiles: "local-files-v1",
+  /** Cache name for staging files */
+  stagingFiles: "staging-files-v1",
+};
+
+/**
+ * Backend communication configuration
+ */
+export const backend = {
+  /** Default timeout in milliseconds for client requests to backend */
+  requestTimeout: 5000,
+};
+
+/**
+ * Test configuration
+ */
+export const test = {
+  /** Default test server host */
+  host: "test.localhost",
+  /** Default test server port */
+  port: 1313,
+  /** Get full test URL */
+  getUrl(path = '/test.html') {
+    return \`http://\${this.host}:\${this.port}\${path}\`;
+  }
+};
+
+/**
+ * Development server configuration
+ */
+export const devServer = {
+  /**
+   * Calculate WebSocket port for dev server hot reload
+   * @param {number} currentPort - Current application port
+   * @returns {number} WebSocket port
+   */
+  getWsPort(currentPort) {
+    return Number.parseInt(currentPort, 10) + 1;
+  }
+};
+
+/**
+ * Default configuration object
+ */
+export default {
+  serviceWorker,
+  cache,
+  backend,
+  test,
+  devServer,
+};
 `,mimeType:"text/javascript"},"/$app/events/index.js":{content:`/**
  * @bootstrapp/events
  * Lightweight event system with pub/sub pattern
@@ -8947,360 +8402,6 @@ function createEventHandler(target = {}, { getter = true } = {}) {
 }
 
 export default createEventHandler;
-`,mimeType:"text/javascript"},"/$app/base/config.js":{content:`/**
- * Bootstrapp Framework Configuration
- *
- * Central configuration for framework constants and settings
- * @module config
- */
-
-/**
- * Service Worker configuration
- */
-export const serviceWorker = {
-  /** Timeout in milliseconds for Service Worker initialization */
-  initTimeout: 200,
-  /** Maximum number of retries for Service Worker registration */
-  maxRetries: 5,
-};
-
-/**
- * Cache configuration for Service Worker file caching
- */
-export const cache = {
-  /** Cache name for local files */
-  localFiles: "local-files-v1",
-  /** Cache name for staging files */
-  stagingFiles: "staging-files-v1",
-};
-
-/**
- * Backend communication configuration
- */
-export const backend = {
-  /** Default timeout in milliseconds for client requests to backend */
-  requestTimeout: 5000,
-};
-
-/**
- * Test configuration
- */
-export const test = {
-  /** Default test server host */
-  host: "test.localhost",
-  /** Default test server port */
-  port: 1313,
-  /** Get full test URL */
-  getUrl(path = '/test.html') {
-    return \`http://\${this.host}:\${this.port}\${path}\`;
-  }
-};
-
-/**
- * Development server configuration
- */
-export const devServer = {
-  /**
-   * Calculate WebSocket port for dev server hot reload
-   * @param {number} currentPort - Current application port
-   * @returns {number} WebSocket port
-   */
-  getWsPort(currentPort) {
-    return Number.parseInt(currentPort, 10) + 1;
-  }
-};
-
-/**
- * Default configuration object
- */
-export default {
-  serviceWorker,
-  cache,
-  backend,
-  test,
-  devServer,
-};
-`,mimeType:"text/javascript"},"/$app.js":{content:`import createEventHandler from "/$app/events/index.js";
-
-const runtime = (() => {
-  if (
-    typeof ServiceWorkerGlobalScope !== "undefined" &&
-    globalThis instanceof ServiceWorkerGlobalScope
-  )
-    return "serviceworker";
-
-  if (
-    typeof WorkerGlobalScope !== "undefined" &&
-    globalThis instanceof WorkerGlobalScope
-  )
-    return "worker";
-  return "frontend";
-})();
-
-globalThis.sleep = (ms = 0) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-const ObjectStorageFunctions = {
-  set: function (...args) {
-    if (args.length === 1 && typeof args[0] === "object" && args[0] !== null)
-      Object.entries(args[0]).forEach(([k, v]) => {
-        this[k] =
-          !Array.isArray(this[k]) &&
-          typeof this[k] === "object" &&
-          typeof v === "object"
-            ? { ...this[k], ...v }
-            : v;
-      });
-    if (args.length === 2 && typeof args[0] === "string")
-      this[args[0]] = args[1];
-    return this;
-  },
-  get: function (...args) {
-    const [key1, key2] = args;
-    if (args.length === 0) return undefined;
-    if (args.length === 2) return this[key1]?.[key2];
-    return this[key1];
-  },
-  remove: function (...args) {
-    args.length === 2 ? delete this[args[0]][args[1]] : delete this[args[0]];
-    return this;
-  },
-  keys: function () {
-    return Object.keys(this);
-  },
-};
-const fs = {
-  async fetchResource(path, handleResponse, extension) {
-    try {
-      const response = await fetch(path);
-      this[path] = {
-        path,
-        extension,
-      };
-      if (response.ok) return await handleResponse(response);
-    } catch (error) {
-      console.warn(\`Resource not found at: \${path}\`, error);
-    }
-    return null;
-  },
-  text(path) {
-    return fs.fetchResource(path, (res) => res.text(), "text");
-  },
-  json(path) {
-    return fs.fetchResource(path, (res) => res.json(), "json");
-  },
-  getFilePath(file) {
-    return \`\${$APP.settings.basePath}\${file.startsWith("/") ? file : \`/\${file}\`}\`;
-  },
-  getRequestPath(urlString) {
-    const url = new URL(urlString);
-    return url.pathname + url.search;
-  },
-};
-
-const installModulePrototype = (base) => {
-  if (base instanceof Set || base instanceof Map || Array.isArray(base)) return;
-  if (!base) base = {};
-  const proto = Object.create(Object.getPrototypeOf(base));
-  Object.assign(proto, ObjectStorageFunctions);
-  Object.setPrototypeOf(base, proto);
-  return base;
-};
-
-const coreModules = {
-  events: createEventHandler({}),
-  app: {},
-  assetFiles: new Set(),
-  components: {},
-  data: {},
-  devFiles: new Set(),
-  error: console.error,
-  fs: fs,
-  log: console.log,
-  models: {},
-  modules: {},
-  routes: {},
-  settings: {
-    base: {
-      runtime,
-      dev: true,
-      backend: false,
-      frontend: true,
-      basePath: "",
-    },
-    events: ({ context }) => ({
-      moduleAdded({ module }) {
-        if (module.settings) context[module.name] = module.settings;
-      },
-    }),
-  },
-};
-
-if (runtime === "frontend") {
-  coreModules.routes = {};
-  coreModules.icons = {
-    alias: "Icons",
-    base: new Map(Object.entries(globalThis.__icons || {})),
-  };
-  coreModules.theme = {
-    base: {
-      font: {
-        icon: {
-          family: "lucide",
-        },
-      },
-    },
-    events: ({ context }) => ({
-      moduleAdded({ module }) {
-        if (module.theme) context[module.name] = module.theme;
-      },
-    }),
-  };
-}
-
-const prototypeAPP = {
-  async load(production, backend = false) {
-    try {
-      const response = await fetch("/package.json");
-      if (!response.ok)
-        throw new Error(\`HTTP error! status: \${response.status}\`);
-      const appConfig = await response.json();
-      this._packageJson = appConfig;
-      await this.bootstrap({ ...appConfig, production, backend });
-    } catch (error) {
-      console.error("Could not load 'package.json'. Bootstrap failed.", {
-        error,
-      });
-    }
-  },
-  async bootstrap({
-    backend = false,
-    production = false,
-    settings = {},
-    theme,
-  } = {}) {
-    for (const [key, value] of Object.entries({
-      ...settings,
-      backend,
-      runtime,
-      frontend: !backend,
-      production,
-      dev: !production,
-    }))
-      this.settings.set(key, value);
-    if (!backend && theme) this.theme.set(theme);
-    try {
-      await import("/index.js");
-      if (this.settings.dev) {
-        await this.loadModuleSchemas();
-        await this.loadModuleData();
-      }
-      await import(
-        backend ? "/$app/base/backend/backend.js" : "/$app/base/frontend.js"
-      );
-      await this.events.emit("APP:INIT");
-    } catch (error) {
-      console.warn(error);
-    }
-    return this;
-  },
-  async loadModuleSchemas() {
-    console.log(this.settings.dev, { runtime });
-    if (!this.settings.dev || !this._packageJson) return;
-
-    console.log(this.settings.dev, { runtime });
-    const { discoverSchemaModules, namespaceModels } = await import(
-      "/$app/model/schema-loader.js"
-    );
-    const modules = await discoverSchemaModules(this._packageJson);
-    console.log({ modules });
-    for (const mod of modules) {
-      try {
-        const schemaPath = \`/node_modules/\${mod.packageName}/models/schema.js\`;
-        const schemaModule = await import(schemaPath);
-        const models = schemaModule.default;
-
-        if (models) {
-          const namespace = mod.namespace ? mod.name : null;
-          const namespacedModels = namespaceModels(models, namespace);
-          this.models.set(namespacedModels);
-          this.log?.(
-            \`Loaded schema from \${mod.packageName}\` +
-              (namespace ? \` (namespace: \${namespace}_*)\` : ""),
-          );
-        }
-      } catch (e) {
-        console.warn(\`Failed to load schema from \${mod.packageName}:\`, e);
-      }
-    }
-  },
-  async loadModuleData() {
-    if (!this.settings.dev || !this._packageJson) return;
-
-    const { discoverSchemaModules, namespaceData } = await import(
-      "/$app/model/schema-loader.js"
-    );
-    const modules = await discoverSchemaModules(this._packageJson);
-
-    for (const mod of modules) {
-      try {
-        const seedPath = \`/node_modules/\${mod.packageName}/models/seed.js\`;
-        const seedModule = await import(seedPath);
-        const data = seedModule.default;
-
-        if (data) {
-          const namespace = mod.namespace ? mod.name : null;
-          const namespacedData = namespaceData(data, namespace);
-          this.data.set(namespacedData);
-          this.log?.(
-            \`Loaded seed data from \${mod.packageName}\` +
-              (namespace ? \` (namespace: \${namespace}_*)\` : ""),
-          );
-        }
-      } catch (e) {
-        // seed.js is optional, don't warn if not found
-        if (!e.message?.includes("Failed to fetch")) {
-          console.warn(\`Failed to load seed from \${mod.packageName}:\`, e);
-        }
-      }
-    }
-  },
-  addModule(module) {
-    if (
-      (module.dev && this.settings.dev !== true) ||
-      !!this?.modules?.[module.name]
-    )
-      return;
-    if (!module.base) module.base = {};
-    const { alias, name, events } = module;
-    const base = module.base ?? this[name];
-    if (this.modules && !this.modules[name]) this.modules.set(name, module);
-    installModulePrototype(base);
-    this[name] = base;
-    if (alias) this[alias] = base;
-    if (events)
-      Object.entries(
-        typeof events === "function"
-          ? events({ $APP: this, context: base })
-          : events,
-      ).map(([name, fn]) => this.events.on(name, fn));
-    this.events
-      .get("moduleAdded")
-      .map((fn) => fn.bind(this[module.name])({ module }));
-
-    if (this.log) this.log(\`Module '\${module.name}' added successfully\`);
-    return base;
-  },
-};
-
-const $APP = Object.create(prototypeAPP);
-
-for (const [name, base = {}] of Object.entries(coreModules))
-  $APP.addModule({
-    name,
-    ...(base.base ? base : { base }),
-  });
-globalThis.$APP = $APP;
-export default $APP;
 `,mimeType:"text/javascript"},"/$app/sw/backend.js":{content:`/**
  * @file Service Worker Backend Module
  * @description Service Worker backend with caching, fetch handling, and messaging
@@ -9656,6 +8757,287 @@ export function initSWBackend(app, appConfig = {}) {
 }
 
 export default { initSWBackend };
+`,mimeType:"text/javascript"},"/$app.js":{content:`import createEventHandler from "/$app/events/index.js";
+
+const runtime = (() => {
+  if (
+    typeof ServiceWorkerGlobalScope !== "undefined" &&
+    globalThis instanceof ServiceWorkerGlobalScope
+  )
+    return "serviceworker";
+
+  if (
+    typeof WorkerGlobalScope !== "undefined" &&
+    globalThis instanceof WorkerGlobalScope
+  )
+    return "worker";
+  return "frontend";
+})();
+
+globalThis.sleep = (ms = 0) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+const ObjectStorageFunctions = {
+  set: function (...args) {
+    if (args.length === 1 && typeof args[0] === "object" && args[0] !== null)
+      Object.entries(args[0]).forEach(([k, v]) => {
+        this[k] =
+          !Array.isArray(this[k]) &&
+          typeof this[k] === "object" &&
+          typeof v === "object"
+            ? { ...this[k], ...v }
+            : v;
+      });
+    if (args.length === 2 && typeof args[0] === "string")
+      this[args[0]] = args[1];
+    return this;
+  },
+  get: function (...args) {
+    const [key1, key2] = args;
+    if (args.length === 0) return undefined;
+    if (args.length === 2) return this[key1]?.[key2];
+    return this[key1];
+  },
+  remove: function (...args) {
+    args.length === 2 ? delete this[args[0]][args[1]] : delete this[args[0]];
+    return this;
+  },
+  keys: function () {
+    return Object.keys(this);
+  },
+};
+const fs = {
+  async fetchResource(path, handleResponse, extension) {
+    try {
+      const response = await fetch(path);
+      this[path] = {
+        path,
+        extension,
+      };
+      if (response.ok) return await handleResponse(response);
+    } catch (error) {
+      console.warn(\`Resource not found at: \${path}\`, error);
+    }
+    return null;
+  },
+  text(path) {
+    return fs.fetchResource(path, (res) => res.text(), "text");
+  },
+  json(path) {
+    return fs.fetchResource(path, (res) => res.json(), "json");
+  },
+  getFilePath(file) {
+    return \`\${$APP.settings.basePath}\${file.startsWith("/") ? file : \`/\${file}\`}\`;
+  },
+  getRequestPath(urlString) {
+    const url = new URL(urlString);
+    return url.pathname + url.search;
+  },
+};
+
+const installModulePrototype = (base) => {
+  if (base instanceof Set || base instanceof Map || Array.isArray(base)) return;
+  if (!base) base = {};
+  const proto = Object.create(Object.getPrototypeOf(base));
+  Object.assign(proto, ObjectStorageFunctions);
+  Object.setPrototypeOf(base, proto);
+  return base;
+};
+
+const coreModules = {
+  events: createEventHandler({}),
+  app: {},
+  assetFiles: new Set(),
+  components: {},
+  data: {},
+  devFiles: new Set(),
+  error: console.error,
+  fs: fs,
+  log: console.log,
+  models: {},
+  modules: {},
+  routes: {},
+  settings: {
+    base: {
+      runtime,
+      dev: true,
+      backend: false,
+      frontend: true,
+      basePath: "",
+    },
+    events: ({ context }) => ({
+      moduleAdded({ module }) {
+        if (module.settings) context[module.name] = module.settings;
+      },
+    }),
+  },
+};
+
+if (runtime === "frontend") {
+  coreModules.routes = {};
+  coreModules.icons = {
+    alias: "Icons",
+    base: new Map(Object.entries(globalThis.__icons || {})),
+  };
+  coreModules.theme = {
+    base: {
+      font: {
+        icon: {
+          family: "lucide",
+        },
+      },
+    },
+    events: ({ context }) => ({
+      moduleAdded({ module }) {
+        if (module.theme) context[module.name] = module.theme;
+      },
+    }),
+  };
+}
+
+const prototypeAPP = {
+  async load(production, backend = false) {
+    try {
+      const response = await fetch("/package.json");
+      if (!response.ok)
+        throw new Error(\`HTTP error! status: \${response.status}\`);
+      const appConfig = await response.json();
+      this._packageJson = appConfig;
+      await this.bootstrap({ ...appConfig, production, backend });
+    } catch (error) {
+      console.error("Could not load 'package.json'. Bootstrap failed.", {
+        error,
+      });
+    }
+  },
+  async bootstrap({
+    backend = false,
+    production = false,
+    settings = {},
+    theme,
+  } = {}) {
+    for (const [key, value] of Object.entries({
+      ...settings,
+      backend,
+      runtime,
+      frontend: !backend,
+      production,
+      dev: !production,
+    }))
+      this.settings.set(key, value);
+    if (!backend && theme) this.theme.set(theme);
+    try {
+      await import("/index.js");
+      if (this.settings.dev) {
+        await this.loadModuleSchemas();
+        await this.loadModuleData();
+      }
+      await import(
+        backend ? "/$app/base/backend/backend.js" : "/$app/base/frontend.js"
+      );
+      await this.events.emit("APP:INIT");
+    } catch (error) {
+      console.warn(error);
+    }
+    return this;
+  },
+  async loadModuleSchemas() {
+    console.log(this.settings.dev, { runtime });
+    if (!this.settings.dev || !this._packageJson) return;
+
+    console.log(this.settings.dev, { runtime });
+    const { discoverSchemaModules, namespaceModels } = await import(
+      "/$app/model/schema-loader.js"
+    );
+    const modules = await discoverSchemaModules(this._packageJson);
+    console.log({ modules });
+    for (const mod of modules) {
+      try {
+        const schemaPath = \`/node_modules/\${mod.packageName}/models/schema.js\`;
+        const schemaModule = await import(schemaPath);
+        const models = schemaModule.default;
+
+        if (models) {
+          const namespace = mod.namespace ? mod.name : null;
+          const namespacedModels = namespaceModels(models, namespace);
+          this.models.set(namespacedModels);
+          this.log?.(
+            \`Loaded schema from \${mod.packageName}\` +
+              (namespace ? \` (namespace: \${namespace}_*)\` : ""),
+          );
+        }
+      } catch (e) {
+        console.warn(\`Failed to load schema from \${mod.packageName}:\`, e);
+      }
+    }
+  },
+  async loadModuleData() {
+    if (!this.settings.dev || !this._packageJson) return;
+
+    const { discoverSchemaModules, namespaceData } = await import(
+      "/$app/model/schema-loader.js"
+    );
+    const modules = await discoverSchemaModules(this._packageJson);
+
+    for (const mod of modules) {
+      try {
+        const seedPath = \`/node_modules/\${mod.packageName}/models/seed.js\`;
+        const seedModule = await import(seedPath);
+        const data = seedModule.default;
+
+        if (data) {
+          const namespace = mod.namespace ? mod.name : null;
+          const namespacedData = namespaceData(data, namespace);
+          this.data.set(namespacedData);
+          this.log?.(
+            \`Loaded seed data from \${mod.packageName}\` +
+              (namespace ? \` (namespace: \${namespace}_*)\` : ""),
+          );
+        }
+      } catch (e) {
+        // seed.js is optional, don't warn if not found
+        if (!e.message?.includes("Failed to fetch")) {
+          console.warn(\`Failed to load seed from \${mod.packageName}:\`, e);
+        }
+      }
+    }
+  },
+  addModule(module) {
+    if (
+      (module.dev && this.settings.dev !== true) ||
+      !!this?.modules?.[module.name]
+    )
+      return;
+    if (!module.base) module.base = {};
+    const { alias, name, events } = module;
+    const base = module.base ?? this[name];
+    if (this.modules && !this.modules[name]) this.modules.set(name, module);
+    installModulePrototype(base);
+    this[name] = base;
+    if (alias) this[alias] = base;
+    if (events)
+      Object.entries(
+        typeof events === "function"
+          ? events({ $APP: this, context: base })
+          : events,
+      ).map(([name, fn]) => this.events.on(name, fn));
+    this.events
+      .get("moduleAdded")
+      .map((fn) => fn.bind(this[module.name])({ module }));
+
+    if (this.log) this.log(\`Module '\${module.name}' added successfully\`);
+    return base;
+  },
+};
+
+const $APP = Object.create(prototypeAPP);
+
+for (const [name, base = {}] of Object.entries(coreModules))
+  $APP.addModule({
+    name,
+    ...(base.base ? base : { base }),
+  });
+globalThis.$APP = $APP;
+export default $APP;
 `,mimeType:"text/javascript"},"/$app/base/backend/workers/database.js":{content:`import $APP from "/$app.js";
 
 if ($APP.settings.runtime === "worker") {
@@ -13097,6 +12479,380 @@ export default {
   getAvailableAdapters,
   hasAdapter,
 };
+`,mimeType:"text/javascript"},"/$app/model/query-builder.js":{content:`/**
+ * @file Query Builder Utilities
+ * @description Common query building and filtering logic shared across adapters
+ */
+
+/**
+ * Parse order string into structured format
+ * @param {string|Array} order - Order specification
+ * @returns {Array<{field: string, direction: 'ASC'|'DESC'}>}
+ * @example
+ * parseOrder('name ASC') => [{field: 'name', direction: 'ASC'}]
+ * parseOrder('age DESC, name ASC') => [{field: 'age', direction: 'DESC'}, {field: 'name', direction: 'ASC'}]
+ */
+export function parseOrder(order) {
+  if (!order) return [];
+  if (Array.isArray(order)) return order;
+
+  return order.split(',').map(part => {
+    const [field, direction = 'ASC'] = part.trim().split(/\\s+/);
+    return { field, direction: direction.toUpperCase() };
+  });
+}
+
+/**
+ * Apply where filter to a record
+ * @param {Object} record - Record to test
+ * @param {Object} where - Filter conditions
+ * @returns {boolean} True if record matches filter
+ * @example
+ * matchesWhere({age: 25}, {age: 25}) => true
+ * matchesWhere({age: 30}, {age: {'>': 25}}) => true
+ */
+export function matchesWhere(record, where) {
+  if (!where || Object.keys(where).length === 0) return true;
+
+  return Object.entries(where).every(([field, condition]) => {
+    const value = record[field];
+
+    // Direct equality
+    if (typeof condition !== 'object' || condition === null) {
+      // Use string coercion for 'id' field to handle string/number mismatch
+      // (PocketBase returns string IDs, but queries may use numbers)
+      if (field === 'id') {
+        return String(value) === String(condition);
+      }
+      return value === condition;
+    }
+
+    // Operator-based conditions
+    return Object.entries(condition).every(([operator, expected]) => {
+      switch (operator) {
+        case '>':
+          return value > expected;
+        case '>=':
+          return value >= expected;
+        case '<':
+          return value < expected;
+        case '<=':
+          return value <= expected;
+        case '!=':
+        case '<>':
+          return value !== expected;
+        case 'in':
+          return Array.isArray(expected) && expected.includes(value);
+        case 'not in':
+          return Array.isArray(expected) && !expected.includes(value);
+        case 'like':
+          return typeof value === 'string' && value.includes(expected);
+        case 'ilike':
+          return typeof value === 'string' &&
+                 value.toLowerCase().includes(expected.toLowerCase());
+        case 'is null':
+          return value === null || value === undefined;
+        case 'is not null':
+          return value !== null && value !== undefined;
+        default:
+          return value === expected;
+      }
+    });
+  });
+}
+
+/**
+ * Apply sorting to an array of records
+ * @param {Array<Object>} records - Records to sort
+ * @param {string|Array} order - Sort specification
+ * @returns {Array<Object>} Sorted records
+ */
+export function applyOrder(records, order) {
+  if (!order || !records || records.length === 0) return records;
+
+  const orderArray = parseOrder(order);
+  if (orderArray.length === 0) return records;
+
+  return [...records].sort((a, b) => {
+    for (const { field, direction } of orderArray) {
+      const aVal = a[field];
+      const bVal = b[field];
+
+      if (aVal === bVal) continue;
+
+      const comparison = aVal < bVal ? -1 : 1;
+      return direction === 'DESC' ? -comparison : comparison;
+    }
+    return 0;
+  });
+}
+
+/**
+ * Apply limit and offset to an array of records
+ * @param {Array<Object>} records - Records to paginate
+ * @param {number} [limit] - Maximum records to return
+ * @param {number} [offset=0] - Records to skip
+ * @returns {Array<Object>} Paginated records
+ */
+export function applyPagination(records, limit, offset = 0) {
+  if (!records) return [];
+  if (!limit && !offset) return records;
+
+  const start = offset || 0;
+  const end = limit ? start + limit : undefined;
+
+  return records.slice(start, end);
+}
+
+/**
+ * Build a complete query result from options
+ * @param {Array<Object>} allRecords - All available records
+ * @param {Object} options - Query options
+ * @param {Object} [options.where] - Filter conditions
+ * @param {string|Array} [options.order] - Sort specification
+ * @param {number} [options.limit] - Maximum records
+ * @param {number} [options.offset] - Records to skip
+ * @returns {Object} {items: Array, count: number, total: number}
+ */
+export function buildQueryResult(allRecords, options = {}) {
+  const { where, order, limit, offset } = options;
+
+  // Filter
+  let filtered = where ? allRecords.filter(r => matchesWhere(r, where)) : allRecords;
+  const total = filtered.length;
+
+  // Sort
+  if (order) {
+    filtered = applyOrder(filtered, order);
+  }
+
+  // Paginate
+  const items = applyPagination(filtered, limit, offset);
+
+  return {
+    items,
+    count: total,
+    total,
+    limit,
+    offset: offset || 0,
+  };
+}
+
+/**
+ * Validate query options
+ * @param {Object} options - Query options to validate
+ * @throws {Error} If options are invalid
+ */
+export function validateQueryOptions(options = {}) {
+  const { limit, offset, where } = options;
+
+  if (limit !== undefined) {
+    if (typeof limit !== 'number' || limit < 0) {
+      throw new Error('limit must be a positive number');
+    }
+  }
+
+  if (offset !== undefined) {
+    if (typeof offset !== 'number' || offset < 0) {
+      throw new Error('offset must be a non-negative number');
+    }
+  }
+
+  if (where !== undefined && (typeof where !== 'object' || where === null)) {
+    throw new Error('where must be an object');
+  }
+
+  return true;
+}
+
+export default {
+  parseOrder,
+  matchesWhere,
+  applyOrder,
+  applyPagination,
+  buildQueryResult,
+  validateQueryOptions,
+};
+`,mimeType:"text/javascript"},"/$app/model/backend.js":{content:`/**
+ * @file Backend Model Module
+ * @description Initializes Model system for worker context with database operations
+ */
+
+import { createModel } from "./index.js";
+
+/**
+ * Create model event handlers for worker context
+ * @param {object} $APP - App instance with Database
+ * @returns {object} Event handlers object
+ */
+export function createModelEventHandlers($APP) {
+  return {
+    ADD: async ({ payload, respond }) => {
+      try {
+        const response = await $APP.Database.add(payload.model, payload.row);
+        respond([null, response]);
+      } catch (error) {
+        respond([error, null]);
+      }
+    },
+    ADD_MANY: async ({ payload, respond }) => {
+      const results = [];
+      for (const row of payload.rows) {
+        try {
+          const result = await $APP.Database.add(payload.model, row);
+          results.push([null, result]);
+        } catch (error) {
+          respond([error, null]);
+        }
+      }
+      respond([null, results]);
+    },
+    REMOVE: async ({ payload, respond }) => {
+      const response = await $APP.Database.remove(payload.model, payload.id);
+      respond(response);
+    },
+    REMOVE_MANY: async ({ payload, respond }) => {
+      const results = [];
+      const ids = Array.isArray(payload.ids) ? payload.ids : [payload.ids];
+      for (const id of ids) {
+        const result = await $APP.Database.remove(payload.model, id);
+        results.push(result);
+      }
+      respond([null, results]);
+    },
+    EDIT: async ({ payload, respond }) => {
+      if (!payload.row.id) {
+        respond([
+          new Error("Record data must include 'id' field for edit operation"),
+          null,
+        ]);
+        return;
+      }
+      try {
+        const response = await $APP.Database.edit(
+          payload.model,
+          payload.row.id,
+          payload.row,
+        );
+        respond([null, response]);
+      } catch (error) {
+        respond([error, null]);
+      }
+    },
+    EDIT_MANY: async ({ payload, respond }) => {
+      const results = [];
+      for (const row of payload.rows) {
+        if (!row.id) {
+          results.push([new Error("Record must have id field"), null]);
+          continue;
+        }
+        try {
+          const result = await $APP.Database.edit(payload.model, row.id, row);
+          results.push([null, result]);
+        } catch (error) {
+          respond([error, null]);
+        }
+      }
+      respond([null, results]);
+    },
+    GET: async ({ payload, respond }) => {
+      const { id, model, opts = {} } = payload;
+      let response;
+      if (id) {
+        response = await $APP.Database.get(model, id, opts);
+      } else if (opts.where) {
+        const where =
+          typeof opts.where === "string" ? JSON.parse(opts.where) : opts.where;
+        const results = await $APP.Database.getAll(model, {
+          where,
+          limit: 1,
+          includes: opts.includes || [],
+        });
+        response = results.length > 0 ? results[0] : null;
+      } else {
+        response = null;
+      }
+      respond(response);
+    },
+    GET_MANY: async ({ payload: { model, opts = {} }, respond } = {}) => {
+      const response = await $APP.Database.getAll(model, opts);
+      respond(response);
+    },
+  };
+}
+
+/**
+ * Create relationship sync handlers
+ * @param {object} $APP - App instance
+ * @returns {object} Event handlers for relationship sync
+ */
+export function createRelationshipSyncHandlers($APP) {
+  return {
+    onAddRecord({ model, row }) {
+      $APP.Backend.broadcast({
+        type: "QUERY_DATA_SYNC",
+        payload: { action: "add", model, record: row },
+      });
+    },
+    onEditRecord({ model, row }) {
+      $APP.Backend.broadcast({
+        type: "QUERY_DATA_SYNC",
+        payload: { action: "update", model, record: row },
+      });
+    },
+    onRemoveRecord({ model, row, id }) {
+      $APP.Backend.broadcast({
+        type: "QUERY_DATA_SYNC",
+        payload: { action: "delete", model, record: row || { id } },
+      });
+    },
+  };
+}
+
+/**
+ * Initialize Model backend in worker context
+ * @param {object} $APP - App instance with Database, Backend
+ * @returns {object} Model instance
+ */
+export function initModelBackend($APP) {
+  const Model = createModel($APP);
+
+  // Register CRUD event handlers
+  const queryModelEvents = createModelEventHandlers($APP);
+  $APP.events.set(queryModelEvents);
+
+  // Create direct request function for worker
+  const request = (action, modelName, payload = {}) => {
+    return new Promise((resolve) => {
+      const event = queryModelEvents[action];
+      if (event && typeof event === "function") {
+        event({
+          respond: resolve,
+          payload: {
+            model: modelName,
+            ...payload,
+          },
+        });
+      } else
+        resolve({ success: false, error: \`Action "\${action}" not found.\` });
+    });
+  };
+
+  // Register relationship sync handlers
+  const relationshipHandlers = createRelationshipSyncHandlers($APP);
+  $APP.events.set(relationshipHandlers);
+
+  Model.request = request;
+  $APP.addModule({ name: "Model", base: Model });
+
+  return Model;
+}
+
+export default {
+  createModelEventHandlers,
+  createRelationshipSyncHandlers,
+  initModelBackend,
+};
 `,mimeType:"text/javascript"},"/$app/auth/backend.js":{content:`/**
  * @file Backend Auth Module
  * @description Handles authentication event handlers in the Web Worker context
@@ -13456,380 +13212,6 @@ export function initAuthBackend($APP) {
 }
 
 export default { createAuthEventHandlers, initAuthBackend };
-`,mimeType:"text/javascript"},"/$app/model/backend.js":{content:`/**
- * @file Backend Model Module
- * @description Initializes Model system for worker context with database operations
- */
-
-import { createModel } from "./index.js";
-
-/**
- * Create model event handlers for worker context
- * @param {object} $APP - App instance with Database
- * @returns {object} Event handlers object
- */
-export function createModelEventHandlers($APP) {
-  return {
-    ADD: async ({ payload, respond }) => {
-      try {
-        const response = await $APP.Database.add(payload.model, payload.row);
-        respond([null, response]);
-      } catch (error) {
-        respond([error, null]);
-      }
-    },
-    ADD_MANY: async ({ payload, respond }) => {
-      const results = [];
-      for (const row of payload.rows) {
-        try {
-          const result = await $APP.Database.add(payload.model, row);
-          results.push([null, result]);
-        } catch (error) {
-          respond([error, null]);
-        }
-      }
-      respond([null, results]);
-    },
-    REMOVE: async ({ payload, respond }) => {
-      const response = await $APP.Database.remove(payload.model, payload.id);
-      respond(response);
-    },
-    REMOVE_MANY: async ({ payload, respond }) => {
-      const results = [];
-      const ids = Array.isArray(payload.ids) ? payload.ids : [payload.ids];
-      for (const id of ids) {
-        const result = await $APP.Database.remove(payload.model, id);
-        results.push(result);
-      }
-      respond([null, results]);
-    },
-    EDIT: async ({ payload, respond }) => {
-      if (!payload.row.id) {
-        respond([
-          new Error("Record data must include 'id' field for edit operation"),
-          null,
-        ]);
-        return;
-      }
-      try {
-        const response = await $APP.Database.edit(
-          payload.model,
-          payload.row.id,
-          payload.row,
-        );
-        respond([null, response]);
-      } catch (error) {
-        respond([error, null]);
-      }
-    },
-    EDIT_MANY: async ({ payload, respond }) => {
-      const results = [];
-      for (const row of payload.rows) {
-        if (!row.id) {
-          results.push([new Error("Record must have id field"), null]);
-          continue;
-        }
-        try {
-          const result = await $APP.Database.edit(payload.model, row.id, row);
-          results.push([null, result]);
-        } catch (error) {
-          respond([error, null]);
-        }
-      }
-      respond([null, results]);
-    },
-    GET: async ({ payload, respond }) => {
-      const { id, model, opts = {} } = payload;
-      let response;
-      if (id) {
-        response = await $APP.Database.get(model, id, opts);
-      } else if (opts.where) {
-        const where =
-          typeof opts.where === "string" ? JSON.parse(opts.where) : opts.where;
-        const results = await $APP.Database.getAll(model, {
-          where,
-          limit: 1,
-          includes: opts.includes || [],
-        });
-        response = results.length > 0 ? results[0] : null;
-      } else {
-        response = null;
-      }
-      respond(response);
-    },
-    GET_MANY: async ({ payload: { model, opts = {} }, respond } = {}) => {
-      const response = await $APP.Database.getAll(model, opts);
-      respond(response);
-    },
-  };
-}
-
-/**
- * Create relationship sync handlers
- * @param {object} $APP - App instance
- * @returns {object} Event handlers for relationship sync
- */
-export function createRelationshipSyncHandlers($APP) {
-  return {
-    onAddRecord({ model, row }) {
-      $APP.Backend.broadcast({
-        type: "QUERY_DATA_SYNC",
-        payload: { action: "add", model, record: row },
-      });
-    },
-    onEditRecord({ model, row }) {
-      $APP.Backend.broadcast({
-        type: "QUERY_DATA_SYNC",
-        payload: { action: "update", model, record: row },
-      });
-    },
-    onRemoveRecord({ model, row, id }) {
-      $APP.Backend.broadcast({
-        type: "QUERY_DATA_SYNC",
-        payload: { action: "delete", model, record: row || { id } },
-      });
-    },
-  };
-}
-
-/**
- * Initialize Model backend in worker context
- * @param {object} $APP - App instance with Database, Backend
- * @returns {object} Model instance
- */
-export function initModelBackend($APP) {
-  const Model = createModel($APP);
-
-  // Register CRUD event handlers
-  const queryModelEvents = createModelEventHandlers($APP);
-  $APP.events.set(queryModelEvents);
-
-  // Create direct request function for worker
-  const request = (action, modelName, payload = {}) => {
-    return new Promise((resolve) => {
-      const event = queryModelEvents[action];
-      if (event && typeof event === "function") {
-        event({
-          respond: resolve,
-          payload: {
-            model: modelName,
-            ...payload,
-          },
-        });
-      } else
-        resolve({ success: false, error: \`Action "\${action}" not found.\` });
-    });
-  };
-
-  // Register relationship sync handlers
-  const relationshipHandlers = createRelationshipSyncHandlers($APP);
-  $APP.events.set(relationshipHandlers);
-
-  Model.request = request;
-  $APP.addModule({ name: "Model", base: Model });
-
-  return Model;
-}
-
-export default {
-  createModelEventHandlers,
-  createRelationshipSyncHandlers,
-  initModelBackend,
-};
-`,mimeType:"text/javascript"},"/$app/model/query-builder.js":{content:`/**
- * @file Query Builder Utilities
- * @description Common query building and filtering logic shared across adapters
- */
-
-/**
- * Parse order string into structured format
- * @param {string|Array} order - Order specification
- * @returns {Array<{field: string, direction: 'ASC'|'DESC'}>}
- * @example
- * parseOrder('name ASC') => [{field: 'name', direction: 'ASC'}]
- * parseOrder('age DESC, name ASC') => [{field: 'age', direction: 'DESC'}, {field: 'name', direction: 'ASC'}]
- */
-export function parseOrder(order) {
-  if (!order) return [];
-  if (Array.isArray(order)) return order;
-
-  return order.split(',').map(part => {
-    const [field, direction = 'ASC'] = part.trim().split(/\\s+/);
-    return { field, direction: direction.toUpperCase() };
-  });
-}
-
-/**
- * Apply where filter to a record
- * @param {Object} record - Record to test
- * @param {Object} where - Filter conditions
- * @returns {boolean} True if record matches filter
- * @example
- * matchesWhere({age: 25}, {age: 25}) => true
- * matchesWhere({age: 30}, {age: {'>': 25}}) => true
- */
-export function matchesWhere(record, where) {
-  if (!where || Object.keys(where).length === 0) return true;
-
-  return Object.entries(where).every(([field, condition]) => {
-    const value = record[field];
-
-    // Direct equality
-    if (typeof condition !== 'object' || condition === null) {
-      // Use string coercion for 'id' field to handle string/number mismatch
-      // (PocketBase returns string IDs, but queries may use numbers)
-      if (field === 'id') {
-        return String(value) === String(condition);
-      }
-      return value === condition;
-    }
-
-    // Operator-based conditions
-    return Object.entries(condition).every(([operator, expected]) => {
-      switch (operator) {
-        case '>':
-          return value > expected;
-        case '>=':
-          return value >= expected;
-        case '<':
-          return value < expected;
-        case '<=':
-          return value <= expected;
-        case '!=':
-        case '<>':
-          return value !== expected;
-        case 'in':
-          return Array.isArray(expected) && expected.includes(value);
-        case 'not in':
-          return Array.isArray(expected) && !expected.includes(value);
-        case 'like':
-          return typeof value === 'string' && value.includes(expected);
-        case 'ilike':
-          return typeof value === 'string' &&
-                 value.toLowerCase().includes(expected.toLowerCase());
-        case 'is null':
-          return value === null || value === undefined;
-        case 'is not null':
-          return value !== null && value !== undefined;
-        default:
-          return value === expected;
-      }
-    });
-  });
-}
-
-/**
- * Apply sorting to an array of records
- * @param {Array<Object>} records - Records to sort
- * @param {string|Array} order - Sort specification
- * @returns {Array<Object>} Sorted records
- */
-export function applyOrder(records, order) {
-  if (!order || !records || records.length === 0) return records;
-
-  const orderArray = parseOrder(order);
-  if (orderArray.length === 0) return records;
-
-  return [...records].sort((a, b) => {
-    for (const { field, direction } of orderArray) {
-      const aVal = a[field];
-      const bVal = b[field];
-
-      if (aVal === bVal) continue;
-
-      const comparison = aVal < bVal ? -1 : 1;
-      return direction === 'DESC' ? -comparison : comparison;
-    }
-    return 0;
-  });
-}
-
-/**
- * Apply limit and offset to an array of records
- * @param {Array<Object>} records - Records to paginate
- * @param {number} [limit] - Maximum records to return
- * @param {number} [offset=0] - Records to skip
- * @returns {Array<Object>} Paginated records
- */
-export function applyPagination(records, limit, offset = 0) {
-  if (!records) return [];
-  if (!limit && !offset) return records;
-
-  const start = offset || 0;
-  const end = limit ? start + limit : undefined;
-
-  return records.slice(start, end);
-}
-
-/**
- * Build a complete query result from options
- * @param {Array<Object>} allRecords - All available records
- * @param {Object} options - Query options
- * @param {Object} [options.where] - Filter conditions
- * @param {string|Array} [options.order] - Sort specification
- * @param {number} [options.limit] - Maximum records
- * @param {number} [options.offset] - Records to skip
- * @returns {Object} {items: Array, count: number, total: number}
- */
-export function buildQueryResult(allRecords, options = {}) {
-  const { where, order, limit, offset } = options;
-
-  // Filter
-  let filtered = where ? allRecords.filter(r => matchesWhere(r, where)) : allRecords;
-  const total = filtered.length;
-
-  // Sort
-  if (order) {
-    filtered = applyOrder(filtered, order);
-  }
-
-  // Paginate
-  const items = applyPagination(filtered, limit, offset);
-
-  return {
-    items,
-    count: total,
-    total,
-    limit,
-    offset: offset || 0,
-  };
-}
-
-/**
- * Validate query options
- * @param {Object} options - Query options to validate
- * @throws {Error} If options are invalid
- */
-export function validateQueryOptions(options = {}) {
-  const { limit, offset, where } = options;
-
-  if (limit !== undefined) {
-    if (typeof limit !== 'number' || limit < 0) {
-      throw new Error('limit must be a positive number');
-    }
-  }
-
-  if (offset !== undefined) {
-    if (typeof offset !== 'number' || offset < 0) {
-      throw new Error('offset must be a non-negative number');
-    }
-  }
-
-  if (where !== undefined && (typeof where !== 'object' || where === null)) {
-    throw new Error('where must be an object');
-  }
-
-  return true;
-}
-
-export default {
-  parseOrder,
-  matchesWhere,
-  applyOrder,
-  applyPagination,
-  buildQueryResult,
-  validateQueryOptions,
-};
 `,mimeType:"text/javascript"},"/$app/model/row-utils.js":{content:`/**
  * @file Row Utilities
  * @description Utilities for preparing, validating, and transforming database rows
@@ -16782,6 +16164,186 @@ export class SystemModelManager {
 }
 
 export default SystemModelManager;
+`,mimeType:"text/javascript"},"/views/templates/app.js":{content:`import Router from "/$app/router/index.js";
+import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+export default {
+  class: "h-screen w-full bg-purple-50 flex flex-col font-sans",
+  properties: {
+    currentRoute: T.object({ sync: Router }),
+    currentLang: T.string("en"),
+    modalItem: T.object(null),
+    modalOpen: T.boolean(false),
+    userId: T.number({ sync: "local" }),
+  },
+  getActiveTabFromRoute() {
+    const rN = this.currentRoute?.name;
+    return ["profile", "meetups", "groups"].includes(rN) ? rN : "discover";
+  },
+  render() {
+    const tabs = [
+      { id: "discover", route: "/discover", icon: "house" },
+      { id: "groups", route: "/groups", icon: "users" },
+      { id: "meetups", route: "/meetups", icon: "map-pin" },
+      { id: "profile", route: "/profile", icon: "user" },
+    ];
+    const aT = this.getActiveTabFromRoute();
+
+    return html\`
+        <div class="flex-1 overflow-y-auto no-scrollbar">\${this.currentRoute.component}</div>
+        <uix-bottom-nav
+          class="flex-shrink-0 bg-white border-t-3 border-black p-2 z-30 flex justify-around items-center pt-4 mx-auto w-full"
+          style="--direction: column"
+        >
+          \${tabs.map(
+            (tab) => html\`
+              <uix-link href=\${tab.route} vertical class="flex flex-1 mt-2 flex-col items-center p-2 rounded-xl transition-all duration-200 \${aT === tab.id ? "bg-green-300 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transform -translate-y-2" : "hover:bg-gray-100"}">
+                <uix-icon size="lg" class="text-3xl mb-1 mx-auto" name=\${tab.icon}></uix-icon>
+                \${aT === tab.id ? html\`<div class="text-xs font-black uppercase">\${$APP.i18n.t(\`tabs.\${tab.id}\`)}</div>\` : null}
+              </uix-link>
+            \`,
+          )}
+        </uix-bottom-nav>
+        <view-item-modal .item=\${this.modalItem} .isOpen=\${this.modalOpen} @close=\${() => {
+          this.modalOpen = false;
+          this.modalItem = null;
+        }}></view-item-modal>
+      \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/discover-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { NBS } from "./utils.js";
+
+export default {
+  style: true,
+
+  properties: {
+    userId: T.string({ defaultValue: "guest" }),
+    currentUser: T.object({
+      sync: $APP.Model.users,
+      query: (inst) => ({
+        id: inst.userId,
+        includes: [
+          "likedPlaces",
+          "likedEvents",
+          "likedMeetups",
+          "likedGroups",
+          "interestedEvents",
+          "interestedMeetups",
+        ],
+      }),
+      dependsOn: ["userId"],
+    }),
+    places: T.array({ sync: $APP.Model.places, query: {} }),
+    events: T.array({ sync: $APP.Model.events, query: {} }),
+    meetups: T.array({ sync: $APP.Model.meetups, query: {} }),
+    groups: T.array({ sync: $APP.Model.groups, query: {} }),
+    meetupAttendance: T.array({ defaultValue: [] }),
+    searchQuery: T.string({ defaultValue: "" }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+    // Load meetup attendance for current user
+    this.meetupAttendance = await $APP.Model.meetup_attendance.getAll({
+      where: { user: this.userId },
+    });
+  },
+  isLoading() {
+    return (
+      !this.currentUser ||
+      !this.places ||
+      !this.events ||
+      !this.meetups ||
+      !this.groups
+    );
+  },
+  isJoined(meetupId) {
+    return this.meetupAttendance?.some((a) => a.meetup === meetupId) || false;
+  },
+  getNextEvents() {
+    return (this.events || []).sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+  },
+  getMyMeetups() {
+    const joinedMeetupIds = new Set(
+      (this.meetupAttendance || []).map((a) => a.meetup),
+    );
+    return (this.meetups || []).filter((m) => joinedMeetupIds.has(m.id));
+  },
+  render() {
+    if (this.isLoading()) return NBS.SPINNER;
+
+    const nE = this.events ?? [];
+    const mMs = this.meetups ?? [];
+    const nY = this.places ?? [];
+    return html\`
+      <div class="space-y-8 pb-8">
+        <div class="flex items-center justify-between px-6 pt-6">
+          <h1 class="text-4xl font-black text-black tracking-tight">Discover</h1>
+          <button class="w-12 h-12 flex items-center justify-center bg-accent border-3 border-black rounded-xl shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        </div>
+        <div class="md:px-6 overflow-hidden mx-1 max-w-screen">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">Today in Rio</h2>
+            <button @click=\${() => $APP.Router.go("calendar")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
+          </div>
+          <div class="flex gap-4 overflow-x-auto pb-4">
+            \${
+              nE.length === 0
+                ? html\`<div class="text-sm font-bold text-gray-500 italic">No upcoming events found.</div>\`
+                : nE.map(
+                    (event) => html\`
+                <view-story-circle .content=\${event} .onClick=\${(e) => $APP.Router.go("event-detail", { slug: e.slug })} class="last:mr-1"></view-story-circle>
+              \`,
+                  )
+            }
+          </div>
+        </div>
+        <div class="px-6 overflow-hidden">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">My Meetups</h2>
+            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
+          </div>
+          <div class="flex gap-4 overflow-x-auto pb-4 px-6">
+            \${
+              mMs.length === 0
+                ? html\`
+              <div class="w-full bg-white border-3 border-dashed border-gray-300 rounded-2xl p-6 text-center">
+                <p class="text-sm font-bold text-gray-400">You haven't joined any meetups yet.</p>
+                <button class="mt-2 text-xs font-black text-black underline">Explore below</button>
+              </div>
+            \`
+                : mMs.map(
+                    (meetup) => html\`
+                <view-meetup-card-horizontal .content=\${meetup} .onClick=\${(m) => $APP.Router.go("meetup-detail", { slug: m.slug })}></view-meetup-card-horizontal>
+              \`,
+                  )
+            }
+          </div>
+        </div>
+        <div class="px-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">Near You</h2>
+            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">Filter</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 p-2 md:p-4 lg:p-8">
+            \${nY.map(
+              (place) => html\`
+                <view-meetup-card-compact .content=\${place} type="place" .onClick=\${(p) => $APP.Router.go("place-detail", { slug: p.slug })}></view-meetup-card-compact>
+              \`,
+            )}
+          </div>
+        </div>
+      </div>
+    \`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/admin/views/layout.js":{content:`import Router from "/$app/router/index.js";
 import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
@@ -16928,6 +16490,191 @@ export default {
           </main>
         </div>
       </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/app/bottom-nav.js":{content:`import T from "/$app/types/index.js";
+
+export default {
+  tag: "uix-bottom-nav",
+  properties: {
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "floating", "filled"],
+    }),
+    fixed: T.boolean(),
+  },
+  style: true,
+  role: "navigation",
+};
+
+/**
+ * Bottom Navigation Component
+ *
+ * @component
+ * @category navigation
+ * @tag uix-bottom-nav
+ *
+ * A mobile-optimized bottom navigation bar with icon and label items.
+ * Commonly used in mobile apps for primary navigation.
+ *
+ * @slot default - Navigation items
+ *
+ * @part nav - The navigation container
+ *
+ * @example Basic Navigation
+ * \`\`\`html
+ * <uix-bottom-nav>
+ *   <a href="/">
+ *     <uix-icon name="house"></uix-icon>
+ *     <span>Home</span>
+ *   </a>
+ *   <a href="/search">
+ *     <uix-icon name="search"></uix-icon>
+ *     <span>Search</span>
+ *   </a>
+ *   <a href="/favorites">
+ *     <uix-icon name="heart"></uix-icon>
+ *     <span>Favorites</span>
+ *   </a>
+ *   <a href="/profile">
+ *     <uix-icon name="user"></uix-icon>
+ *     <span>Profile</span>
+ *   </a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ *
+ * @example With Badges
+ * \`\`\`html
+ * <uix-bottom-nav>
+ *   <a href="/">
+ *     <uix-icon name="house"></uix-icon>
+ *     <span>Home</span>
+ *   </a>
+ *   <a href="/notifications">
+ *     <uix-badge>3</uix-badge>
+ *     <uix-icon name="bell"></uix-icon>
+ *     <span>Notifications</span>
+ *   </a>
+ *   <a href="/messages">
+ *     <uix-badge>12</uix-badge>
+ *     <uix-icon name="message-circle"></uix-icon>
+ *     <span>Messages</span>
+ *   </a>
+ *   <a href="/profile">
+ *     <uix-icon name="user"></uix-icon>
+ *     <span>Profile</span>
+ *   </a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ *
+ * @example Floating Variant
+ * \`\`\`html
+ * <uix-bottom-nav variant="floating">
+ *   <a href="/">
+ *     <uix-icon name="house"></uix-icon>
+ *     <span>Home</span>
+ *   </a>
+ *   <a href="/explore">
+ *     <uix-icon name="search"></uix-icon>
+ *     <span>Explore</span>
+ *   </a>
+ *   <a href="/create">
+ *     <uix-icon name="plus"></uix-icon>
+ *     <span>Create</span>
+ *   </a>
+ *   <a href="/profile">
+ *     <uix-icon name="user"></uix-icon>
+ *     <span>Profile</span>
+ *   </a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ *
+ * @example Icons Only (No Labels)
+ * \`\`\`html
+ * <uix-bottom-nav>
+ *   <a href="/" aria-label="Home">
+ *     <uix-icon name="house"></uix-icon>
+ *   </a>
+ *   <a href="/search" aria-label="Search">
+ *     <uix-icon name="search"></uix-icon>
+ *   </a>
+ *   <a href="/saved" aria-label="Saved">
+ *     <uix-icon name="bookmark"></uix-icon>
+ *   </a>
+ *   <a href="/settings" aria-label="Settings">
+ *     <uix-icon name="settings"></uix-icon>
+ *   </a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ *
+ * @example Filled Variant
+ * \`\`\`html
+ * <uix-bottom-nav variant="filled">
+ *   <a href="/">
+ *     <uix-icon name="grid"></uix-icon>
+ *     <span>Dashboard</span>
+ *   </a>
+ *   <a href="/shop">
+ *     <uix-icon name="shopping-cart"></uix-icon>
+ *     <span>Shop</span>
+ *   </a>
+ *   <a href="/wishlist">
+ *     <uix-icon name="heart"></uix-icon>
+ *     <span>Wishlist</span>
+ *   </a>
+ *   <a href="/account">
+ *     <uix-icon name="user"></uix-icon>
+ *     <span>Account</span>
+ *   </a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ *
+ * @example Non-Fixed Position
+ * \`\`\`html
+ * <uix-bottom-nav fixed="false">
+ *   <a href="/"><uix-icon name="house"></uix-icon><span>Home</span></a>
+ *   <a href="/search"><uix-icon name="search"></uix-icon><span>Search</span></a>
+ *   <a href="/profile"><uix-icon name="user"></uix-icon><span>Profile</span></a>
+ * </uix-bottom-nav>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+
+export default {
+  style: true,
+  properties: {
+    item: T.object({ attribute: false }),
+    isOpen: T.boolean({ defaultValue: false }),
+  },
+  handleClose() {
+    this.isOpen = false;
+    this.item = null;
+    this.dispatchEvent(
+      new CustomEvent("close", { bubbles: true, composed: true }),
+    );
+  },
+  render() {
+    if (!this.item) return null;
+
+    return html\`
+      <uix-modal
+        .open=\${this.isOpen}
+        @modal-close=\${this.handleClose.bind(this)}
+        @modal-cancel=\${this.handleClose.bind(this)}
+      >
+        <view-content-card .content=\${this.item}></view-content-card>
+        <div slot="footer" class="pt-4">
+          <button
+            data-close
+            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            \u2715 \${$APP.i18n.t("actions.close")}
+          </button>
+        </div>
+      </uix-modal>
     \`;
   },
 };
@@ -17481,6 +17228,54 @@ export default {
  * </uix-menu>
  * \`\`\`
  */
+`,mimeType:"text/javascript"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+export default {
+  tag: "uix-darkmode",
+  icons: ["moon", "sun"],
+  properties: {
+    width: T.string({ defaultValue: "fit" }),
+    compact: T.boolean(),
+    darkmode: T.boolean({
+      sync: "local",
+      defaultValue: true,
+    }),
+    icon: T.string(),
+  },
+
+  click(e) {
+    e.stopPropagation();
+    this.darkmode = !this.darkmode;
+    this.icon = this.darkmode ? "sun" : "moon";
+  },
+  willUpdate({ changedProps }) {
+    if (changedProps.has("darkmode"))
+      document.documentElement.classList.toggle("dark");
+  },
+  connected() {
+    this.icon = this.darkmode ? "sun" : "moon";
+    if (this.darkmode) document.documentElement.classList.add("dark");
+    this.on("button#click", this.click.bind(this));
+  },
+  render() {
+    return this.compact
+      ? html\`<button>
+        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
+        </button>
+        \`
+      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
+              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
+              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
+              <div class="ml-auto w-10 h-5 \${
+                this.darkmode ? "bg-red-700" : "bg-gray-600"
+              } rounded-full flex items-center p-1 transition-colors">
+                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
+                    this.darkmode ? "translate-x-4" : ""
+                  }"></div>
+              </div>
+          </button>\`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/uix/display/link.js":{content:`/**
  * App Link Component
  * Core link component for navigation and routing
@@ -17615,54 +17410,6 @@ export default {
         \${content}
       </a>
     \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-export default {
-  tag: "uix-darkmode",
-  icons: ["moon", "sun"],
-  properties: {
-    width: T.string({ defaultValue: "fit" }),
-    compact: T.boolean(),
-    darkmode: T.boolean({
-      sync: "local",
-      defaultValue: true,
-    }),
-    icon: T.string(),
-  },
-
-  click(e) {
-    e.stopPropagation();
-    this.darkmode = !this.darkmode;
-    this.icon = this.darkmode ? "sun" : "moon";
-  },
-  willUpdate({ changedProps }) {
-    if (changedProps.has("darkmode"))
-      document.documentElement.classList.toggle("dark");
-  },
-  connected() {
-    this.icon = this.darkmode ? "sun" : "moon";
-    if (this.darkmode) document.documentElement.classList.add("dark");
-    this.on("button#click", this.click.bind(this));
-  },
-  render() {
-    return this.compact
-      ? html\`<button>
-        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
-        </button>
-        \`
-      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
-              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
-              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
-              <div class="ml-auto w-10 h-5 \${
-                this.darkmode ? "bg-red-700" : "bg-gray-600"
-              } rounded-full flex items-center p-1 transition-colors">
-                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
-                    this.darkmode ? "translate-x-4" : ""
-                  }"></div>
-              </div>
-          </button>\`;
   },
 };
 `,mimeType:"text/javascript"},"/$app/uix/navigation/navbar.js":{content:`import T from "/$app/types/index.js";
@@ -17892,7 +17639,9 @@ export default {
  * </uix-navbar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/breadcrumbs.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
+`,mimeType:"text/css"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
+`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
@@ -18715,15 +18464,149 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
-`,mimeType:"text/css"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.css":{content:`:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--font-semibold, 600)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}
-`,mimeType:"text/css"},"/$app/uix/display/avatar.css":{content:`:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}
+`,mimeType:"text/javascript"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
+
+// Category definitions
+export const CATEGORIES = {
+  all: { id: "all", color: "gray-200", icon: "\u{1F4CD}" },
+  beaches: { id: "beaches", color: "blue-300", icon: "\u{1F3D6}\uFE0F" },
+  nightlife: { id: "nightlife", color: "purple-300", icon: "\u{1F389}" },
+  food: { id: "food", color: "orange-300", icon: "\u{1F37D}\uFE0F" },
+  attractions: { id: "attractions", color: "emerald-300", icon: "\u2728" },
+  groups: { id: "groups", color: "pink-300", icon: "\u{1F4AC}" },
+};
+
+// Neubrutalist Shadow styles
+export const NBS = {
+  S: "border-3 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
+  M: "border-3 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all",
+  L: "border-3 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
+  ACTIVE_SM:
+    "active:shadow-none active:translate-x-[2px] active:translate-y-[2px]",
+  ACTIVE_LG:
+    "active:shadow-none active:translate-x-[4px] active:translate-y-[4px]",
+  SPINNER: html\`<div class="flex items-center justify-center min-h-screen"><uix-spinner></uix-spinner></div>\`,
+};
+
+// Helper functions
+export const getCategoryColor = (category) =>
+  CATEGORIES[category]?.color
+    ? \`bg-\${CATEGORIES[category].color}\`
+    : "bg-gray-200";
+
+export const getUser = () => $APP.Auth?.user || null;
+
+export const isGuest = () => $APP.Auth?.isGuest ?? true;
+
+export const styleTag = (css) => html\`<style>\${css}</style>\`;
+`,mimeType:"text/javascript"},"/$app/uix/app/bottom-nav.css":{content:`:where(.uix-bottom-nav,uix-bottom-nav){--icon-size: 36px;display:flex;flex-direction:row;width:100%;align-items:center;justify-content:space-around;gap:var(--bottom-nav-gap, var(--spacing-xs, .5rem));min-height:var(--bottom-nav-height, 56px);padding:var(--bottom-nav-padding-y, var(--spacing-xs, .5rem)) var(--bottom-nav-padding-x, var(--spacing-sm, .75rem));background:var(--bottom-nav-background, var(--color-surface, white));padding-bottom:calc(var(--bottom-nav-padding-y, var(--spacing-xs, .5rem)) + env(safe-area-inset-bottom));padding-left:calc(var(--bottom-nav-padding-x, var(--spacing-sm, .75rem)) + env(safe-area-inset-left));padding-right:calc(var(--bottom-nav-padding-x, var(--spacing-sm, .75rem)) + env(safe-area-inset-right));&[fixed]{position:fixed;bottom:0;left:0;right:0;z-index:100}&[variant=floating]{--bottom-nav-background: var(--color-surface);--bottom-nav-border-radius: var(--radius-xl);margin:var(--bottom-nav-margin, var(--spacing-md));margin-bottom:calc(var(--bottom-nav-margin, var(--spacing-md)) + env(safe-area-inset-bottom));border-radius:var(--bottom-nav-border-radius)}&[variant=filled]{--bottom-nav-item-active-background: var(--color-primary);--bottom-nav-item-active-color: white}}:where(.uix-bottom-nav,uix-bottom-nav)>*{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;--justify-content: center;gap:var(--bottom-nav-item-gap, var(--spacing-xs, .25rem));padding:var( --bottom-nav-item-padding, var(--spacing-xs, .5rem) var(--spacing-sm, .75rem) );flex:1;min-width:0;color:var(--bottom-nav-item-color, var(--color-text-muted));text-decoration:none;border-radius:var(--bottom-nav-item-radius, var(--radius-sm, .25rem));transition:var(--bottom-nav-item-transition, all .2s ease);cursor:pointer;&:hover{background:var(--bottom-nav-item-hover-background, var(--color-primary-lighter));color:var(--bottom-nav-item-hover-color, var(--color-text))}&.active,&[aria-current]{color:var(--bottom-nav-item-active-color, var(--color-primary))}}:where(.uix-bottom-nav[variant=filled],uix-bottom-nav[variant=filled])>*.active,:where(.uix-bottom-nav[variant=filled],uix-bottom-nav[variant=filled])>*[aria-current]{background:var(--bottom-nav-item-active-background, var(--color-primary));color:var(--bottom-nav-item-active-color, white)}:where(.uix-bottom-nav,uix-bottom-nav) uix-icon,:where(.uix-bottom-nav,uix-bottom-nav) svg{width:var(--icon-size);height:var(--icon-size);flex-shrink:0}:where(.uix-bottom-nav,uix-bottom-nav) span{font-size:var(--bottom-nav-text-size, var(--text-xs, .75rem));font-weight:var(--bottom-nav-text-weight, var(--font-medium, 500));text-align:center}
+`,mimeType:"text/css"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
+`,mimeType:"text/css"},"/views/discover-view.css":{content:`.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}.scrollbar-hide::-webkit-scrollbar{display:none}
 `,mimeType:"text/css"},"/$app/uix/display/link.css":{content:`:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}
+`,mimeType:"text/css"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
+`,mimeType:"text/css"},"/$app/uix/display/avatar.css":{content:`:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}
 `,mimeType:"text/css"},"/$app/bundler/views/ui.css":{content:`.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}
+`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.css":{content:`:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--font-semibold, 600)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}
 `,mimeType:"text/css"},"/$app/uix/display/icon.css":{content:`:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 24)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 36)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 48)}}
-`,mimeType:"text/css"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/house.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map-pin.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/feedback/spinner.js":{content:`/**
+ * Spinner Component
+ *
+ * @component
+ * @category feedback
+ * @tag uix-spinner
+ *
+ * A loading spinner component with multiple animation variants and sizes.
+ * Uses pure CSS animations for performance.
+ *
+ * @example Basic Spinner
+ * \`\`\`html
+ * <uix-spinner></uix-spinner>
+ * \`\`\`
+ *
+ * @example Spinner Variants
+ * Different animation styles
+ * \`\`\`html
+ * <div class="flex gap-4">
+ *   <uix-spinner variant="circular"></uix-spinner>
+ *   <uix-spinner variant="dots"></uix-spinner>
+ *   <uix-spinner variant="bars"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Spinner Sizes
+ * \`\`\`html
+ * <div class="flex gap-4 items-center">
+ *   <uix-spinner size="xs"></uix-spinner>
+ *   <uix-spinner size="sm"></uix-spinner>
+ *   <uix-spinner size="md"></uix-spinner>
+ *   <uix-spinner size="lg"></uix-spinner>
+ *   <uix-spinner size="xl"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Colored Spinner
+ * \`\`\`html
+ * <uix-spinner primary></uix-spinner>
+ * <uix-spinner secondary></uix-spinner>
+ * <uix-spinner success></uix-spinner>
+ * <uix-spinner danger></uix-spinner>
+ * \`\`\`
+ *
+ * @example Custom Color
+ * \`\`\`html
+ * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
+ * \`\`\`
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-spinner",
+  properties: {
+    variant: T.string({
+      defaultValue: "circular",
+      enum: ["circular", "dots", "bars"],
+    }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    primary: T.boolean(),
+    secondary: T.boolean(),
+    success: T.boolean(),
+    danger: T.boolean(),
+    warning: T.boolean(),
+    info: T.boolean(),
+  },
+  style: true,
+  render() {
+    // Circular variant uses CSS ::before pseudo-element
+    if (this.variant === "circular") {
+      return html\`\`;
+    }
+
+    // Dots and bars variants need 3 elements
+    if (this.variant === "dots") {
+      return html\`
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      \`;
+    }
+
+    if (this.variant === "bars") {
+      return html\`
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      \`;
+    }
+
+    return html\`\`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
@@ -18873,105 +18756,6 @@ export default {
  *   <div slot="panel">Second panel</div>
  * </uix-tabs>\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  extends: "uix-container",
-  i18n: {},
-  style: true,
-  shadow: true,
-  properties: {
-    borderWidth: T.string({
-      defaultValue: "1",
-      enum: ["none", "1", "2", "3"],
-    }),
-    borderStyle: T.string({
-      defaultValue: "solid",
-      enum: ["solid", "dashed", "dotted"],
-    }),
-    shadow: T.string({
-      defaultValue: "none",
-      enum: ["none", "sm", "md", "lg"],
-    }),
-    hover: T.boolean({
-      defaultValue: false,
-    }),
-    gap: T.string({
-      defaultValue: "md",
-      enum: ["none", "xs", "sm", "md", "lg", "xl"],
-    }),
-  },
-  render() {
-    return html\`
-      <slot name="header" part="header"></slot>
-      <slot part="body"><slot></slot></slot>
-      
-      <slot part="footer" name="footer"></slot>
-    \`;
-  },
-};
-
-/**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * Card Component
- *
- * @component
- * @category layout
- * @tag uix-card
- *
- * A versatile container component for displaying grouped content with optional
- * header and footer sections. Supports different variants and padding options.
- *
- * @slot header - Optional header content
- * @slot - Default slot for card body content
- * @slot footer - Optional footer content
- * @part header - The card header container
- * @part body - The card body container
- * @part footer - The card footer container
- *
- * @example Basic Card
- * \`\`\`html
- * <uix-card>
- *   <h3 slot="header">Card Title</h3>
- *   <p>Card content goes here...</p>
- * </uix-card>
- * \`\`\`
- *
- * @example Card with Footer
- * \`\`\`html
- * <uix-card>
- *   <header slot="header"><h3 class="flex">User Profile</h3></header>
- *   <article>
- *     <p>John Doe</p>
- *     <p>Software Engineer</p>
- *   </article>
- *   <footer slot="footer">
- *     <uix-button primary>Edit</uix-button>
- *     <uix-button>Cancel</uix-button>
- *   </footer>
- * </uix-card>
- * \`\`\`
- *
- * @example Card Variants
- * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card variant="default">Default Card</uix-card>
- *  <uix-card variant="elevated">Elevated Card</uix-card>
- * </div>
- * \`\`\`
- *
- * @example Card Padding Options
- * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card padding="none">No Padding</uix-card>
- *  <uix-card padding="sm">Small Padding</uix-card>
- *  <uix-card padding="md">Medium Padding</uix-card>
- *  <uix-card padding="lg">Large Padding</uix-card>
- * </div>
- * \`\`\`
- */
 `,mimeType:"text/javascript"},"/$app/uix/display/stat.js":{content:`import T from "/$app/types/index.js";
 import { html, nothing } from "/npm/lit-html";
 
@@ -19100,7 +18884,7 @@ export default {
  * </uix-join>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/display/button.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/display/button.js":{content:`import T from "/$app/types/index.js";
 
 export default {
   tag: "uix-button",
@@ -19206,6 +18990,33 @@ export default {
  * <uix-button href="/dashboard">Go to Dashboard</uix-button>
  * \`\`\`
  */
+`,mimeType:"text/javascript"},"/views/story-circle.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  properties: {
+    content: T.object({ attribute: false }),
+    onClick: T.function({ attribute: false }),
+  },
+  render() {
+    if (!this.content) return null;
+    return html\`
+      <div
+        class="flex flex-col items-center gap-1 cursor-pointer group min-w-[72px]"
+        @click=\${() => this.onClick && this.onClick(this.content)}
+      >
+        <div class="p-[3px] rounded-full bg-gradient-to-tr from-accent to-primary border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] group-hover:shadow-none transition-all">
+          <div class="w-16 h-16 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
+             <img src="\${this.content.image}" class="w-full h-full object-cover" />
+          </div>
+        </div>
+        <uix-link href="/event/\${this.content.slug}" class="text-xs font-black uppercase text-center max-w-[80px] truncate leading-tight">
+          \${this.content.name}
+        </uix-link>
+      </div>
+    \`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/uix/form/input.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
@@ -19350,7 +19161,259 @@ export default {
  * </div>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-textarea",
+  properties: {
+    label: T.string(),
+    id: T.string(),
+    value: T.string(""),
+    placeholder: T.string(""),
+    rows: T.number({ defaultValue: 4 }),
+    cols: T.number({ defaultValue: 50 }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    disabled: T.boolean(false),
+    readonly: T.boolean(false),
+    required: T.boolean(false),
+    maxlength: T.number({ defaultValue: null }),
+    minlength: T.number({ defaultValue: null }),
+    resize: T.string({
+      defaultValue: "vertical",
+      enum: ["none", "both", "horizontal", "vertical"],
+    }),
+    error: T.boolean(false),
+    fullWidth: T.boolean(false),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
+    }),
+    name: T.string(),
+  },
+  style: true,
+  shadow: false,
+  formAssociated: true,
+
+  connected() {
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._internals.setFormValue(this.value);
+    if (!this.id && !this._textareaId) {
+      this._textareaId = generateId();
+    }
+  },
+
+  get textareaId() {
+    return this.id || this._textareaId || (this._textareaId = generateId());
+  },
+
+  handleInput(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("input", { value: this.value });
+  },
+
+  handleChange(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("change", { value: this.value });
+  },
+
+  render() {
+    const id = this.textareaId;
+    const attrs = {};
+    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
+    if (this.minlength !== null) attrs.minlength = this.minlength;
+
+    return html\`
+      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+      <textarea
+        id=\${id}
+        class="textarea"
+        name=\${this.name}
+        value=\${this.value}
+        placeholder=\${this.placeholder}
+        rows=\${this.rows}
+        cols=\${this.cols}
+        ?disabled=\${this.disabled}
+        ?readonly=\${this.readonly}
+        ?required=\${this.required}
+        @input=\${this.handleInput.bind(this)}
+        @change=\${this.handleChange.bind(this)}
+      ></textarea>
+    \`;
+  },
+};
+
+/**
+ * Textarea Component
+ *
+ * @component
+ * @category form
+ * @tag uix-textarea
+ *
+ * Multi-line text input field with size variants and resize options.
+ *
+ * @example
+ * // Basic textarea
+ * \`\`\`html
+ * <uix-textarea placeholder="Enter your message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // With custom rows
+ * \`\`\`html
+ * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // Size variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
+ *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
+ *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
+ *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
+ *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Resize options
+ * \`\`\`html
+ * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+ *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
+ *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
+ *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
+ *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With character limit
+ * \`\`\`html
+ * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // States
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea placeholder="Normal"></uix-textarea>
+ *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
+ *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
+ *   <uix-textarea placeholder="Required" required></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With binding
+ * \`\`\`js
+ * html\`<uix-textarea
+ *   .value=\${this.message}
+ *   @input=\${(e) => this.message = e.detail.value}
+ *   placeholder="Type your message..."
+ * ></uix-textarea>\`
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/views/meetup-card-horizontal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor, NBS } from "./utils.js";
+
+export default {
+  properties: {
+    content: T.object({ attribute: false }),
+    onClick: T.function({ attribute: false }),
+  },
+  render() {
+    if (!this.content) return null;
+    return html\`
+      <div
+        class="min-w-[160px] w-[160px] \${getCategoryColor(this.content.category)} border-3 border-black rounded-2xl p-3 \${NBS.S} cursor-pointer flex flex-col gap-2"
+        @click=\${() => this.onClick && this.onClick(this.content)}
+      >
+        <div class="w-12 h-12 rounded-full border-2 border-black bg-white overflow-hidden mx-auto shadow-sm">
+           <img src="\${this.content.image}" class="w-full h-full object-cover" />
+        </div>
+        <div class="text-center">
+          <uix-link href="/meetup/\${this.content.slug}" class="font-black text-xs uppercase leading-tight line-clamp-2 mb-1">
+            \${this.content.name}
+          </uix-link>
+          <div class="text-[10px] font-bold opacity-70">
+            \u{1F4CD} \${this.content.address || this.content.venue || "Rio"}
+          </div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/meetup-card-compact.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { CATEGORIES, getCategoryColor } from "./utils.js";
+
+export default {
+  style: true,
+  properties: {
+    content: T.object({ attribute: false }),
+    onClick: T.function({ attribute: false }),
+    type: T.string({ defaultValue: "" }), // e.g., "place", "event", "meetup", "group"
+  },
+  getCategoryEmoji() {
+    return CATEGORIES[this.content?.category]?.icon || "\u{1F4CD}";
+  },
+  handleCardClick(e) {
+    if (e.target.closest(".join-button")) return;
+    if (this.onClick) this.onClick(this.content);
+  },
+  handleJoinClick(e) {
+    e.stopPropagation();
+  },
+  render() {
+    if (!this.content) return null;
+    const isJoined = this.content.joined;
+    const btnCls = \`join-button w-full py-2 px-4 border-2 border-black rounded-lg font-black uppercase text-xs transition-all duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] \${isJoined ? "bg-primary text-black hover:bg-primary-dark" : "bg-accent text-black hover:bg-accent"}\`;
+
+    return html\`
+      <uix-card
+        class="meetup-card-compact"
+        shadow="md"
+        hover
+        borderWidth="3"
+        padding="none"
+        @click=\${(e) => this.handleCardClick(e)}
+      >
+        <div slot="header" class="w-full h-48 bg-gray-100"
+          style="background-image: url(\${this.content.image}); background-size: cover; background-position: center;"
+        ></div>
+        <div class="p-3 space-y-2 flex-1 flex flex-col">
+          <div>
+            <div class="inline-flex items-center gap-1 px-2 py-1 \${getCategoryColor(this.content.category)} border-2 border-black rounded-lg font-black text-xs uppercase text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              \${this.getCategoryEmoji()} \${$APP.i18n.t(\`categories.\${this.content.category}\`)}
+            </div>
+          </div>
+          <uix-link href="/\${this.type || this.content._type || 'place'}/\${this.content.slug}" class="text-lg font-black leading-tight line-clamp-2 uppercase">\${this.content.name}</uix-link>
+          <div class="flex-1"></div>
+        </div>
+        <div slot="footer" class="p-3 pt-0">
+          <button class="\${btnCls}" @click=\${(e) => this.handleJoinClick(e)}>
+            \${isJoined ? html\`\u2713 \${$APP.i18n.t("actions.joined")}\` : html\`\u2764\uFE0F \${$APP.i18n.t("actions.join")}\`}
+          </button>
+        </div>
+      </uix-card>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+`,mimeType:"text/css"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
+`,mimeType:"text/css"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 const generateId = () => \`uix-checkbox-\${Math.random().toString(36).slice(2, 9)}\`;
@@ -19520,168 +19583,6 @@ export default {
  * </form>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-textarea",
-  properties: {
-    label: T.string(),
-    id: T.string(),
-    value: T.string(""),
-    placeholder: T.string(""),
-    rows: T.number({ defaultValue: 4 }),
-    cols: T.number({ defaultValue: 50 }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    disabled: T.boolean(false),
-    readonly: T.boolean(false),
-    required: T.boolean(false),
-    maxlength: T.number({ defaultValue: null }),
-    minlength: T.number({ defaultValue: null }),
-    resize: T.string({
-      defaultValue: "vertical",
-      enum: ["none", "both", "horizontal", "vertical"],
-    }),
-    error: T.boolean(false),
-    fullWidth: T.boolean(false),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-    name: T.string(),
-  },
-  style: true,
-  shadow: false,
-  formAssociated: true,
-
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._internals.setFormValue(this.value);
-    if (!this.id && !this._textareaId) {
-      this._textareaId = generateId();
-    }
-  },
-
-  get textareaId() {
-    return this.id || this._textareaId || (this._textareaId = generateId());
-  },
-
-  handleInput(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("input", { value: this.value });
-  },
-
-  handleChange(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("change", { value: this.value });
-  },
-
-  render() {
-    const id = this.textareaId;
-    const attrs = {};
-    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
-    if (this.minlength !== null) attrs.minlength = this.minlength;
-
-    return html\`
-      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-      <textarea
-        id=\${id}
-        class="textarea"
-        name=\${this.name}
-        value=\${this.value}
-        placeholder=\${this.placeholder}
-        rows=\${this.rows}
-        cols=\${this.cols}
-        ?disabled=\${this.disabled}
-        ?readonly=\${this.readonly}
-        ?required=\${this.required}
-        @input=\${this.handleInput.bind(this)}
-        @change=\${this.handleChange.bind(this)}
-      ></textarea>
-    \`;
-  },
-};
-
-/**
- * Textarea Component
- *
- * @component
- * @category form
- * @tag uix-textarea
- *
- * Multi-line text input field with size variants and resize options.
- *
- * @example
- * // Basic textarea
- * \`\`\`html
- * <uix-textarea placeholder="Enter your message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // With custom rows
- * \`\`\`html
- * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
- *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
- *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
- *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
- *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // Resize options
- * \`\`\`html
- * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
- *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
- *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
- *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
- *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With character limit
- * \`\`\`html
- * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
- * \`\`\`
- *
- * @example
- * // States
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea placeholder="Normal"></uix-textarea>
- *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
- *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
- *   <uix-textarea placeholder="Required" required></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With binding
- * \`\`\`js
- * html\`<uix-textarea
- *   .value=\${this.message}
- *   @input=\${(e) => this.message = e.detail.value}
- *   placeholder="Type your message..."
- * ></uix-textarea>\`
- * \`\`\`
- */
 `,mimeType:"text/javascript"},"/$app/uix/form/select.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
@@ -19845,34 +19746,11 @@ export default {
  * ></uix-select>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-`,mimeType:"text/css"},"/$app/uix/layout/container.js":{content:`/**
- * UIX Container Component
- * Generic container component with padding, overflow, and variant support
- */
-
-import T from "/$app/types/index.js";
-
-export default {
-  style: true,
-  properties: {
-    padding: T.string({
-      defaultValue: "md",
-      enum: ["none", "sm", "md", "lg"],
-    }),
-    overflow: T.string({
-      enum: ["visible", "hidden", "auto", "scroll"],
-    }),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "filled", "outlined", "elevated"],
-    }),
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
-`,mimeType:"text/css"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
-`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
+`,mimeType:"text/javascript"},"/$app/uix/feedback/spinner.css":{content:`:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}
 `,mimeType:"text/css"},"/$app/uix/form/textarea.css":{content:`:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/css"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
+`,mimeType:"text/css"},"/views/meetup-card-compact.css":{content:`.meetup-card-compact.uix-card{cursor:pointer;height:100%;background:#fff;border-color:var(--card-border-color, black);border-radius:1rem}.meetup-card-compact.uix-card>[slot=header]{border-bottom:3px solid var(--card-border-color, black);padding:0}.meetup-card-compact.uix-card>[slot=footer]{justify-content:stretch}.meetup-card-compact.uix-card>[slot=footer]>button{width:100%}
+`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
 `,mimeType:"text/css"},"/$app/uix/form/checkbox.css":{content:`:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}
 `,mimeType:"text/css"},"/$app/uix/form/select.css":{content:`:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
 `,mimeType:"text/css"},"/$app/uix/form/label.js":{content:`import T from "/$app/types/index.js";
@@ -19919,9 +19797,131 @@ export default {
  * <uix-input id="email" required></uix-input>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/form/label.css":{content:`:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}
+`,mimeType:"text/css"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  extends: "uix-container",
+  i18n: {},
+  style: true,
+  shadow: true,
+  properties: {
+    borderWidth: T.string({
+      defaultValue: "1",
+      enum: ["none", "1", "2", "3"],
+    }),
+    borderStyle: T.string({
+      defaultValue: "solid",
+      enum: ["solid", "dashed", "dotted"],
+    }),
+    shadow: T.string({
+      defaultValue: "none",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    hover: T.boolean({
+      defaultValue: false,
+    }),
+    gap: T.string({
+      defaultValue: "md",
+      enum: ["none", "xs", "sm", "md", "lg", "xl"],
+    }),
+  },
+  render() {
+    return html\`
+      <slot name="header" part="header"></slot>
+      <slot part="body"><slot></slot></slot>
+      
+      <slot part="footer" name="footer"></slot>
+    \`;
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * Card Component
+ *
+ * @component
+ * @category layout
+ * @tag uix-card
+ *
+ * A versatile container component for displaying grouped content with optional
+ * header and footer sections. Supports different variants and padding options.
+ *
+ * @slot header - Optional header content
+ * @slot - Default slot for card body content
+ * @slot footer - Optional footer content
+ * @part header - The card header container
+ * @part body - The card body container
+ * @part footer - The card footer container
+ *
+ * @example Basic Card
+ * \`\`\`html
+ * <uix-card>
+ *   <h3 slot="header">Card Title</h3>
+ *   <p>Card content goes here...</p>
+ * </uix-card>
+ * \`\`\`
+ *
+ * @example Card with Footer
+ * \`\`\`html
+ * <uix-card>
+ *   <header slot="header"><h3 class="flex">User Profile</h3></header>
+ *   <article>
+ *     <p>John Doe</p>
+ *     <p>Software Engineer</p>
+ *   </article>
+ *   <footer slot="footer">
+ *     <uix-button primary>Edit</uix-button>
+ *     <uix-button>Cancel</uix-button>
+ *   </footer>
+ * </uix-card>
+ * \`\`\`
+ *
+ * @example Card Variants
+ * \`\`\`html
+ * <div class="flex flex-row gap-2">
+ *  <uix-card variant="default">Default Card</uix-card>
+ *  <uix-card variant="elevated">Elevated Card</uix-card>
+ * </div>
+ * \`\`\`
+ *
+ * @example Card Padding Options
+ * \`\`\`html
+ * <div class="flex flex-row gap-2">
+ *  <uix-card padding="none">No Padding</uix-card>
+ *  <uix-card padding="sm">Small Padding</uix-card>
+ *  <uix-card padding="md">Medium Padding</uix-card>
+ *  <uix-card padding="lg">Large Padding</uix-card>
+ * </div>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/layout/container.js":{content:`/**
+ * UIX Container Component
+ * Generic container component with padding, overflow, and variant support
+ */
+
+import T from "/$app/types/index.js";
+
+export default {
+  style: true,
+  properties: {
+    padding: T.string({
+      defaultValue: "md",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    overflow: T.string({
+      enum: ["visible", "hidden", "auto", "scroll"],
+    }),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "filled", "outlined", "elevated"],
+    }),
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
 `,mimeType:"text/css"},"/$app/uix/layout/card.css":{content:`:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}
-`,mimeType:"text/css"},"/$app/uix/form/label.css":{content:`:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}
 `,mimeType:"text/css"},"/lit-html":{content:`export*from"/lit-html@3.3.1/es2022/lit-html.mjs";
 `,mimeType:"application/javascript"},"/lit-html@3.3.1/es2022/lit-html.mjs":{content:`var M=globalThis,b=M.trustedTypes,P=b?b.createPolicy("lit-html",{createHTML:e=>e}):void 0,w="$lit$",d=\`lit$\${Math.random().toFixed(9).slice(2)}$\`,S="?"+d,X=\`<\${S}>\`,c=document,f=()=>c.createComment(""),y=e=>e===null||typeof e!="object"&&typeof e!="function",I=Array.isArray,R=e=>I(e)||typeof e?.[Symbol.iterator]=="function",E=\`[ 	
 \\f\\r]\`,H=/<(?:(!--|\\/[^a-zA-Z])|(\\/?[a-zA-Z][^>\\s]*)|(\\/?$))/g,L=/-->/g,O=/>/g,u=RegExp(\`>|\${E}(?:([^\\\\s"'>=/]+)(\${E}*=\${E}*(?:[^ 	
@@ -19985,5 +19985,5 @@ lit-html/directives/unsafe-html.js:
    * SPDX-License-Identifier: BSD-3-Clause
    *)
 */
-`,mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto;padding:1.5rem}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--font-semibold, 600)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 24)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 36)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 48)}}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
+`,mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto;padding:1.5rem}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--font-semibold, 600)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 24)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 36)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 48)}}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
 `,mimeType:"text/css"}};self.addEventListener("install",e=>e.waitUntil(self.skipWaiting())),self.addEventListener("activate",e=>e.waitUntil(self.clients.claim())),self.addEventListener("fetch",e=>{let n=new URL(e.request.url).pathname;n.startsWith("/npm/")&&(n="/"+n.slice(5));const t=FILE_BUNDLE[n];t&&e.respondWith(new Response(t.content,{headers:{"Content-Type":t.mimeType||"application/javascript"}}))});
