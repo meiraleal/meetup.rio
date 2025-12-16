@@ -762,315 +762,6 @@ export default {
   },
 };
 `,mimeType:"text/javascript"},"/$app/uix/form/form.css":{content:`uix-form form{display:grid;grid-template-columns:1fr;gap:var(--form-gap, 1.25rem)}@media (min-width: 640px){uix-form form{grid-template-columns:repeat(2,1fr)}uix-form .form-field:has(uix-textarea){grid-column:1 / -1}}.form-field{display:flex;flex-direction:column;gap:var(--form-field-gap, .5rem)}.form-label{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.875rem}.form-required{color:var(--form-required-color, #ef4444)}.form-error{color:var(--form-error-color, #ef4444);font-size:.75rem;margin-top:.25rem}.form-field.has-error uix-input,.form-field.has-error uix-select,.form-field.has-error uix-textarea{--input-border-color: var(--form-error-color, #ef4444)}
-`,mimeType:"text/css"},"/views/global-search.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { CATEGORIES, ALL_TAGS, getTagInfo } from "./utils.js";
-
-export default {
-  style: true,
-
-  properties: {
-    query: T.string({ defaultValue: "" }),
-    isOpen: T.boolean({ defaultValue: false }),
-    selectedTags: T.array({ defaultValue: [] }),
-    places: T.array({ sync: $APP.Model.places, query: {} }),
-    events: T.array({ sync: $APP.Model.events, query: {} }),
-    guides: T.array({ sync: $APP.Model.guides, query: {} }),
-    groups: T.array({ sync: $APP.Model.groups, query: {} }),
-  },
-
-  handleInputChange(e) {
-    this.query = e.target.value;
-    this.isOpen = this.query.length > 0 || this.selectedTags.length > 0;
-  },
-
-  handleFocus() {
-    this.isOpen = true;
-  },
-
-  handleBlur() {
-    // Delay to allow click on results
-    setTimeout(() => {
-      this.isOpen = false;
-    }, 200);
-  },
-
-  toggleTag(tagId) {
-    if (this.selectedTags.includes(tagId)) {
-      this.selectedTags = this.selectedTags.filter((t) => t !== tagId);
-    } else {
-      this.selectedTags = [...this.selectedTags, tagId];
-    }
-    this.isOpen = true;
-  },
-
-  clearSearch() {
-    this.query = "";
-    this.selectedTags = [];
-    this.isOpen = false;
-  },
-
-  getFilteredResults() {
-    const q = this.query.toLowerCase().trim();
-    const tags = this.selectedTags;
-
-    const matchesQuery = (item) => {
-      if (!q) return true;
-      return (
-        item.name?.toLowerCase().includes(q) ||
-        item.title?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q)
-      );
-    };
-
-    const matchesTags = (item) => {
-      if (tags.length === 0) return true;
-      return tags.some((tag) => item.tags?.includes(tag));
-    };
-
-    const filterItems = (items) =>
-      (items || []).filter((item) => matchesQuery(item) && matchesTags(item));
-
-    return {
-      places: filterItems(this.places).slice(0, 3),
-      events: filterItems(this.events).slice(0, 3),
-      guides: filterItems(this.guides).slice(0, 3),
-      groups: filterItems(this.groups).slice(0, 3),
-    };
-  },
-
-  navigateTo(type, slug) {
-    this.clearSearch();
-    $APP.Router.go(\`\${type}-detail\`, { slug });
-  },
-
-  renderResultItem(item, type) {
-    const name = item.name || item.title;
-    const icon = type === "place" ? "\u{1F4CD}" : type === "event" ? "\u{1F4C5}" : type === "guide" ? "\u{1F4D6}" : "\u{1F465}";
-
-    return html\`
-      <button
-        class="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 border-b border-gray-200 last:border-0"
-        @click=\${() => this.navigateTo(type, item.slug)}
-      >
-        <span class="text-lg">\${icon}</span>
-        <div class="flex-1 min-w-0">
-          <div class="font-bold text-sm truncate">\${name}</div>
-          <div class="text-xs text-gray-500 truncate">\${item.description?.substring(0, 50)}...</div>
-        </div>
-        \${item.recommended ? html\`<span class="text-yellow-500">\u2B50</span>\` : null}
-      </button>
-    \`;
-  },
-
-  render() {
-    const results = this.getFilteredResults();
-    const hasResults =
-      results.places.length > 0 ||
-      results.events.length > 0 ||
-      results.guides.length > 0 ||
-      results.groups.length > 0;
-    const hasQuery = this.query.length > 0 || this.selectedTags.length > 0;
-
-    return html\`
-      <div class="relative">
-        <!-- Search Input -->
-        <div class="relative">
-          <input
-            type="text"
-            .value=\${this.query}
-            @input=\${(e) => this.handleInputChange(e)}
-            @focus=\${() => this.handleFocus()}
-            @blur=\${() => this.handleBlur()}
-            placeholder=\${$APP.i18n?.t?.("search.placeholder") || "Search places, events, guides..."}
-            class="w-full px-4 py-3 pl-12 pr-12 bg-white border-3 border-black rounded-xl font-medium shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:translate-x-[2px] focus:translate-y-[2px] transition-all outline-none"
-          />
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          \${hasQuery ? html\`
-            <button
-              @click=\${() => this.clearSearch()}
-              class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          \` : null}
-        </div>
-
-        <!-- Tag Filters -->
-        <div class="flex gap-2 mt-3 overflow-x-auto pb-2">
-          \${Object.entries(ALL_TAGS).slice(0, 6).map(([tagId, tagInfo]) => {
-            const isSelected = this.selectedTags.includes(tagId);
-            return html\`
-              <button
-                @click=\${() => this.toggleTag(tagId)}
-                class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs transition-all \${
-                  isSelected
-                    ? \`bg-\${tagInfo.color} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]\`
-                    : "bg-white hover:bg-gray-100"
-                }"
-              >
-                \${tagInfo.icon} \${tagInfo.label}
-              </button>
-            \`;
-          })}
-        </div>
-
-        <!-- Results Dropdown -->
-        \${this.isOpen && hasQuery ? html\`
-          <div class="absolute top-full left-0 right-0 mt-2 bg-white border-3 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden z-50 max-h-96 overflow-y-auto">
-            \${!hasResults ? html\`
-              <div class="p-6 text-center">
-                <div class="text-2xl mb-2">\u{1F50D}</div>
-                <div class="font-bold text-gray-500">\${$APP.i18n?.t?.("search.noResults") || "No results found"}</div>
-              </div>
-            \` : html\`
-              \${results.places.length > 0 ? html\`
-                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
-                  \${$APP.i18n?.t?.("search.places") || "Places"}
-                </div>
-                \${results.places.map((item) => this.renderResultItem(item, "place"))}
-              \` : null}
-              \${results.events.length > 0 ? html\`
-                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
-                  \${$APP.i18n?.t?.("search.events") || "Events"}
-                </div>
-                \${results.events.map((item) => this.renderResultItem(item, "event"))}
-              \` : null}
-              \${results.guides.length > 0 ? html\`
-                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
-                  \${$APP.i18n?.t?.("search.guides") || "Guides"}
-                </div>
-                \${results.guides.map((item) => this.renderResultItem(item, "guide"))}
-              \` : null}
-              \${results.groups.length > 0 ? html\`
-                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
-                  \${$APP.i18n?.t?.("search.groups") || "Groups"}
-                </div>
-                \${results.groups.map((item) => this.renderResultItem(item, "group"))}
-              \` : null}
-            \`}
-          </div>
-        \` : null}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/story-circle.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  properties: {
-    content: T.object({ attribute: false }),
-    onClick: T.function({ attribute: false }),
-  },
-  render() {
-    if (!this.content) return null;
-    return html\`
-      <div
-        class="flex flex-col items-center gap-1 cursor-pointer group min-w-[72px]"
-        @click=\${() => this.onClick && this.onClick(this.content)}
-      >
-        <div class="p-[3px] rounded-full bg-gradient-to-tr from-accent to-primary border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] group-hover:shadow-none transition-all">
-          <div class="w-16 h-16 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
-             <img src="\${this.content.image}" class="w-full h-full object-cover" />
-          </div>
-        </div>
-        <uix-link href="/event/\${this.content.slug}" class="text-xs font-black uppercase text-center max-w-[80px] truncate leading-tight">
-          \${this.content.name}
-        </uix-link>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/meetup-card-compact.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import { CATEGORIES, getCategoryColor } from "./utils.js";
-
-export default {
-  style: true,
-  properties: {
-    content: T.object({ attribute: false }),
-    onClick: T.function({ attribute: false }),
-    type: T.string({ defaultValue: "" }), // e.g., "place", "event", "meetup", "group"
-    showTags: T.boolean({ defaultValue: true }),
-    showBadge: T.boolean({ defaultValue: true }),
-  },
-  getCategoryEmoji() {
-    return CATEGORIES[this.content?.category]?.icon || "\u{1F4CD}";
-  },
-  handleCardClick(e) {
-    if (e.target.closest(".join-button")) return;
-    if (this.onClick) this.onClick(this.content);
-  },
-  handleJoinClick(e) {
-    e.stopPropagation();
-  },
-  render() {
-    if (!this.content) return null;
-    const { showTags, showBadge } = this;
-    const isJoined = this.content.joined;
-    const hasTags = showTags && this.content.tags?.length > 0;
-    const hasBadge = showBadge && (this.content.recommended || this.content.viewCount >= 100);
-    const btnCls = \`join-button w-full py-2 px-4 border-2 border-black rounded-lg font-black uppercase text-xs transition-all duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] \${isJoined ? "bg-primary text-black hover:bg-primary-dark" : "bg-accent text-black hover:bg-accent"}\`;
-
-    return html\`
-      <uix-card
-        class="meetup-card-compact"
-        shadow="md"
-        hover
-        borderWidth="3"
-        padding="none"
-        @click=\${(e) => this.handleCardClick(e)}
-      >
-        <div slot="header" class="relative w-full h-48 bg-gray-100"
-          style="background-image: url(\${this.content.image}); background-size: cover; background-position: center;"
-        >
-          \${hasBadge ? html\`
-            <div class="absolute top-2 right-2">
-              <view-recommended-badge
-                .recommended=\${this.content.recommended}
-                .viewCount=\${this.content.viewCount || 0}
-              ></view-recommended-badge>
-            </div>
-          \` : null}
-        </div>
-        <div class="p-3 space-y-2 flex-1 flex flex-col">
-          <div>
-            <div class="inline-flex items-center gap-1 px-2 py-1 \${getCategoryColor(this.content.category)} border-2 border-black rounded-lg font-black text-xs uppercase text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              \${this.getCategoryEmoji()} \${$APP.i18n.t(\`categories.\${this.content.category}\`)}
-            </div>
-          </div>
-          <uix-link href="/\${this.type || this.content._type || 'place'}/\${this.content.slug}" class="text-lg font-black leading-tight line-clamp-2 uppercase">\${this.content.name}</uix-link>
-          \${hasTags ? html\`
-            <view-tags-display .tags=\${this.content.tags} .maxVisible=\${2}></view-tags-display>
-          \` : null}
-          <div class="flex-1"></div>
-        </div>
-        <div slot="footer" class="p-3 pt-0">
-          <button class="\${btnCls}" @click=\${(e) => this.handleJoinClick(e)}>
-            \${isJoined ? html\`\u2713 \${$APP.i18n.t("actions.joined")}\` : html\`\u2764\uFE0F \${$APP.i18n.t("actions.join")}\`}
-          </button>
-        </div>
-      </uix-card>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/meetup-card-compact.css":{content:`.meetup-card-compact.uix-card{cursor:pointer;height:100%;background:#fff;border-color:var(--card-border-color, black);border-radius:1rem}.meetup-card-compact.uix-card>[slot=header]{border-bottom:3px solid var(--card-border-color, black);padding:0}.meetup-card-compact.uix-card>[slot=footer]{justify-content:stretch}.meetup-card-compact.uix-card>[slot=footer]>button{width:100%}
 `,mimeType:"text/css"},"/$app/cms/views/media-library.js":{content:`/**
  * @bootstrapp/cms - Media Library
  * Full-page media management with upload, organize, and delete
@@ -6591,7 +6282,7 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/arrow-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 19l-7-7l7-7m7 7H5"/></svg>',mimeType:"image/svg+xml"},"/$app/cms/views/editor.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/cms/views/editor.js":{content:`/**
  * @bootstrapp/cms - Content Editor
  * Full-page content editor with markdown and publishing sidebar
  */
@@ -7048,7 +6739,988 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/link.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',mimeType:"image/svg+xml"},"/$app/admin/views/layout.js":{content:`import Router from "/$app/router/index.js";
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/link.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',mimeType:"image/svg+xml"},"/$app/admin/views/dashboard.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { getModelNames, capitalize } from "../utils/model-utils.js";
+
+export default {
+  tag: "admin-dashboard",
+  style: true,
+  properties: {
+    modelStats: T.object({ defaultValue: {} }),
+    loading: T.boolean({ defaultValue: true }),
+  },
+
+  async connected() {
+    await this.loadStats();
+  },
+
+  async loadStats() {
+    this.loading = true;
+    const stats = {};
+    const models = getModelNames();
+
+    for (const model of models) {
+      try {
+        const records = await $APP.Model[model].getAll();
+        stats[model] = Array.isArray(records) ? records.length : 0;
+      } catch (error) {
+        console.error(\`Error loading stats for \${model}:\`, error);
+        stats[model] = 0;
+      }
+    }
+
+    this.modelStats = stats;
+    this.loading = false;
+  },
+
+  navigate(path) {
+    $APP.Router.go(path);
+  },
+
+  render() {
+    if (this.loading) {
+      return html\`
+        <div class="admin-dashboard-loading">
+          <uix-spinner size="lg"></uix-spinner>
+        </div>
+      \`;
+    }
+
+    const models = Object.entries(this.modelStats);
+    const totalRecords = Object.values(this.modelStats).reduce((a, b) => a + b, 0);
+
+    return html\`
+      <div class="admin-dashboard">
+        <!-- Header -->
+        <div class="admin-dashboard-header">
+          <h1 class="admin-dashboard-title">Dashboard</h1>
+          <p class="admin-dashboard-subtitle">Manage your application data and settings</p>
+        </div>
+
+        <!-- Summary Card -->
+        <uix-card class="admin-dashboard-summary">
+          <div class="admin-dashboard-summary-content">
+            <div>
+              <p class="admin-dashboard-stat-label">Total Records</p>
+              <p class="admin-dashboard-stat-value">\${totalRecords}</p>
+            </div>
+            <div class="admin-dashboard-stat-right">
+              <p class="admin-dashboard-stat-label">Models</p>
+              <p class="admin-dashboard-stat-value">\${models.length}</p>
+            </div>
+          </div>
+        </uix-card>
+
+        <!-- Model Stats Grid -->
+        <section class="admin-dashboard-section">
+          <h2 class="admin-dashboard-section-title">Models</h2>
+          <div class="admin-dashboard-grid">
+            \${models.map(
+              ([model, count]) => html\`
+                <uix-card
+                  hover
+                  class="admin-dashboard-model-card"
+                  @click=\${() => this.navigate(\`/admin/models/\${model}\`)}
+                >
+                  <div class="admin-dashboard-model-header">
+                    <uix-icon name="database" size="24"></uix-icon>
+                    <span class="admin-dashboard-model-count">\${count}</span>
+                  </div>
+                  <p class="admin-dashboard-model-name">\${model}</p>
+                  <p class="admin-dashboard-model-label">
+                    \${count === 1 ? "record" : "records"}
+                  </p>
+                </uix-card>
+              \`,
+            )}
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="admin-dashboard-section">
+          <h2 class="admin-dashboard-section-title">Quick Actions</h2>
+          <div class="admin-dashboard-actions">
+            <uix-button
+              class="admin-action-deploy"
+              @click=\${() => this.navigate("/admin/deploy")}
+            >
+              <uix-icon name="rocket" size="24"></uix-icon>
+              Deploy
+            </uix-button>
+
+            <uix-button
+              class="admin-action-theme"
+              @click=\${() => this.navigate("/admin/theme")}
+            >
+              <uix-icon name="palette" size="24"></uix-icon>
+              Theme
+            </uix-button>
+
+            <uix-button
+              class="admin-action-refresh"
+              @click=\${() => this.loadStats()}
+            >
+              <uix-icon name="refresh-cw" size="24"></uix-icon>
+              Refresh
+            </uix-button>
+          </div>
+        </section>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/admin/views/dashboard.css":{content:`.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}
+`,mimeType:"text/css"},"/views/guides-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { NBS } from "./utils.js";
+
+const { brand } = $APP.settings;
+
+export default {
+  dataQuery: true,
+  properties: {
+    guides: T.array(),
+    selectedType: T.string({ defaultValue: "all" }),
+  },
+
+  goToGuide(guide) {
+    $APP.Router.go("guide-detail", { slug: guide.slug });
+  },
+
+  getFilteredGuides() {
+    let filtered = this.guides || [];
+
+    if (this.selectedType !== "all") {
+      filtered = filtered.filter((g) => g.guideType === this.selectedType);
+    }
+
+    return filtered;
+  },
+
+  render() {
+    if (!this.guides) return NBS.SPINNER;
+
+    const featured = this.guides.filter((g) => g.featured);
+    const filtered = this.getFilteredGuides();
+
+    return html\`
+      <div class="p-4 sm:p-6 space-y-6 pb-24">
+        <!-- Mobile Header with branding -->
+        <header class="md:hidden flex items-center justify-between">
+          <div class="text-xl font-black tracking-tight">
+            \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
+          </div>
+          <div class="bg-amber-300 border-2 border-black rounded-full w-10 h-10 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+            <span class="text-lg">\u{1F4DA}</span>
+          </div>
+        </header>
+
+        <!-- Page Title -->
+        <h1 class="text-2xl md:text-4xl font-black uppercase text-black tracking-tight">
+          Guides
+        </h1>
+
+        <!-- Type Filter Tabs -->
+        <div class="flex gap-2 overflow-x-auto pb-2">
+          \${["all", "article", "list"].map(
+            (type) => html\`
+              <button
+                @click=\${() => (this.selectedType = type)}
+                class="px-4 py-2 border-2 border-black rounded-lg font-bold text-sm uppercase whitespace-nowrap
+                \${this.selectedType === type
+                  ? "bg-black text-white"
+                  : "bg-white hover:bg-gray-100"}
+                shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
+              >
+                \${type === "all"
+                  ? "All"
+                  : type === "article"
+                    ? "Articles"
+                    : "Curated Lists"}
+              </button>
+            \`
+          )}
+        </div>
+
+        <!-- Featured Section -->
+        \${featured.length > 0 && this.selectedType === "all"
+          ? html\`
+              <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transform -rotate-1"
+                  >
+                    Featured
+                  </span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  \${featured.map(
+                    (g) => html\`
+                      <view-guide-card
+                        .guide=\${g}
+                        .featured=\${true}
+                        .onClick=\${(guide) => this.goToGuide(guide)}
+                      ></view-guide-card>
+                    \`
+                  )}
+                </div>
+              </div>
+            \`
+          : null}
+
+        <!-- All Guides Section -->
+        \${filtered.length > 0
+          ? html\`
+              <div class="space-y-4">
+                <h2 class="text-xl font-black uppercase text-black">
+                  \${this.selectedType === "all"
+                    ? "All Guides"
+                    : this.selectedType === "article"
+                      ? "Articles"
+                      : "Curated Lists"}
+                </h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  \${filtered.map(
+                    (g) => html\`
+                      <view-guide-card
+                        .guide=\${g}
+                        .onClick=\${(guide) => this.goToGuide(guide)}
+                      ></view-guide-card>
+                    \`
+                  )}
+                </div>
+              </div>
+            \`
+          : null}
+
+        <!-- Empty State -->
+        \${filtered.length === 0
+          ? html\`
+              <div
+                class="bg-white border-3 border-black rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center"
+              >
+                <div class="text-5xl mb-4">\u{1F4DA}</div>
+                <h3 class="text-xl font-black uppercase mb-2">No Guides Yet</h3>
+                <p class="text-gray-600 font-medium">
+                  Check back soon for local insights and tips!
+                </p>
+              </div>
+            \`
+          : null}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/calendar-view.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { CATEGORIES } from "./utils.js";
+
+export default {
+  properties: {
+    events: T.array({ sync: $APP.Model.events, query: {} }),
+    selectedCategory: T.string({ defaultValue: "all" }),
+  },
+  getFilteredEvents() {
+    const events = (this.events || []).map((e) => ({ ...e, title: e.name }));
+    return this.selectedCategory === "all"
+      ? events
+      : events.filter((e) => e.category === this.selectedCategory);
+  },
+  handleCategoryChange(category) {
+    this.selectedCategory = category;
+  },
+  handleEventClick(e) {
+    const event = e.detail.event;
+    $APP.Router.go("event-detail", {
+      id: event.recurrenceParentId || event.id,
+    });
+  },
+  render() {
+    return html\`
+      <div class="min-h-screen bg-surface pb-20">
+        <div class="bg-white border-b-3 border-black px-6 py-4">
+          <div class="flex items-center justify-between mb-4">
+            <button
+              @click=\${() => $APP.Router.back()}
+              class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-lg"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <h1 class="text-2xl font-black uppercase">Calendar</h1>
+            <div class="w-10"></div>
+          </div>
+          <div class="overflow-x-auto pb-2">
+            <div class="flex gap-2 min-w-max">
+              \${Object.keys(CATEGORIES)
+                .filter((c) => c !== "groups")
+                .map(
+                  (c) => html\`
+                    <button
+                      @click=\${() => this.handleCategoryChange(c)}
+                      class="px-4 py-1.5 border-2 border-black rounded-lg font-bold text-xs uppercase \${this.selectedCategory === c ? "bg-accent" : "bg-white"}"
+                    >
+                      \${c}
+                    </button>
+                  \`,
+                )}
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-6">
+          <uix-calendar
+            .events=\${this.getFilteredEvents()}
+            @event-click=\${this.handleEventClick}
+          ></uix-calendar>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/display/calendar.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+// Utility functions for calendar logic
+const generateRecurringInstances = (event, startDate, endDate) => {
+  if (!event.isRecurring) return [];
+  const instances = [];
+  const current = new Date(startDate);
+  const end = new Date(endDate);
+  const recurrenceEnd = event.recurrenceEndDate
+    ? new Date(event.recurrenceEndDate)
+    : new Date(current.getTime() + 31536000000); // 1 year default
+  const originalDate = new Date(event.date);
+
+  const shouldGenerate = (date, evt, origDate) => {
+    switch (evt.recurrencePattern) {
+      case "daily":
+        return true;
+      case "weekly":
+        return date.getDay() === origDate.getDay();
+      case "monthly":
+        return date.getDate() === origDate.getDate();
+      case "custom":
+        return evt.recurrenceDays?.includes(date.getDay());
+      default:
+        return false;
+    }
+  };
+
+  const advance = (date, pattern) => {
+    switch (pattern) {
+      case "daily":
+        date.setDate(date.getDate() + 1);
+        break;
+      case "weekly":
+        date.setDate(date.getDate() + 7);
+        break;
+      case "monthly":
+        date.setMonth(date.getMonth() + 1);
+        break;
+      case "custom":
+        date.setDate(date.getDate() + 1);
+        break;
+    }
+  };
+
+  while (current <= end && current <= recurrenceEnd) {
+    if (shouldGenerate(current, event, originalDate)) {
+      instances.push({
+        ...event,
+        id: \`\${event.id}-\${current.toISOString().split("T")[0]}\`,
+        date: current.toISOString().split("T")[0],
+        recurrenceParentId: event.id,
+        isRecurring: false,
+      });
+    }
+    advance(current, event.recurrencePattern);
+  }
+  return instances;
+};
+
+const isSameDay = (d1, d2) =>
+  d1.getFullYear() === d2.getFullYear() &&
+  d1.getMonth() === d2.getMonth() &&
+  d1.getDate() === d2.getDate();
+
+const isThisWeek = (date) => {
+  const today = new Date();
+  const weekFromNow = new Date(today.getTime() + 604800000);
+  return date >= today && date <= weekFromNow;
+};
+
+const getDateSection = (dateStr, locale) => {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (isSameDay(date, today)) return "TODAY";
+  if (isSameDay(date, tomorrow)) return "TOMORROW";
+  if (isThisWeek(date))
+    return date.toLocaleDateString(locale, { weekday: "long" }).toUpperCase();
+  return date
+    .toLocaleDateString(locale, { month: "short", day: "numeric" })
+    .toUpperCase();
+};
+
+const groupEventsByDate = (events) =>
+  events.reduce(
+    (groups, event) => ({
+      ...groups,
+      [event.date]: [...(groups[event.date] || []), event],
+    }),
+    {},
+  );
+
+const getEventsInRange = (startDate, endDate, events) => {
+  const withRecurring = [];
+
+  events.forEach((event) => {
+    if (event.isRecurring) {
+      withRecurring.push(...generateRecurringInstances(event, startDate, endDate));
+    } else {
+      const eventDate = new Date(event.date);
+      if (eventDate >= startDate && eventDate <= endDate) {
+        withRecurring.push(event);
+      }
+    }
+  });
+  return withRecurring.sort((a, b) => new Date(a.date) - new Date(b.date));
+};
+
+const formatMonthYear = (month, year, locale) =>
+  new Date(year, month, 1)
+    .toLocaleDateString(locale, { month: "long", year: "numeric" })
+    .toUpperCase();
+
+const getDaysInMonth = (year, month, events) => {
+  const days = [];
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const firstDayOfWeek = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const eventsByDate = events.reduce(
+    (groups, event) => ({
+      ...groups,
+      [event.date]: [...(groups[event.date] || []), event],
+    }),
+    {},
+  );
+
+  // Previous month padding
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    const date = new Date(year, month, -i);
+    const dateStr = date.toISOString().split("T")[0];
+    days.push({
+      date,
+      day: date.getDate(),
+      isCurrentMonth: false,
+      isToday: false,
+      events: eventsByDate[dateStr] || [],
+    });
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const dateStr = date.toISOString().split("T")[0];
+    date.setHours(0, 0, 0, 0);
+    days.push({
+      date,
+      day,
+      isCurrentMonth: true,
+      isToday: date.getTime() === today.getTime(),
+      events: eventsByDate[dateStr] || [],
+    });
+  }
+
+  // Next month padding (fill to 42 days = 6 weeks)
+  const remaining = 42 - days.length;
+  for (let i = 1; i <= remaining; i++) {
+    const date = new Date(year, month + 1, i);
+    const dateStr = date.toISOString().split("T")[0];
+    days.push({
+      date,
+      day: date.getDate(),
+      isCurrentMonth: false,
+      isToday: false,
+      events: eventsByDate[dateStr] || [],
+    });
+  }
+
+  return days;
+};
+
+export default {
+  tag: "uix-calendar",
+  style: true,
+  shadow: true,
+  properties: {
+    // Data
+    events: T.array({ defaultValue: [] }),
+
+    // View state
+    viewMode: T.string({ defaultValue: "month", enum: ["list", "month"] }),
+    currentMonth: T.number(new Date().getMonth()),
+    currentYear: T.number(new Date().getFullYear()),
+    selectedDate: T.string(""),
+    showDayPanel: T.boolean(false),
+
+    // Config
+    showViewToggle: T.boolean(true),
+    showNavigation: T.boolean(true),
+    showTodayButton: T.boolean(true),
+    locale: T.string("en"),
+    monthsAhead: T.number(3),
+  },
+
+  // Get events for the calendar range (for list view)
+  getEventsForCalendar() {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setMonth(endDate.getMonth() + this.monthsAhead);
+    return getEventsInRange(today, endDate, this.events || []);
+  },
+
+  // Navigation handlers
+  handleNav(direction) {
+    if (direction === -1) {
+      if (this.currentMonth === 0) {
+        this.currentMonth = 11;
+        this.currentYear--;
+      } else {
+        this.currentMonth--;
+      }
+    } else {
+      if (this.currentMonth === 11) {
+        this.currentMonth = 0;
+        this.currentYear++;
+      } else {
+        this.currentMonth++;
+      }
+    }
+    this.showDayPanel = false;
+    this.emit("month-change", {
+      month: this.currentMonth,
+      year: this.currentYear,
+    });
+  },
+
+  handleTodayClick() {
+    const today = new Date();
+    this.currentMonth = today.getMonth();
+    this.currentYear = today.getFullYear();
+    this.showDayPanel = false;
+  },
+
+  handleViewToggle(mode) {
+    this.viewMode = mode;
+  },
+
+  handleDayClick(dayObj) {
+    const dateStr = dayObj.date.toISOString().split("T")[0];
+    const hasEvents = dayObj.events.length > 0;
+    if (this.selectedDate === dateStr) {
+      this.showDayPanel = !this.showDayPanel && hasEvents;
+    } else {
+      this.selectedDate = dateStr;
+      this.showDayPanel = hasEvents;
+    }
+    this.emit("day-click", { date: dateStr, events: dayObj.events });
+  },
+
+  handleClosePanel() {
+    this.showDayPanel = false;
+  },
+
+  handleEventClick(event, e) {
+    e?.stopPropagation();
+    this.emit("event-click", { event });
+  },
+
+  getEventsForSelectedDay() {
+    if (!this.selectedDate) return [];
+    return this.getEventsForCalendar().filter(
+      (e) => e.date === this.selectedDate,
+    );
+  },
+
+  render() {
+    const events = this.getEventsForCalendar();
+    const groupedEvents = groupEventsByDate(events);
+
+    return html\`
+      <style>
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      </style>
+
+      <div class="calendar-container" part="container">
+        \${this.showViewToggle ? this.renderViewToggle() : null}
+        \${this.viewMode === "list"
+          ? this.renderListView(groupedEvents)
+          : this.renderGridView(events)}
+      </div>
+    \`;
+  },
+
+  renderViewToggle() {
+    return html\`
+      <div class="view-toggle" part="view-toggle">
+        <button
+          @click=\${() => this.handleViewToggle("list")}
+          class="toggle-btn \${this.viewMode === "list" ? "active" : ""}"
+          part="toggle-btn \${this.viewMode === "list" ? "toggle-btn-active" : ""}"
+        >
+          List
+        </button>
+        <button
+          @click=\${() => this.handleViewToggle("month")}
+          class="toggle-btn \${this.viewMode === "month" ? "active" : ""}"
+          part="toggle-btn \${this.viewMode === "month" ? "toggle-btn-active" : ""}"
+        >
+          Month
+        </button>
+      </div>
+    \`;
+  },
+
+  renderListView(groupedEvents) {
+    const dateKeys = Object.keys(groupedEvents).sort();
+
+    if (dateKeys.length === 0) {
+      return html\`
+        <div class="empty-state" part="empty">
+          <div class="empty-icon">\u{1F4C5}</div>
+          <p class="empty-text">No events scheduled</p>
+        </div>
+      \`;
+    }
+
+    return html\`
+      <div class="list-view" part="list">
+        \${dateKeys.map((dateKey) => {
+          const eventsForDate = groupedEvents[dateKey];
+          const section = getDateSection(dateKey, this.locale);
+          return html\`
+            <div class="list-section" part="list-section">
+              <h2 class="list-section-title" part="list-section-title">\${section}</h2>
+              <div class="list-items">
+                \${eventsForDate.map(
+                  (event) => html\`
+                    <div
+                      @click=\${(e) => this.handleEventClick(event, e)}
+                      class="list-item"
+                      part="list-item"
+                      data-category="\${event.category || ""}"
+                    >
+                      \${event.image
+                        ? html\`<img
+                            src="\${event.image}"
+                            alt="\${event.title}"
+                            class="list-item-image"
+                            part="list-item-image"
+                          />\`
+                        : null}
+                      <div class="list-item-content" part="list-item-content">
+                        <div class="list-item-header">
+                          <h3 class="list-item-title" part="list-item-title">\${event.title}</h3>
+                          \${event.recurrenceParentId
+                            ? html\`<span class="recurring-badge" part="recurring-badge">\u{1F501}</span>\`
+                            : null}
+                        </div>
+                        <p class="list-item-meta" part="list-item-meta">
+                          \${event.time || ""} \${event.venue || event.address ? \`\u2022 \${event.venue || event.address}\` : ""}
+                        </p>
+                        <slot name="list-item-extra" .event=\${event}></slot>
+                      </div>
+                    </div>
+                  \`,
+                )}
+              </div>
+            </div>
+          \`;
+        })}
+      </div>
+    \`;
+  },
+
+  renderGridView(events) {
+    const days = getDaysInMonth(this.currentYear, this.currentMonth, events);
+    const monthYearLabel = formatMonthYear(this.currentMonth, this.currentYear, this.locale);
+    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    return html\`
+      <div class="grid-view" part="grid-view">
+        \${this.showNavigation ? html\`
+          <div class="grid-header" part="header">
+            <button
+              @click=\${() => this.handleNav(-1)}
+              class="nav-btn"
+              part="nav-btn nav-btn-prev"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <h2 class="month-label" part="month-label">\${monthYearLabel}</h2>
+            <button
+              @click=\${() => this.handleNav(1)}
+              class="nav-btn"
+              part="nav-btn nav-btn-next"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+        \` : null}
+
+        \${this.showTodayButton ? html\`
+          <button
+            @click=\${this.handleTodayClick.bind(this)}
+            class="today-btn"
+            part="today-btn"
+          >
+            Jump to Today
+          </button>
+        \` : null}
+
+        <div class="grid-container" part="grid">
+          <div class="weekday-header" part="weekday-header">
+            \${weekDays.map(
+              (day) => html\`<div class="weekday" part="weekday">\${day}</div>\`,
+            )}
+          </div>
+          <div class="days-grid" part="days-grid">
+            \${days.map((dayObj) => {
+              const isSelected =
+                this.selectedDate === dayObj.date.toISOString().split("T")[0];
+              const hasEvents = dayObj.events.length > 0;
+              return html\`
+                <div
+                  @click=\${() => this.handleDayClick(dayObj)}
+                  class="day-cell \${dayObj.isToday ? "today" : ""} \${isSelected ? "selected" : ""} \${!dayObj.isCurrentMonth ? "other-month" : ""} \${hasEvents ? "has-events" : ""}"
+                  part="day \${dayObj.isToday ? "day-today" : ""} \${isSelected ? "day-selected" : ""} \${!dayObj.isCurrentMonth ? "day-other-month" : ""}"
+                >
+                  <span class="day-number" part="day-number">\${dayObj.day}</span>
+                  \${hasEvents
+                    ? html\`
+                        <div class="day-events" part="day-events">
+                          \${dayObj.events.slice(0, 2).map(
+                            (event) => html\`
+                              <div
+                                class="event-indicator"
+                                part="event"
+                                data-category="\${event.category || ""}"
+                              >
+                                \${event.title.length > 12
+                                  ? event.title.substring(0, 12) + "..."
+                                  : event.title}
+                              </div>
+                            \`,
+                          )}
+                          \${dayObj.events.length > 2
+                            ? html\`<div class="more-events" part="more-events">+\${dayObj.events.length - 2} more</div>\`
+                            : null}
+                        </div>
+                      \`
+                    : null}
+                </div>
+              \`;
+            })}
+          </div>
+        </div>
+
+        \${this.showDayPanel ? this.renderDayDetailPanel() : null}
+      </div>
+    \`;
+  },
+
+  renderDayDetailPanel() {
+    const selectedEvents = this.getEventsForSelectedDay();
+    const selectedDateObj = new Date(this.selectedDate);
+    const dateLabel = selectedDateObj
+      .toLocaleDateString(this.locale, {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      })
+      .toUpperCase();
+
+    return html\`
+      <div
+        @click=\${this.handleClosePanel.bind(this)}
+        class="panel-overlay"
+        part="panel-overlay"
+        style="animation: fadeIn 0.2s ease-out;"
+      ></div>
+      <div class="day-panel" part="panel" style="animation: slideUp 0.3s ease-out;">
+        <div class="panel-header" part="panel-header">
+          <h3 class="panel-title" part="panel-title">\${dateLabel}</h3>
+          <button
+            @click=\${this.handleClosePanel.bind(this)}
+            class="panel-close"
+            part="panel-close"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="panel-content" part="panel-content">
+          \${selectedEvents.length === 0
+            ? html\`<p class="panel-empty" part="panel-empty">No events on this day</p>\`
+            : selectedEvents.map(
+                (event) => html\`
+                  <div
+                    @click=\${(e) => this.handleEventClick(event, e)}
+                    class="panel-item"
+                    part="panel-item"
+                    data-category="\${event.category || ""}"
+                  >
+                    \${event.image
+                      ? html\`<img
+                          src="\${event.image}"
+                          alt="\${event.title}"
+                          class="panel-item-image"
+                          part="panel-item-image"
+                        />\`
+                      : null}
+                    <div class="panel-item-content" part="panel-item-content">
+                      <div class="panel-item-header">
+                        <h4 class="panel-item-title" part="panel-item-title">\${event.title}</h4>
+                        \${event.recurrenceParentId
+                          ? html\`<span class="recurring-badge" part="recurring-badge">\u{1F501}</span>\`
+                          : null}
+                      </div>
+                      <p class="panel-item-meta" part="panel-item-meta">
+                        \${event.time || ""} \${event.venue || event.address ? \`\u2022 \${event.venue || event.address}\` : ""}
+                      </p>
+                    </div>
+                  </div>
+                \`,
+              )}
+        </div>
+      </div>
+    \`;
+  },
+};
+
+/**
+ * Calendar Component
+ *
+ * @component
+ * @category display
+ * @tag uix-calendar
+ *
+ * A full-featured calendar component with list and month grid views,
+ * recurring event support, and day detail panels.
+ *
+ * @slot - Default slot for additional content
+ *
+ * @part container - Main calendar container
+ * @part view-toggle - View mode toggle container
+ * @part toggle-btn - Toggle button
+ * @part toggle-btn-active - Active toggle button
+ * @part header - Grid view header with navigation
+ * @part nav-btn - Navigation buttons
+ * @part month-label - Current month/year label
+ * @part today-btn - Jump to today button
+ * @part grid - Calendar grid container
+ * @part weekday-header - Weekday names row
+ * @part weekday - Individual weekday name
+ * @part days-grid - Grid of day cells
+ * @part day - Individual day cell
+ * @part day-today - Today's day cell
+ * @part day-selected - Selected day cell
+ * @part day-other-month - Day cell from adjacent month
+ * @part day-number - Day number text
+ * @part day-events - Container for event indicators
+ * @part event - Event indicator in grid
+ * @part more-events - "+N more" indicator
+ * @part list - List view container
+ * @part list-section - Date section in list view
+ * @part list-section-title - Section title (TODAY, TOMORROW, etc.)
+ * @part list-item - Event item in list view
+ * @part list-item-image - Event image in list
+ * @part list-item-content - Event content container
+ * @part list-item-title - Event title
+ * @part list-item-meta - Event time/venue info
+ * @part recurring-badge - Recurring event indicator
+ * @part panel - Day detail panel
+ * @part panel-overlay - Panel backdrop overlay
+ * @part panel-header - Panel header
+ * @part panel-title - Panel date title
+ * @part panel-close - Panel close button
+ * @part panel-content - Panel event list
+ * @part panel-item - Event item in panel
+ * @part panel-empty - Empty panel message
+ * @part empty - Empty state container
+ *
+ * @fires day-click - When a day is clicked. Detail: { date: string, events: array }
+ * @fires event-click - When an event is clicked. Detail: { event: object }
+ * @fires month-change - When month changes. Detail: { month: number, year: number }
+ *
+ * @example Basic Calendar
+ * \`\`\`html
+ * <uix-calendar
+ *   .events=\${[
+ *     { id: "1", date: "2024-01-15", title: "Meeting" },
+ *     { id: "2", date: "2024-01-20", title: "Conference", isRecurring: true, recurrencePattern: "weekly" }
+ *   ]}
+ * ></uix-calendar>
+ * \`\`\`
+ *
+ * @example List View Only
+ * \`\`\`html
+ * <uix-calendar
+ *   viewMode="list"
+ *   .showViewToggle=\${false}
+ *   .events=\${events}
+ * ></uix-calendar>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/display/calendar.css":{content:`:where(.uix-calendar,uix-calendar){display:block;--calendar-border-width: 2px;--calendar-border-color: black;--calendar-border-radius: .75rem;--calendar-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);--calendar-shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 1);--calendar-today-bg: #fef3c7;--calendar-today-border: #eab308;--calendar-selected-bg: var(--color-accent, #f472b6);--calendar-font-family: inherit;&::part(view-toggle){display:flex;gap:.5rem;margin-bottom:1rem}&::part(toggle-btn){flex:1;padding:.5rem 1rem;font-weight:900;font-size:.875rem;text-transform:uppercase;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);background:#fff;box-shadow:3px 3px #000;cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:1px 1px #000}}&::part(toggle-btn-active){background:var(--calendar-selected-bg)}&::part(header){display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}&::part(nav-btn){width:2.5rem;height:2.5rem;display:flex;align-items:center;justify-content:center;background:#fff;border:3px solid var(--calendar-border-color);border-radius:.5rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(month-label){font-size:1.125rem;font-weight:900;text-transform:uppercase}&::part(today-btn){width:100%;margin-bottom:1rem;padding:.5rem 1rem;background:#f9a8d4;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);font-weight:900;font-size:.875rem;text-transform:uppercase;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(grid){background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;box-shadow:6px 6px #000}&::part(weekday-header){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem;margin-bottom:.5rem}&::part(weekday){text-align:center;font-weight:900;font-size:.75rem;color:#4b5563}&::part(days-grid){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}&::part(day){aspect-ratio:1;position:relative;display:flex;flex-direction:column;align-items:flex-start;padding:.25rem;border-radius:.5rem;border:2px solid #d1d5db;cursor:pointer;overflow:hidden;transition:all .15s ease;&:active{transform:translate(1px,1px)}}&::part(day-today){background:var(--calendar-today-bg);border-color:var(--calendar-today-border);border-width:3px}&::part(day-selected){background:var(--calendar-selected-bg);border-color:var(--calendar-border-color);border-width:3px;box-shadow:var(--calendar-shadow-sm)}&::part(day-other-month){opacity:.4}&::part(day-number){font-size:.75rem;font-weight:700;margin-bottom:.125rem}&::part(day-events){width:100%;display:flex;flex-direction:column;gap:.125rem}&::part(event){font-size:9px;line-height:1.1;font-weight:700;padding:.125rem .25rem;border-radius:.25rem;border:1px solid var(--calendar-border-color);background:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(more-events){font-size:8px;font-weight:700;color:#4b5563;padding:0 .25rem}&::part(list){display:flex;flex-direction:column;gap:1.5rem}&::part(list-section-title){font-size:.875rem;font-weight:900;text-transform:uppercase;color:#4b5563;margin-bottom:.75rem}&::part(list-item){display:flex;gap:1rem;background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:1rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(list-item-image){width:5rem;height:5rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(list-item-title){font-weight:900;font-size:.875rem;line-height:1.25}&::part(list-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(recurring-badge){flex-shrink:0;font-size:.75rem;font-weight:700;background:#ddd6fe;border:1px solid var(--calendar-border-color);padding:.125rem .5rem;border-radius:.25rem}&::part(panel-overlay){position:fixed;inset:0;background:#00000080;z-index:40}&::part(panel){position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:3px solid var(--calendar-border-color);border-radius:1rem 1rem 0 0;z-index:50;max-height:70vh;overflow-y:auto}&::part(panel-header){position:sticky;top:0;background:#fff;border-bottom:2px solid var(--calendar-border-color);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}&::part(panel-title){font-weight:900;font-size:1.125rem}&::part(panel-close){width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--calendar-border-color);border-radius:.5rem;background:#fff;cursor:pointer;&:hover{background:#f3f4f6}}&::part(panel-content){padding:1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem}&::part(panel-item){display:flex;gap:.75rem;background:#f9fafb;border:2px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;cursor:pointer;box-shadow:3px 3px #000;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:none}}&::part(panel-item-image){width:4rem;height:4rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(panel-item-title){font-weight:700;font-size:.875rem;line-height:1.25}&::part(panel-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(panel-empty){text-align:center;font-size:.875rem;font-weight:700;color:#9ca3af;padding:2rem 0}&::part(empty){display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5rem 0;.empty-icon{font-size:3.75rem;margin-bottom:1rem}.empty-text{font-size:1.125rem;font-weight:700;color:#9ca3af}}}
+`,mimeType:"text/css"},"/manifest.json":{content:`{
+  "name": "meetup.rio",
+  "short_name": "meetup.rio",
+  "description": "Discover the best of Rio de Janeiro - Places, Events, and Things to Do",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fef3c7",
+  "theme_color": "#facc15",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}
+`,mimeType:"application/json"},"/$app/admin/views/layout.js":{content:`import Router from "/$app/router/index.js";
 import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 import { getSidebarItems } from "../plugins.js";
@@ -7641,55 +8313,6 @@ export default {
  * </uix-menu>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
-`,mimeType:"text/css"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-export default {
-  tag: "uix-darkmode",
-  icons: ["moon", "sun"],
-  properties: {
-    width: T.string({ defaultValue: "fit" }),
-    compact: T.boolean(),
-    darkmode: T.boolean({
-      sync: "local",
-      defaultValue: true,
-    }),
-    icon: T.string(),
-  },
-
-  click(e) {
-    e.stopPropagation();
-    this.darkmode = !this.darkmode;
-    this.icon = this.darkmode ? "sun" : "moon";
-  },
-  willUpdate({ changedProps }) {
-    if (changedProps.has("darkmode"))
-      document.documentElement.classList.toggle("dark");
-  },
-  connected() {
-    this.icon = this.darkmode ? "sun" : "moon";
-    if (this.darkmode) document.documentElement.classList.add("dark");
-    this.on("button#click", this.click.bind(this));
-  },
-  render() {
-    return this.compact
-      ? html\`<button>
-        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
-        </button>
-        \`
-      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
-              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
-              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
-              <div class="ml-auto w-10 h-5 \${
-                this.darkmode ? "bg-red-700" : "bg-gray-600"
-              } rounded-full flex items-center p-1 transition-colors">
-                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
-                    this.darkmode ? "translate-x-4" : ""
-                  }"></div>
-              </div>
-          </button>\`;
-  },
-};
 `,mimeType:"text/javascript"},"/$app/uix/navigation/navbar.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
@@ -7917,8 +8540,7 @@ export default {
  * </uix-navbar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/navigation/breadcrumbs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
@@ -8093,6 +8715,54 @@ export default {
  * </uix-breadcrumbs>
  * \`\`\`
  */
+`,mimeType:"text/javascript"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+export default {
+  tag: "uix-darkmode",
+  icons: ["moon", "sun"],
+  properties: {
+    width: T.string({ defaultValue: "fit" }),
+    compact: T.boolean(),
+    darkmode: T.boolean({
+      sync: "local",
+      defaultValue: true,
+    }),
+    icon: T.string(),
+  },
+
+  click(e) {
+    e.stopPropagation();
+    this.darkmode = !this.darkmode;
+    this.icon = this.darkmode ? "sun" : "moon";
+  },
+  willUpdate({ changedProps }) {
+    if (changedProps.has("darkmode"))
+      document.documentElement.classList.toggle("dark");
+  },
+  connected() {
+    this.icon = this.darkmode ? "sun" : "moon";
+    if (this.darkmode) document.documentElement.classList.add("dark");
+    this.on("button#click", this.click.bind(this));
+  },
+  render() {
+    return this.compact
+      ? html\`<button>
+        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
+        </button>
+        \`
+      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
+              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
+              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
+              <div class="ml-auto w-10 h-5 \${
+                this.darkmode ? "bg-red-700" : "bg-gray-600"
+              } rounded-full flex items-center p-1 transition-colors">
+                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
+                    this.darkmode ? "translate-x-4" : ""
+                  }"></div>
+              </div>
+          </button>\`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/uix/display/avatar.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
@@ -8193,17 +8863,422 @@ export default {
  * <uix-avatar name="Alice" status="away"></uix-avatar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/admin/views/dashboard.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
+`,mimeType:"text/javascript"},"/$app/bundler/views/ui.js":{content:`import Bundler from "/$app/bundler/index.js";
+import T from "/$app/types/index.js";
 import $APP from "/$app.js";
-import { getModelNames, capitalize } from "../utils/model-utils.js";
+import { html } from "/npm/lit-html";
+
+$APP.define("credentials-manager", {
+  dataQuery: true,
+  properties: {
+    row: T.object(),
+  },
+  render() {
+    if (!this.row)
+      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">GitHub Credentials</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="Owner"
+            .value=\${this.row.owner}
+            @change=\${(e) => (this.row.owner = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Repository"
+            .value=\${this.row.repo}
+            @change=\${(e) => (this.row.repo = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Branch"
+            .value=\${this.row.branch}
+            @change=\${(e) => (this.row.branch = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="GitHub Token"
+            type="password"
+            .value=\${this.row.token}
+            @change=\${(e) => (this.row.token = e.target.value)}
+          ></uix-input>
+        </div>
+        <div slot="footer">
+          <uix-button
+            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row })}
+            label="Save Credentials"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("cloudflare-credentials-manager", {
+  dataQuery: true,
+  properties: {
+    row: T.object(),
+  },
+  render() {
+    if (!this.row)
+      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
+    if (!this.row.cloudflare) this.row.cloudflare = {};
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">Cloudflare Credentials</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="Account ID"
+            .value=\${this.row.cloudflare.accountId}
+            @change=\${(e) => (this.row.cloudflare.accountId = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Pages Project Name"
+            .value=\${this.row.cloudflare.projectName}
+            @change=\${(e) => (this.row.cloudflare.projectName = e.target.value)}
+          ></uix-input>
+          <uix-input
+            class="bundler-full-width"
+            label="API Token"
+            type="password"
+            .value=\${this.row.cloudflare.apiToken}
+            @change=\${(e) => (this.row.cloudflare.apiToken = e.target.value)}
+          ></uix-input>
+        </div>
+        <p class="bundler-help-text">
+          The bundler will automatically create a Cloudflare Pages project if one with the given name doesn't exist.
+        </p>
+        <div slot="footer">
+          <uix-button
+            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row, cloudflare: this.row.cloudflare })}
+            label="Save Cloudflare Credentials"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("release-creator", {
+  properties: {
+    version: T.string(\`v\${new Date().toISOString().slice(0, 10)}\`),
+    notes: T.string(""),
+    deployMode: T.string("spa"),
+    deployTarget: T.string("localhost"),
+    isDeploying: T.boolean(false),
+  },
+
+  getTargetOptions() {
+    const targets = Bundler.getTargets();
+    console.log(targets);
+    return targets.map((t) => ({
+      value: t.name,
+      label: t.label,
+    }));
+  },
+
+  getModeOptions() {
+    // When cloudflare target is selected, only worker mode makes sense
+    if (this.deployTarget === "cloudflare") {
+      return [{ value: "worker", label: "Cloudflare Workers" }];
+    }
+    return [
+      { value: "spa", label: "SPA" },
+      { value: "ssg", label: "SSG" },
+      { value: "hybrid", label: "Hybrid" },
+    ];
+  },
+
+  needsCredentials() {
+    // ZIP, TAR.GZ, and localhost don't need credentials
+    return !["zip", "targz", "localhost"].includes(this.deployTarget);
+  },
+
+  async handleDeploy() {
+    if (this.isDeploying) return;
+
+    this.isDeploying = true;
+    const credentials = await $APP.Model.bundler_credentials.get("singleton");
+
+    // Validate credentials for targets that need them
+    if (this.needsCredentials()) {
+      if (this.deployTarget === "cloudflare") {
+        if (
+          !credentials?.cloudflare?.apiToken ||
+          !credentials?.cloudflare?.accountId ||
+          !credentials?.cloudflare?.projectName
+        ) {
+          alert(
+            "Please provide your Cloudflare Account ID, API Token, and a Project Name before deploying.",
+          );
+          this.isDeploying = false;
+          return;
+        }
+      } else if (this.deployTarget === "github") {
+        if (!credentials || !credentials.token) {
+          alert("Please provide a GitHub token before deploying.");
+          this.isDeploying = false;
+          return;
+        }
+      }
+    }
+    const release = {
+      version: this.version,
+      notes: this.notes,
+      status: "pending",
+      deployedAt: Date.now(),
+      deployType: this.deployMode,
+      deployTarget: this.deployTarget,
+    };
+    try {
+      const [_, newRelease] = await $APP.Model.bundler_releases.add(release);
+      const result = await Bundler.deploy({
+        ...credentials,
+        mode: this.deployMode,
+        target: this.deployTarget,
+        version: this.version,
+      });
+      await $APP.Model.bundler_releases.edit({
+        id: newRelease.id,
+        status: "success",
+        result,
+      });
+
+      const targetLabel =
+        Bundler.getTargets().find((t) => t.name === this.deployTarget)?.label ||
+        this.deployTarget;
+      alert(\`Deployment to \${targetLabel} successful!\`);
+    } catch (error) {
+      console.error(\`Deployment failed:\`, { error });
+      console.trace();
+      alert(\`Deployment failed: \${error.message}\`);
+      if (release?._id) {
+        await $APP.Model.bundler_releases.add({
+          ...release,
+          status: "failed",
+          error: error.message,
+        });
+      }
+    } finally {
+      this.isDeploying = false;
+    }
+  },
+
+  render() {
+    const targetOptions = this.getTargetOptions();
+    const modeOptions = this.getModeOptions();
+
+    // Auto-switch to worker mode when cloudflare is selected
+    if (this.deployTarget === "cloudflare" && this.deployMode !== "worker") {
+      this.deployMode = "worker";
+    }
+    // Switch away from worker mode when not cloudflare
+    if (this.deployTarget !== "cloudflare" && this.deployMode === "worker") {
+      this.deployMode = "hybrid";
+    }
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">New Release</h2>
+        <div class="bundler-form">
+          <uix-input
+            label="Version"
+            .value=\${this.version}
+            @change=\${(e) => (this.version = e.target.value)}
+          ></uix-input>
+          <uix-textarea
+            label="Release Notes"
+            .value=\${this.notes}
+            @change=\${(e) => (this.notes = e.target.value)}
+          ></uix-textarea>
+          <uix-checkbox
+            ?checked=\${!!$APP.settings.obfuscate}
+            @change=\${(e) => ($APP.settings.obfuscate = e.target.checked)}
+            label="Obfuscate"
+          ></uix-checkbox>
+        </div>
+        <div class="bundler-deploy-row">
+          <uix-select
+            label="Build Mode"
+            value=\${this.deployMode}
+            .options=\${modeOptions}
+            @change=\${(e) => (this.deployMode = e.target.value)}
+          >
+          </uix-select>
+          <uix-select
+            label="Deploy Target"
+            value=\${this.deployTarget}
+            .options=\${targetOptions}
+            @change=\${(e) => (this.deployTarget = e.target.value)}
+          >
+          </uix-select>
+          <uix-button
+            @click=\${() => this.handleDeploy()}
+            label=\${this.isDeploying ? \`Deploying...\` : "Deploy"}
+            ?disabled=\${this.isDeploying}
+          ></uix-button>
+        </div>
+        \${
+          !this.needsCredentials()
+            ? html\`<p class="bundler-help-text">This target downloads directly to your browser - no credentials needed.</p>\`
+            : ""
+        }
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("release-history", {
+  dataQuery: true,
+  properties: {
+    rows: T.array(),
+    limit: T.number(0),
+  },
+  render() {
+    let sortedRows = this.rows?.length
+      ? [...this.rows].sort(
+          (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
+        )
+      : [];
+
+    if (this.limit > 0) {
+      sortedRows = sortedRows.slice(0, this.limit);
+    }
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">Release History</h2>
+        <div class="bundler-releases">
+          \${
+            sortedRows.length > 0
+              ? sortedRows.map(
+                  (release) => html\`
+                  <div class="bundler-release bundler-release-\${release.status}">
+                    <div class="bundler-release-row">
+                      <span class="bundler-release-version">\${release.version}</span>
+                      <span class="bundler-release-status">\${release.status}</span>
+                      \${
+                        release.deployType
+                          ? html\`<span class="bundler-release-type">\${release.deployType.toUpperCase()}</span>\`
+                          : ""
+                      }
+                      \${
+                        release.deployTarget
+                          ? html\`<span class="bundler-release-target">\${release.deployTarget}</span>\`
+                          : ""
+                      }
+                      <span class="bundler-release-date">\${new Date(release.deployedAt).toLocaleString()}</span>
+                    </div>
+                    \${
+                      release.notes
+                        ? html\`<p class="bundler-release-notes">\${release.notes}</p>\`
+                        : ""
+                    }
+                  </div>
+                \`,
+                )
+              : html\`<p class="bundler-empty">No releases yet.</p>\`
+          }
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("settings-editor", {
+  properties: {
+    _settings: T.object(null),
+  },
+  connected() {
+    this._settings = $APP.settings;
+  },
+  async handleSave() {
+    try {
+      await $APP.settings.set(this._settings);
+      alert("Settings saved successfully!");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      alert("Error saving settings. Check the console for details.");
+    }
+  },
+  render() {
+    if (!this._settings) {
+      return html\`<div class="bundler-loading">Loading settings...</div>\`;
+    }
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">App Settings</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="App Name"
+            .value=\${this._settings.name}
+            @change=\${(e) => (this._settings.name = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Short Name"
+            .value=\${this._settings.short_name}
+            @change=\${(e) => (this._settings.short_name = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Emoji Icon"
+            .value=\${this._settings.emojiIcon}
+            @change=\${(e) => (this._settings.emojiIcon = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Icon"
+            .value=\${this._settings.icon}
+            @change=\${(e) => (this._settings.icon = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Start URL"
+            .value=\${this._settings.url}
+            @change=\${(e) => (this._settings.url = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Theme Color"
+            type="color"
+            .value=\${this._settings.theme_color}
+            @change=\${(e) => (this._settings.theme_color = e.target.value)}
+          ></uix-input>
+          <uix-input
+            class="bundler-full-width"
+            label="Open Graph Image URL"
+            .value=\${this._settings.og_image}
+            @change=\${(e) => (this._settings.og_image = e.target.value)}
+          ></uix-input>
+          <uix-textarea
+            class="bundler-full-width"
+            label="Description"
+            .value=\${this._settings.description}
+            @change=\${(e) => (this._settings.description = e.target.value)}
+          ></uix-textarea>
+        </div>
+        <div slot="footer">
+          <uix-button
+            @click=\${this.handleSave.bind(this)}
+            label="Save Settings"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
 
 export default {
-  tag: "admin-dashboard",
+  tag: "bundler-ui",
   style: true,
   properties: {
-    modelStats: T.object({ defaultValue: {} }),
-    loading: T.boolean({ defaultValue: true }),
+    activeTab: T.number(0),
+    releaseStats: T.object({
+      defaultValue: {
+        total: 0,
+        success: 0,
+        failed: 0,
+        pending: 0,
+        lastDeploy: null,
+      },
+    }),
+    releases: T.array(),
   },
 
   async connected() {
@@ -8211,221 +9286,412 @@ export default {
   },
 
   async loadStats() {
-    this.loading = true;
-    const stats = {};
-    const models = getModelNames();
-
-    for (const model of models) {
-      try {
-        const records = await $APP.Model[model].getAll();
-        stats[model] = Array.isArray(records) ? records.length : 0;
-      } catch (error) {
-        console.error(\`Error loading stats for \${model}:\`, error);
-        stats[model] = 0;
-      }
+    try {
+      const releases = await $APP.Model.bundler_releases.getAll();
+      this.releases = releases || [];
+      this.releaseStats = {
+        total: this.releases.length,
+        success: this.releases.filter((r) => r.status === "success").length,
+        failed: this.releases.filter((r) => r.status === "failed").length,
+        pending: this.releases.filter((r) => r.status === "pending").length,
+        lastDeploy:
+          this.releases.length > 0
+            ? [...this.releases].sort(
+                (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
+              )[0]?.deployedAt
+            : null,
+      };
+    } catch (error) {
+      console.error("Failed to load release stats:", error);
     }
-
-    this.modelStats = stats;
-    this.loading = false;
   },
 
-  navigate(path) {
-    $APP.Router.go(path);
+  formatDate(date) {
+    if (!date) return "Never";
+    return new Date(date).toLocaleDateString();
   },
 
   render() {
-    if (this.loading) {
-      return html\`
-        <div class="admin-dashboard-loading">
-          <uix-spinner size="lg"></uix-spinner>
-        </div>
-      \`;
-    }
-
-    const models = Object.entries(this.modelStats);
-    const totalRecords = Object.values(this.modelStats).reduce((a, b) => a + b, 0);
-
     return html\`
-      <div class="admin-dashboard">
-        <!-- Header -->
-        <div class="admin-dashboard-header">
-          <h1 class="admin-dashboard-title">Dashboard</h1>
-          <p class="admin-dashboard-subtitle">Manage your application data and settings</p>
+      <div class="bundler-ui">
+        <h1 class="bundler-page-title">Release Manager</h1>
+        <uix-tabs .activeTab=\${this.activeTab} @tab-change=\${(e) => (this.activeTab = e.detail)}>
+          <button slot="tab"><uix-icon name="layout-dashboard"></uix-icon> Dashboard</button>
+          <button slot="tab"><uix-icon name="settings"></uix-icon> Settings</button>
+          <button slot="tab"><uix-icon name="rocket"></uix-icon> Deploy</button>
+          <button slot="tab"><uix-icon name="key"></uix-icon> Credentials</button>
+
+          <div slot="panel">\${this.renderDashboard()}</div>
+          <div slot="panel">\${this.renderSettings()}</div>
+          <div slot="panel">\${this.renderDeploy()}</div>
+          <div slot="panel">\${this.renderCredentials()}</div>
+        </uix-tabs>
+      </div>
+    \`;
+  },
+
+  renderDashboard() {
+    return html\`
+      <div class="bundler-dashboard">
+        <div class="bundler-stats-grid">
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Total Releases" value=\${this.releaseStats.total} centered>
+              <uix-icon slot="figure" name="package" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Successful" value=\${this.releaseStats.success} variant="success" centered>
+              <uix-icon slot="figure" name="circle-check" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Failed" value=\${this.releaseStats.failed} variant="danger" centered>
+              <uix-icon slot="figure" name="circle-x" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Last Deploy" value=\${this.formatDate(this.releaseStats.lastDeploy)} centered>
+              <uix-icon slot="figure" name="clock" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
         </div>
 
-        <!-- Summary Card -->
-        <uix-card class="admin-dashboard-summary">
-          <div class="admin-dashboard-summary-content">
-            <div>
-              <p class="admin-dashboard-stat-label">Total Records</p>
-              <p class="admin-dashboard-stat-value">\${totalRecords}</p>
-            </div>
-            <div class="admin-dashboard-stat-right">
-              <p class="admin-dashboard-stat-label">Models</p>
-              <p class="admin-dashboard-stat-value">\${models.length}</p>
-            </div>
+        <uix-card shadow="none" borderWidth="0">
+          <h3 slot="header">Quick Actions</h3>
+          <div class="bundler-quick-actions">
+            <uix-button @click=\${() => (this.activeTab = 2)}>
+              <uix-icon name="rocket"></uix-icon> Deploy Now
+            </uix-button>
+            <uix-button @click=\${() => (this.activeTab = 1)}>
+              <uix-icon name="settings"></uix-icon> Settings
+            </uix-button>
+            <uix-button @click=\${() => this.loadStats()}>
+              <uix-icon name="refresh-cw"></uix-icon> Refresh
+            </uix-button>
           </div>
         </uix-card>
 
-        <!-- Model Stats Grid -->
-        <section class="admin-dashboard-section">
-          <h2 class="admin-dashboard-section-title">Models</h2>
-          <div class="admin-dashboard-grid">
-            \${models.map(
-              ([model, count]) => html\`
-                <uix-card
-                  hover
-                  class="admin-dashboard-model-card"
-                  @click=\${() => this.navigate(\`/admin/models/\${model}\`)}
-                >
-                  <div class="admin-dashboard-model-header">
-                    <uix-icon name="database" size="24"></uix-icon>
-                    <span class="admin-dashboard-model-count">\${count}</span>
-                  </div>
-                  <p class="admin-dashboard-model-name">\${model}</p>
-                  <p class="admin-dashboard-model-label">
-                    \${count === 1 ? "record" : "records"}
-                  </p>
-                </uix-card>
-              \`,
-            )}
-          </div>
-        </section>
+        <release-history
+          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
+        ></release-history>
+      </div>
+    \`;
+  },
 
-        <!-- Quick Actions -->
-        <section class="admin-dashboard-section">
-          <h2 class="admin-dashboard-section-title">Quick Actions</h2>
-          <div class="admin-dashboard-actions">
-            <uix-button
-              class="admin-action-deploy"
-              @click=\${() => this.navigate("/admin/deploy")}
-            >
-              <uix-icon name="rocket" size="24"></uix-icon>
-              Deploy
-            </uix-button>
+  renderSettings() {
+    return html\`
+      <div class="bundler-tab-content">
+        <settings-editor></settings-editor>
+      </div>
+    \`;
+  },
 
-            <uix-button
-              class="admin-action-theme"
-              @click=\${() => this.navigate("/admin/theme")}
-            >
-              <uix-icon name="palette" size="24"></uix-icon>
-              Theme
-            </uix-button>
+  renderDeploy() {
+    return html\`
+      <div class="bundler-tab-content bundler-deploy-content">
+        <release-creator></release-creator>
+        <release-history
+          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
+        ></release-history>
+      </div>
+    \`;
+  },
 
-            <uix-button
-              class="admin-action-refresh"
-              @click=\${() => this.loadStats()}
-            >
-              <uix-icon name="refresh-cw" size="24"></uix-icon>
-              Refresh
-            </uix-button>
-          </div>
-        </section>
+  renderCredentials() {
+    return html\`
+      <div class="bundler-tab-content bundler-credentials-content">
+        <credentials-manager
+          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
+        ></credentials-manager>
+        <cloudflare-credentials-manager
+          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
+        ></cloudflare-credentials-manager>
       </div>
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
+`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
+`,mimeType:"text/css"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
+`,mimeType:"text/css"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
 `,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.css":{content:`:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}
 `,mimeType:"text/css"},"/$app/uix/display/avatar.css":{content:`:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}
-`,mimeType:"text/css"},"/$app/admin/views/dashboard.css":{content:`.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}
-`,mimeType:"text/css"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/file-text.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8m8 4H8m8 4H8"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/image.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/css"},"/$app/bundler/views/ui.css":{content:`.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}
+`,mimeType:"text/css"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
-  extends: "uix-container",
-  i18n: {},
+  tag: "uix-tabs",
+  properties: {
+    activeTab: T.number(0),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "pills", "underline"],
+    }),
+    vertical: T.boolean(),
+  },
   style: true,
   shadow: true,
-  properties: {
-    borderWidth: T.string({
-      defaultValue: "1",
-      enum: ["none", "1", "2", "3"],
-    }),
-    borderStyle: T.string({
-      defaultValue: "solid",
-      enum: ["solid", "dashed", "dotted"],
-    }),
-    shadow: T.string({
-      defaultValue: "none",
-      enum: ["none", "sm", "md", "lg"],
-    }),
-    hover: T.boolean({
-      defaultValue: false,
-    }),
-    gap: T.string({
-      defaultValue: "md",
-      enum: ["none", "xs", "sm", "md", "lg", "xl"],
-    }),
+
+  firstUpdated() {
+    const slot = this.shadowRoot.querySelector("slot[name=panel]");
+    slot.addEventListener("slotchange", () => {
+      this.updateActivePanels();
+    });
   },
+
+  updateActivePanels() {
+    const panelSlot = this.shadowRoot.querySelector("slot[name=panel]");
+    const tabSlot = this.shadowRoot.querySelector("slot[name=tab]");
+
+    if (!panelSlot) return;
+
+    const panels = panelSlot.assignedNodes({ flatten: true });
+    const tabs = tabSlot?.assignedElements() || [];
+
+    // Update panel visibility
+    if (panels.length > 1) {
+      panels.forEach((panel, index) => {
+        if (index === this.activeTab) {
+          panel.removeAttribute("hide");
+        } else {
+          panel.setAttribute("hide", "");
+        }
+      });
+    }
+
+    // Update tab active state
+    tabs.forEach((tab, index) => {
+      if (index === this.activeTab) {
+        tab.setAttribute("active", "");
+      } else {
+        tab.removeAttribute("active");
+      }
+    });
+  },
+
+  selectTab(e) {
+    const clickedElement = e.target;
+    const slot = clickedElement.assignedSlot;
+    if (slot && slot.name === "tab") {
+      const tabs = slot.assignedElements();
+      const index = tabs.indexOf(clickedElement);
+      this.activeTab = index;
+      this.updateActivePanels();
+      this.emit("tab-change", index);
+    }
+  },
+
   render() {
     return html\`
-      <slot name="header" part="header"></slot>
-      <slot part="body"><slot></slot></slot>
-      
-      <slot part="footer" name="footer"></slot>
+        <div
+          part="tab-list"
+          role="tablist"
+          aria-orientation=\${this.vertical ? "vertical" : "horizontal"}
+        >
+          <slot name="tab" part="tab" @click=\${this.selectTab.bind(this)}></slot>
+        </div>
+        <slot part="tab-panel" name="panel" part="panel"></slot>
+     
     \`;
   },
 };
 
 /**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * Card Component
+ * Tabs Component
  *
  * @component
- * @category layout
- * @tag uix-card
+ * @category navigation
+ * @tag uix-tabs
  *
- * A versatile container component for displaying grouped content with optional
- * header and footer sections. Supports different variants and padding options.
+ * Accessible tabs with keyboard navigation and flexible content
  *
- * @slot header - Optional header content
- * @slot - Default slot for card body content
- * @slot footer - Optional footer content
- * @part header - The card header container
- * @part body - The card body container
- * @part footer - The card footer container
- *
- * @example Basic Card
+ * @example
+ * // Pattern 1: Static tabs with multiple panels (each panel rendered separately)
  * \`\`\`html
- * <uix-card>
- *   <h3 slot="header">Card Title</h3>
- *   <p>Card content goes here...</p>
- * </uix-card>
+ * <uix-tabs activeTab=2>
+ *   <button slot="tab">Profile</button>
+ *   <button slot="tab">Settings</button>
+ *   <button slot="tab">Account</button>
+ *
+ *   <div slot="panel">Profile content...</div>
+ *   <div slot="panel">Settings content...</div>
+ *   <div slot="panel">Account content...</div>
+ * </uix-tabs>
  * \`\`\`
  *
- * @example Card with Footer
+ * @example
+ * // Pattern 2: Dynamic tabs with single panel (content switches based on active tab)
+ * \`\`\`js
+ * html\`<uix-tabs>
+ *   \${sections.map(section => html\`
+ *     <button slot="tab">
+ *       <uix-icon name=\${section.icon}></uix-icon>
+ *       \${section.label}
+ *     </button>
+ *   \`)}
+ *   <div slot="panel">
+ *     \${sections[this.activeTab].render()}
+ *   </div>
+ * </uix-tabs>\`
+ * \`\`\`
+ * @example
+ * // With variants
+ *
  * \`\`\`html
- * <uix-card>
- *   <header slot="header"><h3 class="flex">User Profile</h3></header>
- *   <article>
- *     <p>John Doe</p>
- *     <p>Software Engineer</p>
- *   </article>
- *   <footer slot="footer">
- *     <uix-button primary>Edit</uix-button>
- *     <uix-button>Cancel</uix-button>
- *   </footer>
- * </uix-card>
+ * <uix-tabs variant="pills">
+ *   <button slot="tab">Tab 1</button>
+ *   <button slot="tab">Tab 2</button>
+ *   <div slot="panel">Panel 1</div>
+ *   <div slot="panel">Panel 2</div>
+ * </uix-tabs>
  * \`\`\`
  *
- * @example Card Variants
+ * @example
+ * // Vertical orientation
  * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card variant="default">Default Card</uix-card>
- *  <uix-card variant="elevated">Elevated Card</uix-card>
- * </div>
+ * <uix-tabs vertical variant="underline">
+ *   <button slot="tab">Navigation</button>
+ *   <button slot="tab">Content</button>
+ *   <div slot="panel">Nav content</div>
+ *   <div slot="panel">Main content</div>
+ * </uix-tabs>
+ * \`\`\`
+ * @example
+ * // Controlled with property binding
+ * \`\`\`js
+ * html\`<uix-tabs .activeTab=\${this.currentTab} @tab-change=\${this.handleTabChange}>
+ *   <button slot="tab">First</button>
+ *   <button slot="tab">Second</button>
+ *   <div slot="panel">First panel</div>
+ *   <div slot="panel">Second panel</div>
+ * </uix-tabs>\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/display/stat.js":{content:`import T from "/$app/types/index.js";
+import { html, nothing } from "/npm/lit-html";
+
+export default {
+  tag: "uix-stat",
+  properties: {
+    title: T.string(""),
+    value: T.any(""),
+    desc: T.string(""),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["sm", "md", "lg"],
+    }),
+    variant: T.string({
+      defaultValue: "default",
+      enum: [
+        "default",
+        "primary",
+        "secondary",
+        "success",
+        "danger",
+        "warning",
+        "info",
+      ],
+    }),
+    centered: T.boolean(false),
+  },
+  style: true,
+  shadow: true,
+
+  render() {
+    return html\`
+      <div part="figure">
+        <slot name="figure"></slot>
+      </div>
+      <div part="body">
+        \${this.title ? html\`<div part="title">\${this.title}</div>\` : nothing}
+        \${this.value !== "" ? html\`<div part="value">\${this.value}</div>\` : nothing}
+        <div part="desc">
+          \${this.desc ? this.desc : html\`<slot></slot>\`}
+        </div>
+      </div>
+    \`;
+  },
+};
+
+/**
+ * Stat Component
+ *
+ * @component
+ * @category display
+ * @tag uix-stat
+ *
+ * Display statistics with title, value, and description in a clean format.
+ * Supports icons/figures and works great when grouped with uix-join.
+ *
+ * @slot default - Description content below the value
+ * @slot figure - Icon, avatar, or image to display alongside the stat
+ *
+ * @part figure - Container for the figure slot
+ * @part body - Container for title, value, and description
+ * @part title - The stat title/label
+ * @part value - The main stat value (hero element)
+ * @part desc - Description text below the value
+ *
+ * @example
+ * // Basic stat
+ * \`\`\`html
+ * <uix-stat title="Total Users" value="1,234"></uix-stat>
  * \`\`\`
  *
- * @example Card Padding Options
+ * @example
+ * // With description
  * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card padding="none">No Padding</uix-card>
- *  <uix-card padding="sm">Small Padding</uix-card>
- *  <uix-card padding="md">Medium Padding</uix-card>
- *  <uix-card padding="lg">Large Padding</uix-card>
- * </div>
+ * <uix-stat title="Downloads" value="31K" desc="Jan 1st - Feb 1st"></uix-stat>
+ * \`\`\`
+ *
+ * @example
+ * // With icon figure
+ * \`\`\`html
+ * <uix-stat title="Total Likes" value="25.6K" variant="primary">
+ *   <uix-icon slot="figure" name="heart" size="lg"></uix-icon>
+ *   21% more than last month
+ * </uix-stat>
+ * \`\`\`
+ *
+ * @example
+ * // With colored variants
+ * \`\`\`html
+ * <uix-stat title="Active" value="85" variant="success">\u2191 12%</uix-stat>
+ * <uix-stat title="Errors" value="3" variant="danger">\u2193 5%</uix-stat>
+ * \`\`\`
+ *
+ * @example
+ * // Grouped stats with uix-join
+ * \`\`\`html
+ * <uix-join>
+ *   <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
+ *   <uix-stat title="New Users" value="4,200">\u2191 400 (22%)</uix-stat>
+ *   <uix-stat title="New Registers" value="1,200">\u2193 90 (14%)</uix-stat>
+ * </uix-join>
+ * \`\`\`
+ *
+ * @example
+ * // Stats with icons grouped
+ * \`\`\`html
+ * <uix-join>
+ *   <uix-stat title="Total Likes" value="25.6K" variant="primary">
+ *     <uix-icon slot="figure" name="heart"></uix-icon>
+ *     21% more than last month
+ *   </uix-stat>
+ *   <uix-stat title="Page Views" value="2.6M" variant="secondary">
+ *     <uix-icon slot="figure" name="zap"></uix-icon>
+ *     21% more than last month
+ *   </uix-stat>
+ * </uix-join>
+ * \`\`\`
+ *
+ * @example
+ * // Centered stats
+ * \`\`\`html
+ * <uix-join>
+ *   <uix-stat title="Passed" value="85" variant="success" centered></uix-stat>
+ *   <uix-stat title="Failed" value="3" variant="danger" centered></uix-stat>
+ *   <uix-stat title="Pending" value="12" variant="warning" centered></uix-stat>
+ * </uix-join>
  * \`\`\`
  */
 `,mimeType:"text/javascript"},"/$app/uix/display/button.js":{content:`import T from "/$app/types/index.js";
@@ -8534,33 +9800,1034 @@ export default {
  * <uix-button href="/dashboard">Go to Dashboard</uix-button>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/layout/container.js":{content:`/**
- * UIX Container Component
- * Generic container component with padding, overflow, and variant support
- */
+`,mimeType:"text/javascript"},"/$app/uix/form/input.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
 
-import T from "/$app/types/index.js";
+const generateId = () => \`uix-input-\${Math.random().toString(36).slice(2, 9)}\`;
 
 export default {
-  style: true,
+  tag: "uix-input",
   properties: {
-    padding: T.string({
-      defaultValue: "md",
-      enum: ["none", "sm", "md", "lg"],
+    label: T.string(),
+    name: T.string(),
+    id: T.string(),
+    value: T.string(""),
+    placeholder: T.string(""),
+    type: T.string({
+      defaultValue: "text",
+      enum: ["text", "email", "tel", "url", "search", "password"],
     }),
-    overflow: T.string({
-      enum: ["visible", "hidden", "auto", "scroll"],
+    size: T.string({
+      enum: ["xs", "sm", "md", "lg", "xl"],
     }),
+    disabled: T.boolean(false),
+    readonly: T.boolean(false),
+    required: T.boolean(false),
+    error: T.boolean(false),
+    fullWidth: T.boolean(false),
     variant: T.string({
       defaultValue: "default",
-      enum: ["default", "filled", "outlined", "elevated"],
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
     }),
   },
+  style: true,
+  shadow: false,
+
+  connected() {
+    if (!this.id && !this._inputId) {
+      this._inputId = generateId();
+    }
+  },
+
+  getInputId() {
+    return this.id || this._inputId || (this._inputId = generateId());
+  },
+
+  handleInput(e) {
+    this.value = e.target.value;
+    this.emit("input", { value: this.value });
+  },
+
+  handleChange(e) {
+    this.value = e.target.value;
+    this.emit("change", { value: this.value });
+  },
+
+  render() {
+    const id = this.getInputId();
+    return html\`
+      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+      <input
+        id=\${id}
+        name=\${this.name ?? id}
+        class="input"
+        type=\${this.type}
+        value=\${this.value}
+        placeholder=\${this.placeholder}
+        ?disabled=\${this.disabled}
+        ?readonly=\${this.readonly}
+        ?required=\${this.required}
+        @input=\${this.handleInput.bind(this)}
+        @change=\${this.handleChange.bind(this)}
+      />
+    \`;
+  },
 };
-`,mimeType:"text/javascript"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
-`,mimeType:"text/css"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
-`,mimeType:"text/css"},"/$app/uix/layout/card.css":{content:`:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;background:var(--card-background, inherit);&::part(body){display:flex;flex-direction:column;flex:1}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, transparent)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, transparent);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}
-`,mimeType:"text/css"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
+
+/**
+ * Input Component
+ *
+ * @component
+ * @category form
+ * @tag uix-input
+ *
+ * Text input field with size variants matching button sizes for use in uix-join
+ *
+ * @example
+ * // Basic input
+ * \`\`\`html
+ * <uix-input placeholder="Enter text..."></uix-input>
+ * \`\`\`
+ *
+ * @example
+ * // With sizes
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input size="xs" placeholder="Extra small"></uix-input>
+ *   <uix-input size="sm" placeholder="Small"></uix-input>
+ *   <uix-input size="md" placeholder="Medium"></uix-input>
+ *   <uix-input size="lg" placeholder="Large"></uix-input>
+ *   <uix-input size="xl" placeholder="Extra large"></uix-input>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Different input types
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input type="text" placeholder="Text"></uix-input>
+ *   <uix-input type="email" placeholder="Email"></uix-input>
+ *   <uix-input type="tel" placeholder="Phone"></uix-input>
+ *   <uix-input type="url" placeholder="URL"></uix-input>
+ *   <uix-input type="search" placeholder="Search"></uix-input>
+ *   <uix-input type="password" placeholder="Password"></uix-input>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // In button group with uix-join
+ * \`\`\`html
+ * <uix-join>
+ *   <uix-input placeholder="Search..." size="md"></uix-input>
+ *   <uix-button variant="primary" size="md">Search</uix-button>
+ * </uix-join>
+ * \`\`\`
+ *
+ * @example
+ * // With binding
+ * \`\`\`js
+ * html\`<uix-input
+ *   .value=\${this.searchQuery}
+ *   @input=\${(e) => this.searchQuery = e.detail.value}
+ *   placeholder="Search..."
+ * ></uix-input>\`
+ * \`\`\`
+ *
+ * @example
+ * // States
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input placeholder="Normal"></uix-input>
+ *   <uix-input placeholder="Disabled" disabled></uix-input>
+ *   <uix-input placeholder="Readonly" value="Read only text" readonly></uix-input>
+ *   <uix-input placeholder="Required" required></uix-input>
+ * </div>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-textarea",
+  properties: {
+    label: T.string(),
+    id: T.string(),
+    value: T.string(""),
+    placeholder: T.string(""),
+    rows: T.number({ defaultValue: 4 }),
+    cols: T.number({ defaultValue: 50 }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    disabled: T.boolean(false),
+    readonly: T.boolean(false),
+    required: T.boolean(false),
+    maxlength: T.number({ defaultValue: null }),
+    minlength: T.number({ defaultValue: null }),
+    resize: T.string({
+      defaultValue: "vertical",
+      enum: ["none", "both", "horizontal", "vertical"],
+    }),
+    error: T.boolean(false),
+    fullWidth: T.boolean(false),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
+    }),
+    name: T.string(),
+  },
+  style: true,
+  shadow: false,
+  formAssociated: true,
+
+  connected() {
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._internals.setFormValue(this.value);
+    if (!this.id && !this._textareaId) {
+      this._textareaId = generateId();
+    }
+  },
+
+  get textareaId() {
+    return this.id || this._textareaId || (this._textareaId = generateId());
+  },
+
+  handleInput(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("input", { value: this.value });
+  },
+
+  handleChange(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("change", { value: this.value });
+  },
+
+  render() {
+    const id = this.textareaId;
+    const attrs = {};
+    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
+    if (this.minlength !== null) attrs.minlength = this.minlength;
+
+    return html\`
+      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+      <textarea
+        id=\${id}
+        class="textarea"
+        name=\${this.name}
+        value=\${this.value}
+        placeholder=\${this.placeholder}
+        rows=\${this.rows}
+        cols=\${this.cols}
+        ?disabled=\${this.disabled}
+        ?readonly=\${this.readonly}
+        ?required=\${this.required}
+        @input=\${this.handleInput.bind(this)}
+        @change=\${this.handleChange.bind(this)}
+      ></textarea>
+    \`;
+  },
+};
+
+/**
+ * Textarea Component
+ *
+ * @component
+ * @category form
+ * @tag uix-textarea
+ *
+ * Multi-line text input field with size variants and resize options.
+ *
+ * @example
+ * // Basic textarea
+ * \`\`\`html
+ * <uix-textarea placeholder="Enter your message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // With custom rows
+ * \`\`\`html
+ * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // Size variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
+ *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
+ *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
+ *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
+ *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Resize options
+ * \`\`\`html
+ * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+ *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
+ *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
+ *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
+ *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With character limit
+ * \`\`\`html
+ * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // States
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea placeholder="Normal"></uix-textarea>
+ *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
+ *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
+ *   <uix-textarea placeholder="Required" required></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With binding
+ * \`\`\`js
+ * html\`<uix-textarea
+ *   .value=\${this.message}
+ *   @input=\${(e) => this.message = e.detail.value}
+ *   placeholder="Type your message..."
+ * ></uix-textarea>\`
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-checkbox-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-checkbox",
+  properties: {
+    id: T.string(),
+    label: T.string(),
+    checked: T.boolean(false),
+    value: T.string(""),
+    name: T.string(""),
+    disabled: T.boolean(false),
+    required: T.boolean(false),
+    indeterminate: T.boolean(false),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    variant: T.string({
+      defaultValue: "primary",
+      enum: ["primary", "secondary", "success", "warning", "error"],
+    }),
+  },
+  style: true,
+  shadow: false,
+  formAssociated: true,
+
+  connected() {
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._updateFormValue();
+    if (!this.id && !this._checkboxId) {
+      this._checkboxId = generateId();
+    }
+  },
+
+  get checkboxId() {
+    return this.id || this._checkboxId || (this._checkboxId = generateId());
+  },
+
+  updated({ changedProps }) {
+    if (changedProps.has("checked")) {
+      this._updateFormValue();
+    }
+    // Handle indeterminate state
+    if (changedProps.has("indeterminate")) {
+      const input =
+        this.shadowRoot?.querySelector("input") || this.querySelector("input");
+      if (input) {
+        input.indeterminate = this.indeterminate;
+      }
+    }
+  },
+
+  _updateFormValue() {
+    if (this._internals) {
+      this._internals.setFormValue(this.checked ? this.value || "on" : null);
+    }
+  },
+
+  handleChange(e) {
+    this.checked = e.target.checked;
+    this.indeterminate = false;
+    this._updateFormValue();
+    this.emit("change", { checked: this.checked, value: this.value });
+  },
+
+  render() {
+    const id = this.checkboxId;
+    return html\`
+      <input
+        type="checkbox"
+        id=\${id}
+        class="checkbox"
+        ?checked=\${this.checked}
+        .indeterminate=\${this.indeterminate}
+        value=\${this.value}
+        name=\${this.name}
+        ?disabled=\${this.disabled}
+        ?required=\${this.required}
+        @change=\${this.handleChange.bind(this)}
+      />
+      \${this.label ? html\`<uix-label inline for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+    \`;
+  },
+};
+
+/**
+ * Checkbox Component
+ *
+ * @component
+ * @category form
+ * @tag uix-checkbox
+ *
+ * A checkbox input for boolean selections with label support.
+ *
+ * @example
+ * // Basic checkbox
+ * \`\`\`html
+ * <uix-checkbox label="Accept terms and conditions"></uix-checkbox>
+ * \`\`\`
+ *
+ * @example
+ * // Checked by default
+ * \`\`\`html
+ * <uix-checkbox checked label="Subscribe to newsletter"></uix-checkbox>
+ * \`\`\`
+ *
+ * @example
+ * // Size variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox size="xs" label="Extra small"></uix-checkbox>
+ *   <uix-checkbox size="sm" label="Small"></uix-checkbox>
+ *   <uix-checkbox size="md" checked label="Medium"></uix-checkbox>
+ *   <uix-checkbox size="lg" label="Large"></uix-checkbox>
+ *   <uix-checkbox size="xl" label="Extra large"></uix-checkbox>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Color variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox variant="primary" checked label="Primary"></uix-checkbox>
+ *   <uix-checkbox variant="secondary" checked label="Secondary"></uix-checkbox>
+ *   <uix-checkbox variant="success" checked label="Success"></uix-checkbox>
+ *   <uix-checkbox variant="warning" checked label="Warning"></uix-checkbox>
+ *   <uix-checkbox variant="error" checked label="Error"></uix-checkbox>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Indeterminate state
+ * \`\`\`html
+ * <uix-checkbox indeterminate label="Select all"></uix-checkbox>
+ * \`\`\`
+ *
+ * @example
+ * // Disabled state
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox disabled label="Disabled unchecked"></uix-checkbox>
+ *   <uix-checkbox checked disabled label="Disabled checked"></uix-checkbox>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With event handling
+ * \`\`\`js
+ * html\`<uix-checkbox
+ *   .checked=\${this.agreed}
+ *   @change=\${(e) => this.agreed = e.detail.checked}
+ *   label="I agree to the terms"
+ * ></uix-checkbox>\`
+ * \`\`\`
+ *
+ * @example
+ * // In a form
+ * \`\`\`html
+ * <form>
+ *   <uix-checkbox name="newsletter" value="yes" label="Subscribe to newsletter"></uix-checkbox>
+ *   <uix-checkbox name="terms" value="accepted" required label="Accept terms"></uix-checkbox>
+ *   <button type="submit">Submit</button>
+ * </form>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/form/select.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-select-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-select",
+  style: true,
+  formAssociated: true,
+  properties: {
+    id: T.string(),
+    value: T.string(),
+    disabled: T.boolean(),
+    required: T.boolean(),
+    placeholder: T.string(),
+    name: T.string(),
+    label: T.string(),
+    options: T.array({ defaultValue: [] }),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
+    }),
+  },
+  formResetCallback() {
+    const $select = this.querySelector("select");
+    if ($select) {
+      $select.value = this._defaultValue || "";
+      this.value = $select.value;
+    }
+  },
+  formDisabledCallback(disabled) {
+    const $select = this.querySelector("select");
+    if ($select) $select.disabled = disabled;
+  },
+  formStateRestoreCallback(state) {
+    const $select = this.querySelector("select");
+    if ($select) $select.value = state;
+    this.value = state;
+  },
+  reportValidity() {
+    const $select = this.querySelector("select");
+    if (!$select) return true;
+    const validity = $select.reportValidity() !== false;
+    $select?.classList.toggle("input-error", !validity);
+    return validity;
+  },
+  connected() {
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._defaultValue = this.value;
+    if (!this.id && !this._selectId) {
+      this._selectId = generateId();
+    }
+  },
+
+  get selectId() {
+    return this.id || this._selectId || (this._selectId = generateId());
+  },
+
+  _onInput(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+  },
+
+  _onChange(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+  },
+
+  render() {
+    const { value, disabled, required, placeholder, name, label, options } = this;
+    const id = this.selectId;
+    return html\`
+        \${label ? html\`<uix-label for=\${id} text=\${label} ?required=\${required}></uix-label>\` : ""}
+        <div class="select-wrapper">
+          <select
+            id=\${id}
+            name=\${name || ""}
+            value=\${value || ""}
+            ?disabled=\${disabled}
+            ?required=\${required}
+            @input=\${this._onInput.bind(this)}
+            @change=\${this._onChange.bind(this)}
+          >
+            \${
+              placeholder && !value
+                ? html\`<option value="" disabled selected hidden>
+                  \${placeholder}
+                </option>\`
+                : ""
+            }
+            \${options.map(
+              (option) => html\`
+                <option
+                  value=\${option.value ?? option}
+                  ?selected=\${(option.value ?? option) === this.value}
+                >
+                  \${option.label ?? option}
+                </option>
+              \`,
+            )}
+          </select>
+          <uix-icon name="chevron-down" class="select-arrow"></uix-icon>
+        </div>
+    \`;
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * Select Component
+ *
+ * @component
+ * @category form
+ * @tag uix-select
+ *
+ * A native select dropdown with consistent styling. Accepts an options array
+ * and integrates with HTML forms.
+ *
+ * @example Basic Select
+ * \`\`\`html
+ * <uix-select
+ *   value="option2"
+ *   options='["Option 1", "Option 2", "Option 3"]'
+ * ></uix-select>
+ * \`\`\`
+ *
+ * @example With Label and Placeholder
+ * \`\`\`html
+ * <uix-select
+ *   label="Choose Color"
+ *   placeholder="Select a color..."
+ *   options='[
+ *     { "value": "red", "label": "Red" },
+ *     { "value": "green", "label": "Green" },
+ *     { "value": "blue", "label": "Blue" }
+ *   ]'
+ * ></uix-select>
+ * \`\`\`
+ *
+ * @example In a Form
+ * \`\`\`html
+ * <form>
+ *   <uix-select
+ *     name="country"
+ *     label="Country"
+ *     required
+ *     options='["USA", "UK", "Canada"]'
+ *   ></uix-select>
+ * </form>
+ * \`\`\`
+ *
+ * @example Disabled State
+ * \`\`\`html
+ * <uix-select
+ *   disabled
+ *   value="disabled"
+ *   options='["This select is disabled"]'
+ * ></uix-select>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/file-text.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8m8 4H8m8 4H8"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/image.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+`,mimeType:"text/css"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
+`,mimeType:"text/css"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
+`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
+`,mimeType:"text/css"},"/$app/uix/form/textarea.css":{content:`:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/css"},"/$app/uix/form/checkbox.css":{content:`:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}
+`,mimeType:"text/css"},"/$app/uix/form/select.css":{content:`:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/css"},"/$app/uix/form/label.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-label",
+  properties: {
+    for: T.string(),
+    text: T.string(),
+    required: T.boolean(false),
+    inline: T.boolean(false),
+  },
+  style: true,
+  shadow: false,
+
+  render() {
+    return html\`
+      <label class="label" for=\${this.for || ""}>\${this.text}\${this.required ? html\`<span class="label-required">*</span>\` : ""}</label>
+    \`;
+  },
+};
+
+/**
+ * Label Component
+ *
+ * @component
+ * @category form
+ * @tag uix-label
+ *
+ * A form label with consistent styling and required indicator support.
+ *
+ * @example
+ * // Basic label
+ * \`\`\`html
+ * <uix-label for="username">Username</uix-label>
+ * <uix-input id="username"></uix-input>
+ * \`\`\`
+ *
+ * @example
+ * // Required label
+ * \`\`\`html
+ * <uix-label for="email" required>Email</uix-label>
+ * <uix-input id="email" required></uix-input>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/form/label.css":{content:`:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}
+`,mimeType:"text/css"},"/views/event-detail-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor, isGuest, NBS } from "./utils.js";
+
+export default {
+  dataQuery: true,
+  properties: {
+    event: T.object({ attribute: false }),
+    userId: T.string({ defaultValue: "guest" }),
+    currentUser: T.object({
+      sync: $APP.Model.users,
+      query: (inst) => ({
+        id: inst.userId,
+        includes: ["likedEvents", "interestedEvents"],
+      }),
+      dependsOn: ["userId"],
+    }),
+    showAuthPrompt: T.boolean({ defaultValue: false }),
+    authPromptMessage: T.string({ defaultValue: "" }),
+    showAuthModal: T.boolean({ defaultValue: false }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+    // Track view count
+    if (this.event?.id) {
+      await $APP.Model.events.edit(this.event.id, {
+        viewCount: (this.event.viewCount || 0) + 1,
+      });
+    }
+  },
+  dataLoaded({ row }) {
+    if (row?.name) {
+      $APP.Router.setTitle(row.name);
+    }
+  },
+  isInterested() {
+    if (!this.currentUser || !this.event) return false;
+    return (
+      this.currentUser.interestedEvents?.some((e) => e.id === this.event.id) ||
+      false
+    );
+  },
+  getRelatedMeetups() {
+    if (!this.event) return [];
+    return (this.meetups || []).filter((m) => m.event === this.event.id);
+  },
+  async handleInterestToggle() {
+    const e = this.event;
+    if (!e || !this.currentUser) return;
+
+    if (this.isInterested()) {
+      // Remove from interested
+      this.currentUser.interestedEvents =
+        this.currentUser.interestedEvents.filter((i) => i.id !== e.id);
+    } else {
+      // Add to interested
+      this.currentUser.interestedEvents = [
+        ...this.currentUser.interestedEvents,
+        { id: e.id },
+      ];
+    }
+    await $APP.Model.users.edit(this.currentUser);
+  },
+  // Keeping createMeetup method for potential future admin use
+  async createMeetup() {
+    if (isGuest()) {
+      this.showAuthPrompt = true;
+      this.authPromptMessage = "Create an account to host meetups!";
+      return;
+    }
+    const e = this.event;
+    const n = {
+      id: Number(\`\${Date.now()}00\`),
+      name: \`Meetup at \${e.name}\`,
+      description: "Join me! I'm looking for a group to go with.",
+      category: e.category,
+      event: e.id,
+      image: e.image,
+      date: e.date,
+      time: "19:00",
+      venue: e.venue,
+      attendees: [],
+      createdAt: new Date().toISOString(),
+      order: 0,
+    };
+    await $APP.Model.meetups.add(n);
+    alert("Meetup Created! Others can now join you.");
+  },
+  render() {
+    const m = this.event;
+    if (!m) return NBS.SPINNER;
+
+    const rM = this.getRelatedMeetups();
+    const h = $APP.Auth.user;
+    const isInterested = this.isInterested();
+    const pD =
+      m.price && m.price > 0 ? \`\${m.currency || "R$"} \${m.price}\` : "FREE";
+
+    return html\`
+      <div class="bg-purple-50 min-h-screen pb-20">
+        <view-auth-modal
+          .isOpen=\${this.showAuthModal}
+          .onClose=\${() => (this.showAuthModal = false)}
+          .onSuccess=\${() => location.reload()}
+        ></view-auth-modal>
+        \${this.showAuthPrompt
+          ? html\`
+              <div class="fixed bottom-20 left-4 right-4 z-40">
+                <view-auth-prompt
+                  .message=\${this.authPromptMessage}
+                  .onLogin=\${() => {
+                    this.showAuthPrompt = false;
+                    this.showAuthModal = true;
+                  }}
+                  .onDismiss=\${() => (this.showAuthPrompt = false)}
+                ></view-auth-prompt>
+              </div>
+            \`
+          : null}
+        <!-- Hero Image -->
+        <div
+          class="relative w-full h-64 sm:h-80 bg-gray-200 border-b-3 border-black overflow-hidden"
+        >
+          <img src="\${m.image}" class="w-full h-full object-cover" />
+          <div class="absolute bottom-4 left-4 flex gap-2">
+            <div
+              class="px-3 py-1 \${getCategoryColor(
+                m.category,
+              )} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+            >
+              \${$APP.i18n.t(\`categories.\${m.category}\`)}
+            </div>
+            \${m.isRecurring
+              ? html\`<div
+                  class="px-3 py-1 bg-blue-200 border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                >
+                  Recurring
+                </div>\`
+              : null}
+          </div>
+          <!-- Share button & Badge -->
+          <div class="absolute top-4 right-4 flex items-center gap-2">
+            <button class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <uix-icon name="share" size="20"></uix-icon>
+            </button>
+            \${m.recommended || m.viewCount >= 100
+              ? html\`
+                  <view-recommended-badge
+                    .recommended=\${m.recommended}
+                    .viewCount=\${m.viewCount || 0}
+                  ></view-recommended-badge>
+                \`
+              : null}
+          </div>
+        </div>
+
+        <!-- Content - Two Column Layout -->
+        <div class="px-4 -mt-6 relative z-10">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Main Content (2/3 width on desktop) -->
+            <div class="md:col-span-2 space-y-6">
+              <!-- Event Details Card -->
+              <div
+                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <div
+                  class="flex items-center gap-2 text-sm font-bold text-gray-600 mb-2"
+                >
+                  <span>\u{1F4CD} \${m.venue || "Rio de Janeiro"}</span>
+                </div>
+                \${m.tags?.length > 0
+                  ? html\`
+                      <div class="mb-4">
+                        <view-tags-display
+                          .tags=\${m.tags}
+                          .maxVisible=\${4}
+                          size="md"
+                        ></view-tags-display>
+                      </div>
+                    \`
+                  : null}
+                <div
+                  class="grid grid-cols-3 gap-0 border-3 border-black rounded-xl overflow-hidden bg-gray-50"
+                >
+                  <div class="p-3 text-center border-r-3 border-black bg-white">
+                    <div class="text-xs font-black text-gray-400 uppercase">
+                      DATE
+                    </div>
+                    <div class="text-sm font-black text-black">
+                      \${m.date
+                        ? new Date(m.date)
+                            .toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                            .toUpperCase()
+                        : "TBA"}
+                    </div>
+                  </div>
+                  <div class="p-3 text-center border-r-3 border-black bg-white">
+                    <div class="text-xs font-black text-gray-400 uppercase">
+                      TIME
+                    </div>
+                    <div class="text-sm font-black text-black">
+                      \${m.time || "All Day"}
+                    </div>
+                  </div>
+                  <div class="p-3 text-center bg-white">
+                    <div class="text-xs font-black text-gray-400 uppercase">
+                      PRICE
+                    </div>
+                    <div
+                      class="text-sm font-black \${m.price === 0
+                        ? "text-green-600"
+                        : "text-black"}"
+                    >
+                      \${pD}
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-200">
+                  <p class="text-base font-medium text-gray-800 leading-relaxed">
+                    \${m.description}
+                  </p>
+                </div>
+                \${m.ticketLink
+                  ? html\`
+                      <div
+                        class="mt-6 pt-6 border-t-2 border-dashed border-gray-300"
+                      >
+                        <div class="flex items-center justify-between mb-3">
+                          <span class="font-black text-sm uppercase"
+                            >Tickets required</span
+                          >
+                          <span
+                            class="font-bold text-sm bg-green-100 text-green-800 px-2 py-1 rounded border border-green-800"
+                            >\${pD}</span
+                          >
+                        </div>
+                        <a
+                          href="\${m.ticketLink}"
+                          target="_blank"
+                          class="block w-full text-center py-3 bg-green-400 border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+                        >
+                          \u{1F39F}\uFE0F Buy Tickets
+                        </a>
+                      </div>
+                    \`
+                  : null}
+                <div
+                  class="mt-6 pt-6 border-t-2 border-dashed border-gray-300"
+                >
+                  <button
+                    @click=\${() => this.handleInterestToggle()}
+                    class="w-full py-4 \${isInterested
+                      ? "bg-green-400"
+                      : "bg-primary"} border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+                  >
+                    \${isInterested ? "\u2713 Interested" : "Mark as Interested"}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Community Meetups Section -->
+              \${rM.length > 0
+                ? html\`
+                    <div>
+                      <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-black uppercase">
+                          Community Meetups
+                        </h3>
+                        <span
+                          class="bg-black text-white text-xs font-bold px-2 py-1 rounded-md"
+                          >\${rM.length}</span
+                        >
+                      </div>
+                      <div class="space-y-4">
+                        \${rM.map(
+                          (meetup) => html\`
+                            <div
+                              class="bg-white border-3 border-black rounded-xl p-4 flex gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:bg-gray-50"
+                              @click=\${() =>
+                                $APP.Router.go("meetup-detail", {
+                                  slug: meetup.slug,
+                                })}
+                            >
+                              <div
+                                class="w-16 h-16 bg-gray-200 border-2 border-black rounded-lg flex-shrink-0 bg-cover bg-center"
+                                style="background-image: url('\${meetup.image}')"
+                              ></div>
+                              <div class="flex-1 min-w-0">
+                                <h4 class="font-black text-sm truncate uppercase">
+                                  \${meetup.name}
+                                </h4>
+                                <div class="text-xs font-bold text-gray-500 mb-2">
+                                  \u{1F4C5} \${meetup.date} \u2022 \${meetup.time}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                  <div class="flex -space-x-2">
+                                    \${meetup.attendees.map(
+                                      () => html\`<div
+                                        class="w-6 h-6 rounded-full bg-gray-300 border border-black"
+                                      ></div>\`,
+                                    )}
+                                  </div>
+                                  <span class="text-xs font-black text-gray-400"
+                                    >\${meetup.attendees.length} going</span
+                                  >
+                                </div>
+                              </div>
+                            </div>
+                          \`,
+                        )}
+                      </div>
+                    </div>
+                  \`
+                : null}
+            </div>
+
+            <!-- Sidebar (1/3 width on desktop) -->
+            <div class="space-y-6">
+              <view-detail-sidebar
+                type="event"
+                .currentItem=\${m}
+                .showToc=\${false}
+              ></view-detail-sidebar>
+            </div>
+          </div>
+
+          <div class="h-24"></div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
 import $APP from "/$app.js";
 
 try {
@@ -9201,6 +11468,7 @@ const KNOWN_DEFINITION_KEYS = new Set([
   "willUpdate",
   "firstUpdated",
   "updated",
+  "dataLoaded",
   "class",
   "role",
   "tag",
@@ -9278,6 +11546,7 @@ class View extends HTMLElement {
       willUpdate,
       firstUpdated,
       updated,
+      dataLoaded,
       class: klass,
       role,
     } = definition;
@@ -9439,7 +11708,7 @@ class View extends HTMLElement {
     ];
 
     component.plugins.push({
-      events: { connected, disconnected, willUpdate, firstUpdated, updated },
+      events: { connected, disconnected, willUpdate, firstUpdated, updated, dataLoaded },
       name: "base",
     });
 
@@ -9725,261 +11994,6 @@ class View extends HTMLElement {
 }
 
 export default View;
-`,mimeType:"text/javascript"},"/$app/base/backend/frontend.js":{content:`import T from "/$app/types/index.js";
-import View from "/$app/view/index.js";
-import $APP from "/$app.js";
-
-let appWorker;
-let wwPort;
-const pendingRequests = {};
-
-const handleWWMessage = async (message = {}) => {
-  const { data } = message;
-  const { eventId, type, payload, connection } = data;
-  const response = payload;
-  const respond =
-    eventId &&
-    ((responsePayload) =>
-      wwPort.postMessage({
-        eventId,
-        payload: responsePayload,
-        connection,
-      }));
-  await $APP.events.emit(type, { respond, payload, eventId });
-
-  if (eventId && pendingRequests[eventId]) {
-    try {
-      pendingRequests[data.eventId].resolve(response);
-    } catch (error) {
-      pendingRequests[data.eventId].reject(new Error(error));
-    } finally {
-      delete pendingRequests[eventId];
-    }
-  }
-  if (respond) return respond(response);
-};
-
-const initBackend = async () => {
-  try {
-    appWorker = new Worker(\`/backend.js\`, {
-      type: "module",
-    });
-    const wwChannel = new MessageChannel();
-    wwPort = wwChannel.port1;
-    wwPort.onmessage = handleWWMessage;
-    wwPort.onmessageerror = (e) => {
-      console.error("Worker message error:", e);
-    };
-    appWorker.postMessage({ type: "APP:BACKEND:START" }, [wwChannel.port2]);
-    //await navigator.storage.persist();
-    $APP.events.on("APP:BACKEND:READY", async () => {
-      await $APP.events.emit("APP:READY");
-    });
-  } catch (error) {
-    console.error("Failed to initialize backend:", error);
-    throw error;
-  }
-};
-
-$APP.events.on("APP:INIT", initBackend);
-
-const postMessageToPort = (port, params, retryFn) => {
-  if (!port) {
-    setTimeout(() => retryFn(params), 100);
-    return;
-  }
-  port.postMessage(params);
-};
-
-const postMessageToWW = (params) =>
-  postMessageToPort(wwPort, params, postMessageToWW);
-const fetchDataQuery = async (instance) => {
-  const query = instance["data-query"];
-  if (!query) return;
-
-  const {
-    model,
-    id,
-    limit,
-    offset = 0,
-    order,
-    where,
-    includes,
-    key,
-    single,
-  } = query;
-
-  if (!model) return console.warn("data-query: 'model' is required");
-  if (!key)
-    return console.warn(
-      "data-query: 'key' is required to know where to store data",
-    );
-  if (!$APP.Model || !$APP.Model[model])
-    return console.error(\`data-query: Model "\${model}" does not exist\`);
-
-  const isMany = query.many ?? (!id && !single);
-  const opts = { limit: single ? 1 : limit, offset, includes, order, where };
-  console.error({ isMany, opts });
-  if (instance._dataQuerySub && instance._dataQuerySubHandler) {
-    instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
-    instance._dataQuerySub = null;
-  }
-  instance._paginationInfo = null;
-  instance._dataQuerySubHandler = (data) => {
-    const oldValue = instance.state[key];
-    instance.state[key] = data;
-    instance.requestUpdate(key, oldValue);
-    instance.emit("dataLoaded", {
-      instance,
-      rows: isMany ? data : undefined,
-      row: !isMany ? data : undefined,
-      ...(instance._paginationInfo || {}),
-      component: instance.constructor,
-    });
-  };
-
-  try {
-    if (isMany) {
-      const result = await $APP.Model[model].getAll(opts);
-      const oldValue = instance.state[key];
-      instance.state[key] = result;
-      instance._paginationInfo =
-        result.limit !== undefined
-          ? {
-              total: result.total,
-              limit: result.limit,
-              offset: result.offset,
-              count: result.count,
-            }
-          : null;
-      instance.requestUpdate(key, oldValue);
-      result.subscribe?.(instance._dataQuerySubHandler);
-      instance._dataQuerySub = result;
-    } else if (single && where) {
-      const result = await $APP.Model[model].getAll(opts);
-
-      const oldValue = instance.state[key];
-      instance.state[key] = result[0] || null;
-      instance.requestUpdate(key, oldValue);
-
-      // Subscribe to array, extract first item on updates
-      result.subscribe?.((data) => {
-        instance._dataQuerySubHandler(data[0] || null);
-      });
-      instance._dataQuerySub = result;
-    } else {
-      // Single record via id
-      const reactiveRow = await $APP.Model[model].get(id);
-      const oldValue = instance.state[key];
-      instance.state[key] = reactiveRow;
-      instance.requestUpdate(key, oldValue);
-      console.log({ id, reactiveRow });
-      // Subscribe to updates - handle both array and single row formats
-      reactiveRow.subscribe?.((data) => {
-        const row = Array.isArray(data) ? data[0] : data;
-        instance._dataQuerySubHandler(row);
-      });
-      instance._dataQuerySub = reactiveRow;
-    }
-    instance.emit("dataLoaded", {
-      instance,
-      rows: isMany ? instance.state[key] : undefined,
-      row: !isMany ? instance.state[key] : undefined,
-      ...(instance._paginationInfo || {}),
-      component: instance.constructor,
-    });
-  } catch (error) {
-    console.error(
-      \`data-query: Failed to load data for model "\${model}":\`,
-      error,
-    );
-    instance.emit("dataError", { instance, error, model, id });
-  }
-
-  instance.syncable = true;
-};
-
-View.plugins.push({
-  name: "dataQuery",
-  test: ({ component }) => !!component.dataQuery,
-  init: ({ View }) => {
-    View.properties["data-query"] = T.object({
-      properties: {
-        model: T.string(),
-        id: T.string(),
-        where: T.object(),
-        includes: T.string(),
-        order: T.string(),
-        limit: T.number(),
-        offset: T.number(),
-        count: T.number(),
-        key: T.string(),
-        single: T.boolean(),
-      },
-    });
-  },
-  events: {
-    connected: async ({ instance }) => {
-      // Initial data fetch
-      await fetchDataQuery(instance);
-
-      // Listen for data-query prop changes to re-fetch
-      instance._dataQueryChangeHandler = async () => {
-        await fetchDataQuery(instance);
-      };
-      instance.on("data-queryChanged", instance._dataQueryChangeHandler);
-    },
-    disconnected: ({ instance }) => {
-      // Clean up subscription
-      if (instance._dataQuerySub && instance._dataQuerySubHandler)
-        instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
-      instance._dataQuerySub = null;
-      instance._dataQuerySubHandler = null;
-      if (instance._dataQueryChangeHandler) {
-        instance.off("data-queryChanged", instance._dataQueryChangeHandler);
-        instance._dataQueryChangeHandler = null;
-      }
-    },
-  },
-});
-
-const backend = (type, payload = {}, connection = null, timeout = 10000) => {
-  if (!type) {
-    return Promise.reject(new Error("backend: type parameter is required"));
-  }
-  const eventId =
-    Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const params = { type, payload, eventId };
-  return new Promise((resolve, reject) => {
-    if (connection) params.connection = connection;
-    const timeoutId = setTimeout(() => {
-      if (pendingRequests[eventId]) {
-        delete pendingRequests[eventId];
-        reject(
-          new Error(
-            \`Backend request timeout after \${timeout}ms for type: \${type}\`,
-          ),
-        );
-      }
-    }, timeout);
-
-    pendingRequests[eventId] = {
-      resolve: (value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      },
-      reject: (error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      },
-    };
-
-    postMessageToWW(params);
-  });
-};
-const Backend = { request: backend, init: initBackend };
-$APP.addModule({ name: "Backend", base: Backend });
-export default Backend;
 `,mimeType:"text/javascript"},"/$app/view/loader.js":{content:`/**
  * @file Component Loader (Core)
  * @description Handles dynamic loading, caching, registration of components,
@@ -10235,58 +12249,261 @@ const getComponentPath = (tag) => {
 View.getComponentPath = getComponentPath;
 
 export default Loader;
-`,mimeType:"text/javascript"},"/$app/model/frontend.js":{content:`/**
- * @file Frontend Model Module
- * @description Initializes Model system for frontend (browser) context
- */
+`,mimeType:"text/javascript"},"/$app/base/backend/frontend.js":{content:`import T from "/$app/types/index.js";
+import View from "/$app/view/index.js";
+import $APP from "/$app.js";
 
-import { createModel } from "./index.js";
-import { SubscriptionManager } from "./subscription-manager.js";
+let appWorker;
+let wwPort;
+const pendingRequests = {};
 
-/**
- * Initialize Model module on frontend
- * @param {object} $APP - App instance with Backend, events
- * @param {object} [options={}] - Initialization options
- * @returns {object} Model instance
- */
-export function initModelFrontend($APP, options = {}) {
-  const Model = createModel($APP);
+const handleWWMessage = async (message = {}) => {
+  const { data } = message;
+  const { eventId, type, payload, connection } = data;
+  const response = payload;
+  const respond =
+    eventId &&
+    ((responsePayload) =>
+      wwPort.postMessage({
+        eventId,
+        payload: responsePayload,
+        connection,
+      }));
+  await $APP.events.emit(type, { respond, payload, eventId });
 
-  // Create request function that uses Backend
-  const request = (action, modelName, params = {}) => {
-    return $APP.Backend.request(action, {
-      model: modelName,
-      ...params,
+  if (eventId && pendingRequests[eventId]) {
+    try {
+      pendingRequests[data.eventId].resolve(response);
+    } catch (error) {
+      pendingRequests[data.eventId].reject(new Error(error));
+    } finally {
+      delete pendingRequests[eventId];
+    }
+  }
+  if (respond) return respond(response);
+};
+
+const initBackend = async () => {
+  try {
+    appWorker = new Worker(\`/backend.js\`, {
+      type: "module",
+    });
+    const wwChannel = new MessageChannel();
+    wwPort = wwChannel.port1;
+    wwPort.onmessage = handleWWMessage;
+    wwPort.onmessageerror = (e) => {
+      console.error("Worker message error:", e);
+    };
+    appWorker.postMessage({ type: "APP:BACKEND:START" }, [wwChannel.port2]);
+    //await navigator.storage.persist();
+    $APP.events.on("APP:BACKEND:READY", async () => {
+      await $APP.events.emit("APP:READY");
+    });
+  } catch (error) {
+    console.error("Failed to initialize backend:", error);
+    throw error;
+  }
+};
+
+$APP.events.on("APP:INIT", initBackend);
+
+const postMessageToPort = (port, params, retryFn) => {
+  if (!port) {
+    setTimeout(() => retryFn(params), 100);
+    return;
+  }
+  port.postMessage(params);
+};
+
+const postMessageToWW = (params) =>
+  postMessageToPort(wwPort, params, postMessageToWW);
+const fetchDataQuery = async (instance) => {
+  const query = instance["data-query"];
+  if (!query) return;
+
+  const {
+    model,
+    id,
+    limit,
+    offset = 0,
+    order,
+    where,
+    includes,
+    key,
+    single,
+  } = query;
+
+  if (!model) return console.warn("data-query: 'model' is required");
+  if (!key)
+    return console.warn(
+      "data-query: 'key' is required to know where to store data",
+    );
+  if (!$APP.Model || !$APP.Model[model])
+    return console.error(\`data-query: Model "\${model}" does not exist\`);
+
+  const isMany = query.many ?? (!id && !single);
+  const opts = { limit: single ? 1 : limit, offset, includes, order, where };
+  console.error({ isMany, opts });
+  if (instance._dataQuerySub && instance._dataQuerySubHandler) {
+    instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
+    instance._dataQuerySub = null;
+  }
+  instance._paginationInfo = null;
+  instance._dataQuerySubHandler = (data) => {
+    const oldValue = instance.state[key];
+    instance.state[key] = data;
+    instance.requestUpdate(key, oldValue);
+    instance.emit("dataLoaded", {
+      instance,
+      rows: isMany ? data : undefined,
+      row: !isMany ? data : undefined,
+      ...(instance._paginationInfo || {}),
+      component: instance.constructor,
     });
   };
 
-  Model.request = request;
-  $APP.addModule({ name: "Model", base: Model });
+  try {
+    if (isMany) {
+      const result = await $APP.Model[model].getAll(opts);
+      const oldValue = instance.state[key];
+      instance.state[key] = result;
+      instance._paginationInfo =
+        result.limit !== undefined
+          ? {
+              total: result.total,
+              limit: result.limit,
+              offset: result.offset,
+              count: result.count,
+            }
+          : null;
+      instance.requestUpdate(key, oldValue);
+      result.subscribe?.(instance._dataQuerySubHandler);
+      instance._dataQuerySub = result;
+    } else if (single && where) {
+      const result = await $APP.Model[model].getAll(opts);
 
-  // Initialize SubscriptionManager on frontend (without database - notifications come from backend)
-  if (!$APP.SubscriptionManager) {
-    $APP.SubscriptionManager = new SubscriptionManager(null);
+      const oldValue = instance.state[key];
+      instance.state[key] = result[0] || null;
+      instance.requestUpdate(key, oldValue);
+
+      // Subscribe to array, extract first item on updates
+      result.subscribe?.((data) => {
+        instance._dataQuerySubHandler(data[0] || null);
+      });
+      instance._dataQuerySub = result;
+    } else {
+      // Single record via id
+      const reactiveRow = await $APP.Model[model].get(id);
+      const oldValue = instance.state[key];
+      instance.state[key] = reactiveRow;
+      instance.requestUpdate(key, oldValue);
+      console.log({ id, reactiveRow });
+      // Subscribe to updates - handle both array and single row formats
+      reactiveRow.subscribe?.((data) => {
+        const row = Array.isArray(data) ? data[0] : data;
+        instance._dataQuerySubHandler(row);
+      });
+      instance._dataQuerySub = reactiveRow;
+    }
+    instance.emit("dataLoaded", {
+      instance,
+      rows: isMany ? instance.state[key] : undefined,
+      row: !isMany ? instance.state[key] : undefined,
+      ...(instance._paginationInfo || {}),
+      component: instance.constructor,
+    });
+  } catch (error) {
+    console.error(
+      \`data-query: Failed to load data for model "\${model}":\`,
+      error,
+    );
+    instance.emit("dataError", { instance, error, model, id });
   }
 
-  // New query-level data sync
-  $APP.events.on("QUERY_DATA_SYNC", ({ payload }) => {
-    const { action, model, record } = payload;
+  instance.syncable = true;
+};
 
-    // Route to SubscriptionManager for query-level notifications
-    if ($APP.SubscriptionManager) {
-      $APP.SubscriptionManager.notifyMatchingQueries(model, action, record);
-    }
+View.plugins.push({
+  name: "dataQuery",
+  test: ({ component }) => !!component.dataQuery,
+  init: ({ View }) => {
+    View.properties["data-query"] = T.object({
+      properties: {
+        model: T.string(),
+        id: T.string(),
+        where: T.object(),
+        includes: T.string(),
+        order: T.string(),
+        limit: T.number(),
+        offset: T.number(),
+        count: T.number(),
+        key: T.string(),
+        single: T.boolean(),
+      },
+    });
+  },
+  events: {
+    connected: async ({ instance }) => {
+      // Initial data fetch
+      await fetchDataQuery(instance);
 
-    // Broadcast to service worker for other tabs
-    if ($APP.SW) {
-      $APP.SW.request("SW:BROADCAST_QUERY_SYNC", payload);
-    }
+      // Listen for data-query prop changes to re-fetch
+      instance._dataQueryChangeHandler = async () => {
+        await fetchDataQuery(instance);
+      };
+      instance.on("data-queryChanged", instance._dataQueryChangeHandler);
+    },
+    disconnected: ({ instance }) => {
+      // Clean up subscription
+      if (instance._dataQuerySub && instance._dataQuerySubHandler)
+        instance._dataQuerySub.unsubscribe(instance._dataQuerySubHandler);
+      instance._dataQuerySub = null;
+      instance._dataQuerySubHandler = null;
+      if (instance._dataQueryChangeHandler) {
+        instance.off("data-queryChanged", instance._dataQueryChangeHandler);
+        instance._dataQueryChangeHandler = null;
+      }
+    },
+  },
+});
+
+const backend = (type, payload = {}, connection = null, timeout = 10000) => {
+  if (!type) {
+    return Promise.reject(new Error("backend: type parameter is required"));
+  }
+  const eventId =
+    Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  const params = { type, payload, eventId };
+  return new Promise((resolve, reject) => {
+    if (connection) params.connection = connection;
+    const timeoutId = setTimeout(() => {
+      if (pendingRequests[eventId]) {
+        delete pendingRequests[eventId];
+        reject(
+          new Error(
+            \`Backend request timeout after \${timeout}ms for type: \${type}\`,
+          ),
+        );
+      }
+    }, timeout);
+
+    pendingRequests[eventId] = {
+      resolve: (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      reject: (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    };
+
+    postMessageToWW(params);
   });
-
-  return Model;
-}
-
-export default { initModelFrontend };
+};
+const Backend = { request: backend, init: initBackend };
+$APP.addModule({ name: "Backend", base: Backend });
+export default Backend;
 `,mimeType:"text/javascript"},"/$app/controller/app.js":{content:`/**
  * @bootstrapp/controller - App Integration
  * Bridges Controller to $APP framework features (Service Worker integration)
@@ -10368,6 +12585,58 @@ export function initControllerApp($APP, Controller, View) {
 }
 
 export default initControllerApp;
+`,mimeType:"text/javascript"},"/$app/model/frontend.js":{content:`/**
+ * @file Frontend Model Module
+ * @description Initializes Model system for frontend (browser) context
+ */
+
+import { createModel } from "./index.js";
+import { SubscriptionManager } from "./subscription-manager.js";
+
+/**
+ * Initialize Model module on frontend
+ * @param {object} $APP - App instance with Backend, events
+ * @param {object} [options={}] - Initialization options
+ * @returns {object} Model instance
+ */
+export function initModelFrontend($APP, options = {}) {
+  const Model = createModel($APP);
+
+  // Create request function that uses Backend
+  const request = (action, modelName, params = {}) => {
+    return $APP.Backend.request(action, {
+      model: modelName,
+      ...params,
+    });
+  };
+
+  Model.request = request;
+  $APP.addModule({ name: "Model", base: Model });
+
+  // Initialize SubscriptionManager on frontend (without database - notifications come from backend)
+  if (!$APP.SubscriptionManager) {
+    $APP.SubscriptionManager = new SubscriptionManager(null);
+  }
+
+  // New query-level data sync
+  $APP.events.on("QUERY_DATA_SYNC", ({ payload }) => {
+    const { action, model, record } = payload;
+
+    // Route to SubscriptionManager for query-level notifications
+    if ($APP.SubscriptionManager) {
+      $APP.SubscriptionManager.notifyMatchingQueries(model, action, record);
+    }
+
+    // Broadcast to service worker for other tabs
+    if ($APP.SW) {
+      $APP.SW.request("SW:BROADCAST_QUERY_SYNC", payload);
+    }
+  });
+
+  return Model;
+}
+
+export default { initModelFrontend };
 `,mimeType:"text/javascript"},"/$app/router/app.js":{content:`/**
  * @bootstrapp/router - App Integration
  * Bridges Router to $APP framework features
@@ -10755,6 +13024,77 @@ export const createController = (initialAdapters = {}) => {
 };
 
 export default createController;
+`,mimeType:"text/javascript"},"/$app/controller/sync-factory.js":{content:`/**
+ * Creates a sync object for any class instance and installs subscribe/notify pattern
+ * @param {Object} instance - The instance to sync with
+ * @param {string} adapterName - The name of the adapter to use in the Controller
+ * @param {Array<string>} syncableProps - Array of property names that can be synced (optional, defaults to all)
+ * @returns {Object} A sync object compatible with the property sync system
+ */
+export const createSync = (instance, adapterName, syncableProps = null) => {
+  if (!instance._listeners) instance._listeners = new Map();
+  if (!instance.subscribe) {
+    instance.subscribe = function (key, callback) {
+      if (!this._listeners.has(key)) this._listeners.set(key, new Set());
+      const listeners = this._listeners.get(key);
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    };
+  }
+  if (!instance._notify) {
+    instance._notify = function (key, value) {
+      if (this._listeners.has(key))
+        this._listeners.get(key).forEach((callback) => callback(value));
+    };
+  }
+  const allowedProps = syncableProps ? new Set(syncableProps) : null;
+  const validateProp = (key) => {
+    if (allowedProps && !allowedProps.has(key)) {
+      console.warn(
+        \`Property "\${key}" is not in the list of syncable properties for \${adapterName}\`,
+      );
+      return false;
+    }
+    return true;
+  };
+  if (syncableProps) {
+    syncableProps.forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(instance, key);
+      if (descriptor && typeof descriptor.set === "function") return;
+      const currentValue = instance[key];
+      const privateKey = \`_\${key}\`;
+      instance[privateKey] = currentValue;
+      Object.defineProperty(instance, key, {
+        get() {
+          return this[privateKey];
+        },
+        set(value) {
+          if (this[privateKey] === value) return;
+          this[privateKey] = value;
+          this._notify(key, value);
+        },
+        enumerable: true,
+        configurable: true,
+      });
+    });
+  }
+
+  return {
+    adapter: adapterName,
+    get: (key) => {
+      if (!validateProp(key)) return undefined;
+      return instance[key];
+    },
+    set: (key, value) => {
+      if (!validateProp(key)) return;
+      instance[key] = value;
+    },
+    subscribe: (key, callback) => {
+      if (!validateProp(key)) return () => {};
+      return instance.subscribe(key, callback);
+    },
+  };
+};
 `,mimeType:"text/javascript"},"/$app/controller/sync.js":{content:`/**
  * @bootstrapp/controller - Sync Utilities
  * Generic sync logic with extensible type system
@@ -10984,77 +13324,6 @@ export function cleanupSyncBindings(instance, Controller) {
     instance._customSyncUnsubscribers = null;
   }
 }
-`,mimeType:"text/javascript"},"/$app/controller/sync-factory.js":{content:`/**
- * Creates a sync object for any class instance and installs subscribe/notify pattern
- * @param {Object} instance - The instance to sync with
- * @param {string} adapterName - The name of the adapter to use in the Controller
- * @param {Array<string>} syncableProps - Array of property names that can be synced (optional, defaults to all)
- * @returns {Object} A sync object compatible with the property sync system
- */
-export const createSync = (instance, adapterName, syncableProps = null) => {
-  if (!instance._listeners) instance._listeners = new Map();
-  if (!instance.subscribe) {
-    instance.subscribe = function (key, callback) {
-      if (!this._listeners.has(key)) this._listeners.set(key, new Set());
-      const listeners = this._listeners.get(key);
-      listeners.add(callback);
-      return () => listeners.delete(callback);
-    };
-  }
-  if (!instance._notify) {
-    instance._notify = function (key, value) {
-      if (this._listeners.has(key))
-        this._listeners.get(key).forEach((callback) => callback(value));
-    };
-  }
-  const allowedProps = syncableProps ? new Set(syncableProps) : null;
-  const validateProp = (key) => {
-    if (allowedProps && !allowedProps.has(key)) {
-      console.warn(
-        \`Property "\${key}" is not in the list of syncable properties for \${adapterName}\`,
-      );
-      return false;
-    }
-    return true;
-  };
-  if (syncableProps) {
-    syncableProps.forEach((key) => {
-      const descriptor = Object.getOwnPropertyDescriptor(instance, key);
-      if (descriptor && typeof descriptor.set === "function") return;
-      const currentValue = instance[key];
-      const privateKey = \`_\${key}\`;
-      instance[privateKey] = currentValue;
-      Object.defineProperty(instance, key, {
-        get() {
-          return this[privateKey];
-        },
-        set(value) {
-          if (this[privateKey] === value) return;
-          this[privateKey] = value;
-          this._notify(key, value);
-        },
-        enumerable: true,
-        configurable: true,
-      });
-    });
-  }
-
-  return {
-    adapter: adapterName,
-    get: (key) => {
-      if (!validateProp(key)) return undefined;
-      return instance[key];
-    },
-    set: (key, value) => {
-      if (!validateProp(key)) return;
-      instance[key] = value;
-    },
-    subscribe: (key, callback) => {
-      if (!validateProp(key)) return () => {};
-      return instance.subscribe(key, callback);
-    },
-  };
-};
 `,mimeType:"text/javascript"},"/$app/router/adapters.js":{content:`/**
  * @bootstrapp/router - Platform Adapters
  * Abstracts browser and memory-based platform operations
@@ -11662,7 +13931,16 @@ export const createRouterCore = (adapter) => {
         };
         this.stack = updated;
       }
-      if (this.currentRoute?.route) this.currentRoute.route.title = newTitle;
+      // Reassign currentRoute to trigger reactivity in synced components
+      if (this.currentRoute?.route) {
+        this.currentRoute = {
+          ...this.currentRoute,
+          route: {
+            ...this.currentRoute.route,
+            title: newTitle,
+          },
+        };
+      }
 
       if (this.options.onTitleChange) {
         this.options.onTitleChange(fullTitle);
@@ -12546,7 +14824,8 @@ const routes = {
     component: ({ slug }) =>
       html\`<view-guide-detail-view .data-query=\${{ model: "guides", where: { slug }, key: "guide", single: true }}></view-guide-detail-view>\`,
     title: "Guide - MEETUP.RIO",
-    template: "template-app",
+    template: "template-detail",
+    pageTitle: "GUIDE",
   },
   "/groups": {
     name: "groups",
@@ -12566,28 +14845,32 @@ const routes = {
     component: ({ slug }) =>
       html\`<view-place-detail-view .data-query=\${{ model: "places", where: { slug }, key: "place", single: true }}></view-place-detail-view>\`,
     title: "Place - MEETUP.RIO",
-    template: "template-app",
+    template: "template-detail",
+    pageTitle: "PLACE DETAILS",
   },
   "/event/:slug": {
     name: "event-detail",
     component: ({ slug }) =>
       html\`<view-event-detail-view .data-query=\${{ model: "events", where: { slug }, key: "event", single: true }}></view-event-detail-view>\`,
     title: "Event - MEETUP.RIO",
-    template: "template-app",
+    template: "template-detail",
+    pageTitle: "EVENT DETAILS",
   },
   "/meetup/:slug": {
     name: "meetup-detail",
     component: ({ slug }) =>
       html\`<view-meetup-detail-view .data-query=\${{ model: "meetups", where: { slug }, key: "meetup", single: true }}></view-meetup-detail-view>\`,
     title: "Meetup - MEETUP.RIO",
-    template: "template-app",
+    template: "template-detail",
+    pageTitle: "MEETUP DETAILS",
   },
   "/group/:slug": {
     name: "group-detail",
     component: ({ slug }) =>
       html\`<view-group-detail-view .data-query=\${{ model: "groups", where: { slug }, key: "group", single: true }}></view-group-detail-view>\`,
     title: "Group - MEETUP.RIO",
-    template: "template-app",
+    template: "template-detail",
+    pageTitle: "GROUP DETAILS",
   },
   "/calendar": {
     name: "calendar",
@@ -12762,54 +15045,6 @@ registerPlugin("instagram", {
     },
   },
 });
-`,mimeType:"text/javascript"},"/$app/admin/integrations/gmaps/plugin.js":{content:`/**
- * Google Maps Plugin for Admin
- * Search and import places from Google Maps
- */
-
-import { registerPlugin } from "/$app/admin/plugins.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-// Register plugin for actions, modals, and sidebar
-registerPlugin("gmaps", {
-  sidebar: [
-    {
-      label: "Maps Search",
-      href: "/admin/maps-search",
-      icon: "map",
-    },
-  ],
-
-  actions: {
-    places: [
-      {
-        label: "Import from Maps",
-        icon: "map-pin",
-        handler: (context) => context.openModal("gmaps-search"),
-      },
-    ],
-  },
-
-  modals: {
-    "gmaps-search": {
-      title: "Import from Google Maps",
-      size: "lg",
-      component: ({ model }) => html\`
-        <admin-gmaps-search .model=\${model} modal></admin-gmaps-search>
-      \`,
-    },
-  },
-});
-
-$APP.routes.set({
-  "/admin/maps-search": {
-    name: "admin-maps-search",
-    component: () => html\`<admin-gmaps-search></admin-gmaps-search>\`,
-    template: "admin-layout",
-  },
-});
-console.log($APP.routes);
 `,mimeType:"text/javascript"},"/$app/admin/integrations/instagram/import.js":{content:`/**
  * Instagram Import Component for Admin
  * Scrape Instagram profiles and create places
@@ -13253,6 +15488,54 @@ export default {
     \`;
   },
 };
+`,mimeType:"text/javascript"},"/$app/admin/integrations/gmaps/plugin.js":{content:`/**
+ * Google Maps Plugin for Admin
+ * Search and import places from Google Maps
+ */
+
+import { registerPlugin } from "/$app/admin/plugins.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+
+// Register plugin for actions, modals, and sidebar
+registerPlugin("gmaps", {
+  sidebar: [
+    {
+      label: "Maps Search",
+      href: "/admin/maps-search",
+      icon: "map",
+    },
+  ],
+
+  actions: {
+    places: [
+      {
+        label: "Import from Maps",
+        icon: "map-pin",
+        handler: (context) => context.openModal("gmaps-search"),
+      },
+    ],
+  },
+
+  modals: {
+    "gmaps-search": {
+      title: "Import from Google Maps",
+      size: "lg",
+      component: ({ model }) => html\`
+        <admin-gmaps-search .model=\${model} modal></admin-gmaps-search>
+      \`,
+    },
+  },
+});
+
+$APP.routes.set({
+  "/admin/maps-search": {
+    name: "admin-maps-search",
+    component: () => html\`<admin-gmaps-search></admin-gmaps-search>\`,
+    template: "admin-layout",
+  },
+});
+console.log($APP.routes);
 `,mimeType:"text/javascript"},"/$app/auth/frontend.js":{content:`/**
  * @file Frontend Auth Module
  * @description Handles user authentication state, session persistence, and cross-tab sync
@@ -14293,109 +16576,6 @@ export class I18n {
 }
 
 export default I18n;
-`,mimeType:"text/javascript"},"/$app/i18n/view-plugin.js":{content:`/**
- * i18n View Plugin
- * Adds component-level i18n support to View components
- *
- * Features:
- * - Extracts inline i18n from component definitions (serves as English default)
- * - Auto-namespaces translations by component tag name
- * - Injects helper methods: $t(), $n(), $d(), $r()
- * - Auto-updates components when language changes
- */
-
-export default {
-  name: "i18n",
-
-  /**
-   * Called when component is registered via $APP.define()
-   * Extracts inline i18n and registers as English translations
-   */
-  init: ({ component, definition, tag }) => {
-    // Extract inline i18n (this IS the English/default translation)
-    if (definition.i18n && typeof definition.i18n === "object") {
-      // Register under component tag name namespace
-      const translations = { [tag]: definition.i18n };
-
-      // Add to English locale (inline i18n is the source of truth for English)
-      if (typeof $APP !== "undefined" && $APP.i18n) {
-        $APP.i18n.addTranslations("en", translations);
-      }
-    }
-
-    // Inject helper methods into component prototype
-
-    /**
-     * Translate a key with auto-namespacing
-     * @param {string} key - Translation key (auto-prefixed with component name)
-     * @param {Object} params - Parameters for interpolation/pluralization
-     * @example
-     * this.$t('submit')  // \u2192 'my-component.submit'
-     * this.$t('count', { n: 5 })  // \u2192 Pluralized translation
-     */
-    component.prototype.$t = function (key, params) {
-      const componentName = this.tagName.toLowerCase();
-      return $APP.i18n.t(\`\${componentName}.\${key}\`, params);
-    };
-
-    /**
-     * Format a number with current locale
-     * @param {number} number - Number to format
-     * @param {Object} options - Intl.NumberFormat options
-     */
-    component.prototype.$n = (number, options) => $APP.i18n.n(number, options);
-
-    /**
-     * Format a date with current locale
-     * @param {Date|string|number} date - Date to format
-     * @param {Object} options - Intl.DateTimeFormat options
-     */
-    component.prototype.$d = (date, options) => $APP.i18n.d(date, options);
-
-    /**
-     * Format a relative date (today, yesterday, X days ago)
-     * @param {Date|string|number} date - Date to format
-     */
-    component.prototype.$r = (date) => $APP.i18n.r(date);
-  },
-
-  /**
-   * Component lifecycle events
-   */
-  events: {
-    /**
-     * Called when component instance connects to DOM
-     * Sets up auto-update on language change
-     */
-    connected: function () {
-      // Create handler that triggers re-render on language change
-      this._i18nUpdateHandler = () => {
-        this.requestUpdate();
-      };
-
-      // Listen to language change events
-      if (typeof $APP !== "undefined" && $APP.events) {
-        $APP.events.on("i18n:language-changed", this._i18nUpdateHandler);
-      }
-    },
-
-    /**
-     * Called when component instance disconnects from DOM
-     * Cleans up event listeners
-     */
-    disconnected: function () {
-      // Remove language change listener
-      if (
-        this._i18nUpdateHandler &&
-        typeof $APP !== "undefined" &&
-        $APP.events
-      ) {
-        $APP.events.off("i18n:language-changed", this._i18nUpdateHandler);
-        this._i18nUpdateHandler = null;
-      }
-    },
-  },
-};
 `,mimeType:"text/javascript"},"/$app/uix/index.js":{content:`export default {
   name: "uix",
   path: "/$app",
@@ -14523,6 +16703,109 @@ export default {
       "showcase-sidebar",
       "theme-generator",
     ],
+  },
+};
+`,mimeType:"text/javascript"},"/$app/i18n/view-plugin.js":{content:`/**
+ * i18n View Plugin
+ * Adds component-level i18n support to View components
+ *
+ * Features:
+ * - Extracts inline i18n from component definitions (serves as English default)
+ * - Auto-namespaces translations by component tag name
+ * - Injects helper methods: $t(), $n(), $d(), $r()
+ * - Auto-updates components when language changes
+ */
+
+export default {
+  name: "i18n",
+
+  /**
+   * Called when component is registered via $APP.define()
+   * Extracts inline i18n and registers as English translations
+   */
+  init: ({ component, definition, tag }) => {
+    // Extract inline i18n (this IS the English/default translation)
+    if (definition.i18n && typeof definition.i18n === "object") {
+      // Register under component tag name namespace
+      const translations = { [tag]: definition.i18n };
+
+      // Add to English locale (inline i18n is the source of truth for English)
+      if (typeof $APP !== "undefined" && $APP.i18n) {
+        $APP.i18n.addTranslations("en", translations);
+      }
+    }
+
+    // Inject helper methods into component prototype
+
+    /**
+     * Translate a key with auto-namespacing
+     * @param {string} key - Translation key (auto-prefixed with component name)
+     * @param {Object} params - Parameters for interpolation/pluralization
+     * @example
+     * this.$t('submit')  // \u2192 'my-component.submit'
+     * this.$t('count', { n: 5 })  // \u2192 Pluralized translation
+     */
+    component.prototype.$t = function (key, params) {
+      const componentName = this.tagName.toLowerCase();
+      return $APP.i18n.t(\`\${componentName}.\${key}\`, params);
+    };
+
+    /**
+     * Format a number with current locale
+     * @param {number} number - Number to format
+     * @param {Object} options - Intl.NumberFormat options
+     */
+    component.prototype.$n = (number, options) => $APP.i18n.n(number, options);
+
+    /**
+     * Format a date with current locale
+     * @param {Date|string|number} date - Date to format
+     * @param {Object} options - Intl.DateTimeFormat options
+     */
+    component.prototype.$d = (date, options) => $APP.i18n.d(date, options);
+
+    /**
+     * Format a relative date (today, yesterday, X days ago)
+     * @param {Date|string|number} date - Date to format
+     */
+    component.prototype.$r = (date) => $APP.i18n.r(date);
+  },
+
+  /**
+   * Component lifecycle events
+   */
+  events: {
+    /**
+     * Called when component instance connects to DOM
+     * Sets up auto-update on language change
+     */
+    connected: function () {
+      // Create handler that triggers re-render on language change
+      this._i18nUpdateHandler = () => {
+        this.requestUpdate();
+      };
+
+      // Listen to language change events
+      if (typeof $APP !== "undefined" && $APP.events) {
+        $APP.events.on("i18n:language-changed", this._i18nUpdateHandler);
+      }
+    },
+
+    /**
+     * Called when component instance disconnects from DOM
+     * Cleans up event listeners
+     */
+    disconnected: function () {
+      // Remove language change listener
+      if (
+        this._i18nUpdateHandler &&
+        typeof $APP !== "undefined" &&
+        $APP.events
+      ) {
+        $APP.events.off("i18n:language-changed", this._i18nUpdateHandler);
+        this._i18nUpdateHandler = null;
+      }
+    },
   },
 };
 `,mimeType:"text/javascript"},"/$app/admin/plugins.js":{content:`/**
@@ -16090,14 +18373,6 @@ export default (settings) => minifyHTML(\`<!DOCTYPE html>
     },
   ],
 });
-`,mimeType:"text/javascript"},"/$app/bundler/templates/robots.txt.js":{content:`export default (settings) => {
-  if (!settings.url) {
-    console.warn("Cannot generate robots.txt: settings.url is not defined.");
-    return "User-agent: *\\nAllow: /\\n";
-  }
-  const sitemapURL = new URL("sitemap.xml", settings.url).href;
-  return \`User-agent: *\\nAllow: /\\nSitemap: \${sitemapURL}\`;
-};
 `,mimeType:"text/javascript"},"/$app/bundler/templates/sitemap.xml.js":{content:`export default (settings, pages) => {
   if (!settings.url) {
     console.warn("Cannot generate sitemap.xml: settings.url is not defined.");
@@ -16159,6 +18434,14 @@ export default ({ headContent, content, settings, needsHydration }) => {
       \${script}
     </body>
 </html>\`);
+};
+`,mimeType:"text/javascript"},"/$app/bundler/templates/robots.txt.js":{content:`export default (settings) => {
+  if (!settings.url) {
+    console.warn("Cannot generate robots.txt: settings.url is not defined.");
+    return "User-agent: *\\nAllow: /\\n";
+  }
+  const sitemapURL = new URL("sitemap.xml", settings.url).href;
+  return \`User-agent: *\\nAllow: /\\nSitemap: \${sitemapURL}\`;
 };
 `,mimeType:"text/javascript"},"/$app/bundler/templates/sw.js.js":{content:`export default ({ fileMap }) =>
   "const FILE_BUNDLE = " +
@@ -16654,7 +18937,8 @@ export default createExtensionBridge;
         };
 
         startApp();\`;
-`,mimeType:"text/javascript"},"/locales/en.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/uix/theme.css":{content:`html,body{font-family:var(--font-family);background-color:var(--background-color);color:var(--text-color);width:100%;min-height:100%;height:100%;padding:0;margin:0}a{color:inherit;text-decoration:none;cursor:pointer}html{font-size:14px}@media (max-width: 768px){html{font-size:18px}}@media (max-width: 480px){html{font-size:20px}}textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}:root{box-sizing:border-box;text-size-adjust:none;line-height:1.2}*,*:before,*:after{box-sizing:border-box}*{margin:0}body{font-family:var(--font-family)}button,textarea,select{background-color:inherit;border-width:0;color:inherit}img,picture,video,canvas,svg{display:block;max-width:100%}input,button,textarea,select{font:inherit;background:inherit;border:inherit}p,h1,h2,h3,h4,h5,h6{font-family:var(--font-family);overflow-wrap:break-word}dialog::backdrop{background-color:#000c}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#79797966;border-radius:0}::-webkit-scrollbar-thumb:hover{background:#646464b3}::-webkit-scrollbar-thumb:active{background:#555c}::-webkit-scrollbar-corner{background:transparent}*{scrollbar-width:thin;scrollbar-color:rgba(121,121,121,.4) transparent}*:not(:defined){display:block;height:100%;opacity:0;transition:opacity .5s ease-in-out;border:1px solid red}.dark{filter:invert(1) hue-rotate(180deg)}.dark img,.dark dialog,.dark video,.dark iframe{filter:invert(1) hue-rotate(180deg)}[direction=horizontal]{--flex-direction: row;flex-direction:row}[direction=vertical]{--flex-direction: column;flex-direction:row}[cursor-pointer]{cursor:pointer}[w-full]{width:100%}[h-full]{height:100%}[min-h-0]{min-height:0}[min-w-0]{min-width:0}[flex]{display:flex}[flex-col]{flex-direction:column}[flex-1]{flex:1}[flex-grow]{flex-grow:1}[flex-shrink-0]{flex-shrink:0}
+`,mimeType:"text/css"},"/locales/en.js":{content:`/**
  * English translations for meetup.rio
  */
 export default {
@@ -21956,6 +24240,93 @@ $APP.events.on("APP:INIT", async () => {
 });
 
 export default Backend;
+`,mimeType:"text/javascript"},"/$app/model/factory.js":{content:`/**
+ * @file Database Adapter Factory
+ * @description Factory function to create database adapters with lazy loading
+ */
+
+/**
+ * Registry of available adapter types
+ * @type {Map<string, Class>}
+ */
+const ADAPTER_REGISTRY = new Map();
+
+/**
+ * Register a database adapter
+ * @param {string} type - Adapter type name
+ * @param {Class} AdapterClass - Adapter class
+ */
+export function registerAdapter(type, AdapterClass) {
+  if (ADAPTER_REGISTRY.has(type)) {
+    console.warn(\`Database: Overwriting existing adapter type "\${type}"\`);
+  }
+  ADAPTER_REGISTRY.set(type, AdapterClass);
+  console.info(\`Database: Registered adapter type "\${type}"\`);
+}
+
+/**
+ * Create a database adapter instance
+ * @param {Object} config - Configuration object
+ * @param {string} [config.type='indexeddb'] - Adapter type
+ * @param {string} config.name - Database name
+ * @param {number} [config.version=1] - Database version
+ * @param {Object} config.models - Model schemas
+ * @returns {Promise<Object>} Adapter instance
+ *
+ */
+export async function createDatabase(config) {
+  if (typeof config === "string") {
+    config = { type: config };
+  }
+
+  const { type = "indexeddb", name, version = 1, models = {} } = config;
+
+  if (!name) {
+    throw new Error("Database name is required");
+  }
+
+  if (!models || Object.keys(models).length === 0) {
+    console.warn(\`Database: No models provided for database "\${name}"\`);
+  }
+
+  // Check registry first
+  if (!ADAPTER_REGISTRY.has(type)) {
+    throw new Error(
+      \`Unknown adapter type "\${type}". Available types: \${getAvailableAdapters().join(", ")}. Use registerAdapter() to register adapters.\`,
+    );
+  }
+
+  const AdapterClass = ADAPTER_REGISTRY.get(type);
+  const adapter = new AdapterClass(config);
+
+  console.info(\`Database: Created \${type} adapter for "\${name}" v\${version}\`);
+
+  return adapter;
+}
+
+/**
+ * Get list of registered adapter types
+ * @returns {Array<string>} List of adapter type names
+ */
+export function getAvailableAdapters() {
+  return Array.from(ADAPTER_REGISTRY.keys());
+}
+
+/**
+ * Check if an adapter type is registered
+ * @param {string} type - Adapter type name
+ * @returns {boolean} True if adapter is registered
+ */
+export function hasAdapter(type) {
+  return ADAPTER_REGISTRY.has(type);
+}
+
+export default {
+  createDatabase,
+  registerAdapter,
+  getAvailableAdapters,
+  hasAdapter,
+};
 `,mimeType:"text/javascript"},"/$app/auth/backend.js":{content:`/**
  * @file Backend Auth Module
  * @description Handles authentication event handlers in the Web Worker context
@@ -22635,93 +25006,6 @@ async function loadHybridAdapter(dependencies) {
 }
 
 export default { loadAdapter };
-`,mimeType:"text/javascript"},"/$app/model/factory.js":{content:`/**
- * @file Database Adapter Factory
- * @description Factory function to create database adapters with lazy loading
- */
-
-/**
- * Registry of available adapter types
- * @type {Map<string, Class>}
- */
-const ADAPTER_REGISTRY = new Map();
-
-/**
- * Register a database adapter
- * @param {string} type - Adapter type name
- * @param {Class} AdapterClass - Adapter class
- */
-export function registerAdapter(type, AdapterClass) {
-  if (ADAPTER_REGISTRY.has(type)) {
-    console.warn(\`Database: Overwriting existing adapter type "\${type}"\`);
-  }
-  ADAPTER_REGISTRY.set(type, AdapterClass);
-  console.info(\`Database: Registered adapter type "\${type}"\`);
-}
-
-/**
- * Create a database adapter instance
- * @param {Object} config - Configuration object
- * @param {string} [config.type='indexeddb'] - Adapter type
- * @param {string} config.name - Database name
- * @param {number} [config.version=1] - Database version
- * @param {Object} config.models - Model schemas
- * @returns {Promise<Object>} Adapter instance
- *
- */
-export async function createDatabase(config) {
-  if (typeof config === "string") {
-    config = { type: config };
-  }
-
-  const { type = "indexeddb", name, version = 1, models = {} } = config;
-
-  if (!name) {
-    throw new Error("Database name is required");
-  }
-
-  if (!models || Object.keys(models).length === 0) {
-    console.warn(\`Database: No models provided for database "\${name}"\`);
-  }
-
-  // Check registry first
-  if (!ADAPTER_REGISTRY.has(type)) {
-    throw new Error(
-      \`Unknown adapter type "\${type}". Available types: \${getAvailableAdapters().join(", ")}. Use registerAdapter() to register adapters.\`,
-    );
-  }
-
-  const AdapterClass = ADAPTER_REGISTRY.get(type);
-  const adapter = new AdapterClass(config);
-
-  console.info(\`Database: Created \${type} adapter for "\${name}" v\${version}\`);
-
-  return adapter;
-}
-
-/**
- * Get list of registered adapter types
- * @returns {Array<string>} List of adapter type names
- */
-export function getAvailableAdapters() {
-  return Array.from(ADAPTER_REGISTRY.keys());
-}
-
-/**
- * Check if an adapter type is registered
- * @param {string} type - Adapter type name
- * @returns {boolean} True if adapter is registered
- */
-export function hasAdapter(type) {
-  return ADAPTER_REGISTRY.has(type);
-}
-
-export default {
-  createDatabase,
-  registerAdapter,
-  getAvailableAdapters,
-  hasAdapter,
-};
 `,mimeType:"text/javascript"},"/$app/model/query-builder.js":{content:`/**
  * @file Query Builder Utilities
  * @description Common query building and filtering logic shared across adapters
@@ -26196,6 +28480,2918 @@ export default {
  * * <uix-icon name="heart" size="xl" color="danger" solid></uix-icon>
  * \`\`\`
  */
+`,mimeType:"text/javascript"},"/views/discover-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { NBS } from "./utils.js";
+
+const { brand } = $APP.settings;
+
+export default {
+  style: true,
+
+  properties: {
+    userId: T.string({ defaultValue: "guest" }),
+    places: T.array({ sync: $APP.Model.places, query: {} }),
+    events: T.array({ sync: $APP.Model.events, query: {} }),
+    groups: T.array({ sync: $APP.Model.groups, query: {} }),
+    guides: T.array({ sync: $APP.Model.guides, query: {} }),
+    // TODO: MEETUPS HIDDEN - Restore when feature returns
+    // meetups: T.array({ sync: $APP.Model.meetups, query: {} }),
+    // meetupAttendance: T.array({ defaultValue: [] }),
+    searchQuery: T.string({ defaultValue: "" }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+    // TODO: MEETUPS HIDDEN - Restore when feature returns
+    // this.meetupAttendance = await $APP.Model.meetup_attendance.getAll({
+    //   where: { user: this.userId },
+    // });
+  },
+  isLoading() {
+    return !this.places || !this.events || !this.groups;
+  },
+  // TODO: MEETUPS HIDDEN - Restore when feature returns
+  // isJoined(meetupId) {
+  //   return this.meetupAttendance?.some((a) => a.meetup === meetupId) || false;
+  // },
+  getNextEvents() {
+    return (this.events || []).sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+  },
+  // TODO: MEETUPS HIDDEN - Restore when feature returns
+  // getMyMeetups() {
+  //   const joinedMeetupIds = new Set(
+  //     (this.meetupAttendance || []).map((a) => a.meetup),
+  //   );
+  //   return (this.meetups || []).filter((m) => joinedMeetupIds.has(m.id));
+  // },
+  getFeaturedGuides() {
+    return (this.guides || []).filter((g) => g.featured).slice(0, 2);
+  },
+  getRecommendedItems() {
+    // Combine recommended places and events
+    const recPlaces = (this.places || []).filter((p) => p.recommended || p.viewCount >= 100);
+    const recEvents = (this.events || []).filter((e) => e.recommended || e.viewCount >= 100);
+    return [...recPlaces, ...recEvents].slice(0, 4);
+  },
+  render() {
+    if (this.isLoading()) return NBS.SPINNER;
+
+    const nE = this.events ?? [];
+    const nY = this.places ?? [];
+    const featuredGuides = this.getFeaturedGuides();
+    const recommendedItems = this.getRecommendedItems();
+
+    return html\`
+      <div class="space-y-6 pb-8">
+        <!-- Header with branding and search -->
+        <header class="px-4 pt-4">
+          <div class="flex items-center justify-between mb-4 md:hidden">
+            <div class="text-xl font-black tracking-tight">
+              \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
+            </div>
+          </div>
+          <view-global-search></view-global-search>
+        </header>
+
+        <!-- Today in Rio (Events) -->
+        <div class="md:px-6 overflow-hidden mx-1 max-w-screen">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">Today in Rio</h2>
+            <button @click=\${() => $APP.Router.go("events")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View all</button>
+          </div>
+          <div class="flex gap-4 overflow-x-auto pb-4">
+            \${
+              nE.length === 0
+                ? html\`<div class="text-sm font-bold text-gray-500 italic">No upcoming events found.</div>\`
+                : nE.map(
+                    (event) => html\`
+                <view-story-circle .content=\${event} .onClick=\${(e) => $APP.Router.go("event-detail", { slug: e.slug })} class="last:mr-1"></view-story-circle>
+              \`,
+                  )
+            }
+          </div>
+        </div>
+
+        <!-- Recommended Section -->
+        \${recommendedItems.length > 0 ? html\`
+          <div class="px-6 overflow-hidden">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                \u2B50 \${$APP.i18n?.t?.("badges.recommended") || "Recommended"}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              \${recommendedItems.map((item) => {
+                const isEvent = item.date !== undefined;
+                const type = isEvent ? "event" : "place";
+                return html\`
+                  <div
+                    class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+                    @click=\${() => $APP.Router.go(\`\${type}-detail\`, { slug: item.slug })}
+                  >
+                    <div class="relative h-28 bg-gray-200">
+                      <img src="\${item.image}" class="w-full h-full object-cover" />
+                      <div class="absolute top-2 right-2">
+                        <span class="px-2 py-0.5 bg-yellow-300 border-2 border-black rounded text-[10px] font-black">\u2B50</span>
+                      </div>
+                    </div>
+                    <div class="p-2">
+                      <div class="text-xs font-black leading-tight line-clamp-2 uppercase">\${item.name}</div>
+                      \${isEvent && item.date ? html\`
+                        <div class="text-[10px] font-bold text-gray-500 mt-1">\u{1F4C5} \${new Date(item.date).toLocaleDateString()}</div>
+                      \` : null}
+                    </div>
+                  </div>
+                \`;
+              })}
+            </div>
+          </div>
+        \` : null}
+
+        <!-- Featured Guides -->
+        \${featuredGuides.length > 0 ? html\`
+          <div class="px-6 overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-black uppercase text-black">Guides</h2>
+              <button @click=\${() => $APP.Router.go("guides")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View all</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              \${featuredGuides.map(
+                (guide) => html\`
+                  <view-guide-card
+                    .guide=\${guide}
+                    .featured=\${true}
+                    .onClick=\${(g) => $APP.Router.go("guide-detail", { slug: g.slug })}
+                  ></view-guide-card>
+                \`,
+              )}
+            </div>
+          </div>
+        \` : null}
+
+        <!-- TODO: MEETUPS HIDDEN - Restore when feature returns
+        <div class="px-6 overflow-hidden">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">My Meetups</h2>
+            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
+          </div>
+          ...meetups section...
+        </div>
+        -->
+
+        <!-- Near You (Places) -->
+        <div class="px-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-black uppercase text-black">Near You</h2>
+            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">Filter</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 p-2 md:p-4 lg:p-8">
+            \${nY.map(
+              (place) => html\`
+                <view-meetup-card-compact .content=\${place} type="place" .onClick=\${(p) => $APP.Router.go("place-detail", { slug: p.slug })}></view-meetup-card-compact>
+              \`,
+            )}
+          </div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+
+export default {
+  style: true,
+  properties: {
+    item: T.object({ attribute: false }),
+    isOpen: T.boolean({ defaultValue: false }),
+  },
+  handleClose() {
+    this.isOpen = false;
+    this.item = null;
+    this.dispatchEvent(
+      new CustomEvent("close", { bubbles: true, composed: true }),
+    );
+  },
+  render() {
+    if (!this.item) return null;
+
+    return html\`
+      <uix-modal
+        .open=\${this.isOpen}
+        @modal-close=\${this.handleClose.bind(this)}
+        @modal-cancel=\${this.handleClose.bind(this)}
+      >
+        <view-content-card .content=\${this.item}></view-content-card>
+        <div slot="footer" class="pt-4">
+          <button
+            data-close
+            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            \u2715 \${$APP.i18n.t("actions.close")}
+          </button>
+        </div>
+      </uix-modal>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
+
+// Category definitions
+export const CATEGORIES = {
+  all: { id: "all", color: "gray-200", icon: "\u{1F4CD}" },
+  beaches: { id: "beaches", color: "blue-300", icon: "\u{1F3D6}\uFE0F" },
+  hiking: { id: "hiking", color: "green-400", icon: "\u{1F97E}" },
+  culture: { id: "culture", color: "amber-300", icon: "\u{1F3DB}\uFE0F" },
+  parties: { id: "parties", color: "purple-300", icon: "\u{1F389}" },
+  food: { id: "food", color: "orange-300", icon: "\u{1F37D}\uFE0F" },
+  sports: { id: "sports", color: "red-300", icon: "\u26BD" },
+  dancing: { id: "dancing", color: "pink-300", icon: "\u{1F483}" },
+  groups: { id: "groups", color: "rose-300", icon: "\u{1F4AC}" },
+};
+
+// Place categories (excludes groups which is for WhatsApp communities)
+export const PLACE_CATEGORIES = ["beaches", "hiking", "culture", "parties", "food", "sports", "dancing"];
+
+// Attribute tags - practical characteristics
+export const ATTRIBUTE_TAGS = {
+  "pet-friendly": { icon: "\u{1F415}", color: "emerald-200", label: "Pet Friendly" },
+  "wheelchair-accessible": { icon: "\u267F", color: "blue-200", label: "Accessible" },
+  "free-entry": { icon: "\u{1F193}", color: "green-200", label: "Free Entry" },
+  "family-friendly": { icon: "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}", color: "yellow-200", label: "Family Friendly" },
+  "must-see": { icon: "\u2B50", color: "amber-200", label: "Must See" },
+};
+
+// Vibe tags - atmosphere and experience
+export const VIBE_TAGS = {
+  chill: { icon: "\u{1F60E}", color: "sky-200", label: "Chill" },
+  romantic: { icon: "\u{1F495}", color: "pink-200", label: "Romantic" },
+  adventure: { icon: "\u{1F3D4}\uFE0F", color: "orange-200", label: "Adventure" },
+  party: { icon: "\u{1F389}", color: "purple-200", label: "Party" },
+  "local-favorite": { icon: "\u{1F1E7}\u{1F1F7}", color: "lime-200", label: "Local Favorite" },
+};
+
+// All tags combined
+export const ALL_TAGS = { ...ATTRIBUTE_TAGS, ...VIBE_TAGS };
+
+// Helper to get tag info
+export const getTagInfo = (tagId) => ALL_TAGS[tagId] || { icon: "\u{1F3F7}\uFE0F", color: "gray-200", label: tagId };
+
+// Neubrutalist Shadow styles
+export const NBS = {
+  S: "border-3 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
+  M: "border-3 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all",
+  L: "border-3 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
+  ACTIVE_SM:
+    "active:shadow-none active:translate-x-[2px] active:translate-y-[2px]",
+  ACTIVE_LG:
+    "active:shadow-none active:translate-x-[4px] active:translate-y-[4px]",
+  SPINNER: html\`<div class="flex items-center justify-center min-h-screen"><uix-spinner></uix-spinner></div>\`,
+};
+
+// Helper functions
+export const getCategoryColor = (category) =>
+  CATEGORIES[category]?.color
+    ? \`bg-\${CATEGORIES[category].color}\`
+    : "bg-gray-200";
+
+export const getUser = () => $APP.Auth?.user || null;
+
+export const isGuest = () => $APP.Auth?.isGuest ?? true;
+
+export const styleTag = (css) => html\`<style>\${css}</style>\`;
+`,mimeType:"text/javascript"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
+`,mimeType:"text/css"},"/$app/uix/display/link.css":{content:`:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}
+`,mimeType:"text/css"},"/$app/uix/display/icon.css":{content:`:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}
+`,mimeType:"text/css"},"/views/discover-view.css":{content:`.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}.scrollbar-hide::-webkit-scrollbar{display:none}
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/compass.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16.24 7.76l-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/calendar.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8 2v4m8-4v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/book-open.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/feedback/spinner.js":{content:`/**
+ * Spinner Component
+ *
+ * @component
+ * @category feedback
+ * @tag uix-spinner
+ *
+ * A loading spinner component with multiple animation variants and sizes.
+ * Uses pure CSS animations for performance.
+ *
+ * @example Basic Spinner
+ * \`\`\`html
+ * <uix-spinner></uix-spinner>
+ * \`\`\`
+ *
+ * @example Spinner Variants
+ * Different animation styles
+ * \`\`\`html
+ * <div class="flex gap-4">
+ *   <uix-spinner variant="circular"></uix-spinner>
+ *   <uix-spinner variant="dots"></uix-spinner>
+ *   <uix-spinner variant="bars"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Spinner Sizes
+ * \`\`\`html
+ * <div class="flex gap-4 items-center">
+ *   <uix-spinner size="xs"></uix-spinner>
+ *   <uix-spinner size="sm"></uix-spinner>
+ *   <uix-spinner size="md"></uix-spinner>
+ *   <uix-spinner size="lg"></uix-spinner>
+ *   <uix-spinner size="xl"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Colored Spinner
+ * \`\`\`html
+ * <uix-spinner primary></uix-spinner>
+ * <uix-spinner secondary></uix-spinner>
+ * <uix-spinner success></uix-spinner>
+ * <uix-spinner danger></uix-spinner>
+ * \`\`\`
+ *
+ * @example Custom Color
+ * \`\`\`html
+ * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
+ * \`\`\`
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-spinner",
+  properties: {
+    variant: T.string({
+      defaultValue: "circular",
+      enum: ["circular", "dots", "bars"],
+    }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    primary: T.boolean(),
+    secondary: T.boolean(),
+    success: T.boolean(),
+    danger: T.boolean(),
+    warning: T.boolean(),
+    info: T.boolean(),
+  },
+  style: true,
+  render() {
+    // Circular variant uses CSS ::before pseudo-element
+    if (this.variant === "circular") {
+      return html\`\`;
+    }
+
+    // Dots and bars variants need 3 elements
+    if (this.variant === "dots") {
+      return html\`
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      \`;
+    }
+
+    if (this.variant === "bars") {
+      return html\`
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      \`;
+    }
+
+    return html\`\`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/global-search.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { CATEGORIES, ALL_TAGS, getTagInfo } from "./utils.js";
+
+export default {
+  style: true,
+
+  properties: {
+    query: T.string({ defaultValue: "" }),
+    isOpen: T.boolean({ defaultValue: false }),
+    selectedTags: T.array({ defaultValue: [] }),
+    places: T.array({ sync: $APP.Model.places, query: {} }),
+    events: T.array({ sync: $APP.Model.events, query: {} }),
+    guides: T.array({ sync: $APP.Model.guides, query: {} }),
+    groups: T.array({ sync: $APP.Model.groups, query: {} }),
+  },
+
+  handleInputChange(e) {
+    this.query = e.target.value;
+    this.isOpen = this.query.length > 0 || this.selectedTags.length > 0;
+  },
+
+  handleFocus() {
+    this.isOpen = true;
+  },
+
+  handleBlur() {
+    // Delay to allow click on results
+    setTimeout(() => {
+      this.isOpen = false;
+    }, 200);
+  },
+
+  toggleTag(tagId) {
+    if (this.selectedTags.includes(tagId)) {
+      this.selectedTags = this.selectedTags.filter((t) => t !== tagId);
+    } else {
+      this.selectedTags = [...this.selectedTags, tagId];
+    }
+    this.isOpen = true;
+  },
+
+  clearSearch() {
+    this.query = "";
+    this.selectedTags = [];
+    this.isOpen = false;
+  },
+
+  getFilteredResults() {
+    const q = this.query.toLowerCase().trim();
+    const tags = this.selectedTags;
+
+    const matchesQuery = (item) => {
+      if (!q) return true;
+      return (
+        item.name?.toLowerCase().includes(q) ||
+        item.title?.toLowerCase().includes(q) ||
+        item.description?.toLowerCase().includes(q)
+      );
+    };
+
+    const matchesTags = (item) => {
+      if (tags.length === 0) return true;
+      return tags.some((tag) => item.tags?.includes(tag));
+    };
+
+    const filterItems = (items) =>
+      (items || []).filter((item) => matchesQuery(item) && matchesTags(item));
+
+    return {
+      places: filterItems(this.places).slice(0, 3),
+      events: filterItems(this.events).slice(0, 3),
+      guides: filterItems(this.guides).slice(0, 3),
+      groups: filterItems(this.groups).slice(0, 3),
+    };
+  },
+
+  navigateTo(type, slug) {
+    this.clearSearch();
+    $APP.Router.go(\`\${type}-detail\`, { slug });
+  },
+
+  renderResultItem(item, type) {
+    const name = item.name || item.title;
+    const icon = type === "place" ? "\u{1F4CD}" : type === "event" ? "\u{1F4C5}" : type === "guide" ? "\u{1F4D6}" : "\u{1F465}";
+
+    return html\`
+      <button
+        class="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-3 border-b border-gray-200 last:border-0"
+        @click=\${() => this.navigateTo(type, item.slug)}
+      >
+        <span class="text-lg">\${icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm truncate">\${name}</div>
+          <div class="text-xs text-gray-500 truncate">\${item.description?.substring(0, 50)}...</div>
+        </div>
+        \${item.recommended ? html\`<span class="text-yellow-500">\u2B50</span>\` : null}
+      </button>
+    \`;
+  },
+
+  render() {
+    const results = this.getFilteredResults();
+    const hasResults =
+      results.places.length > 0 ||
+      results.events.length > 0 ||
+      results.guides.length > 0 ||
+      results.groups.length > 0;
+    const hasQuery = this.query.length > 0 || this.selectedTags.length > 0;
+
+    return html\`
+      <div class="relative">
+        <!-- Search Input -->
+        <div class="relative">
+          <input
+            type="text"
+            .value=\${this.query}
+            @input=\${(e) => this.handleInputChange(e)}
+            @focus=\${() => this.handleFocus()}
+            @blur=\${() => this.handleBlur()}
+            placeholder=\${$APP.i18n?.t?.("search.placeholder") || "Search places, events, guides..."}
+            class="w-full px-4 py-3 pl-12 pr-12 bg-white border-3 border-black rounded-xl font-medium shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:translate-x-[2px] focus:translate-y-[2px] transition-all outline-none"
+          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          \${hasQuery ? html\`
+            <button
+              @click=\${() => this.clearSearch()}
+              class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          \` : null}
+        </div>
+
+        <!-- Tag Filters -->
+        <div class="flex gap-2 mt-3 overflow-x-auto pb-2">
+          \${Object.entries(ALL_TAGS).slice(0, 6).map(([tagId, tagInfo]) => {
+            const isSelected = this.selectedTags.includes(tagId);
+            return html\`
+              <button
+                @click=\${() => this.toggleTag(tagId)}
+                class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs transition-all \${
+                  isSelected
+                    ? \`bg-\${tagInfo.color} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]\`
+                    : "bg-white hover:bg-gray-100"
+                }"
+              >
+                \${tagInfo.icon} \${tagInfo.label}
+              </button>
+            \`;
+          })}
+        </div>
+
+        <!-- Results Dropdown -->
+        \${this.isOpen && hasQuery ? html\`
+          <div class="absolute top-full left-0 right-0 mt-2 bg-white border-3 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden z-50 max-h-96 overflow-y-auto">
+            \${!hasResults ? html\`
+              <div class="p-6 text-center">
+                <div class="text-2xl mb-2">\u{1F50D}</div>
+                <div class="font-bold text-gray-500">\${$APP.i18n?.t?.("search.noResults") || "No results found"}</div>
+              </div>
+            \` : html\`
+              \${results.places.length > 0 ? html\`
+                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
+                  \${$APP.i18n?.t?.("search.places") || "Places"}
+                </div>
+                \${results.places.map((item) => this.renderResultItem(item, "place"))}
+              \` : null}
+              \${results.events.length > 0 ? html\`
+                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
+                  \${$APP.i18n?.t?.("search.events") || "Events"}
+                </div>
+                \${results.events.map((item) => this.renderResultItem(item, "event"))}
+              \` : null}
+              \${results.guides.length > 0 ? html\`
+                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
+                  \${$APP.i18n?.t?.("search.guides") || "Guides"}
+                </div>
+                \${results.guides.map((item) => this.renderResultItem(item, "guide"))}
+              \` : null}
+              \${results.groups.length > 0 ? html\`
+                <div class="px-4 py-2 bg-gray-100 font-black text-xs uppercase text-gray-600">
+                  \${$APP.i18n?.t?.("search.groups") || "Groups"}
+                </div>
+                \${results.groups.map((item) => this.renderResultItem(item, "group"))}
+              \` : null}
+            \`}
+          </div>
+        \` : null}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/story-circle.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  properties: {
+    content: T.object({ attribute: false }),
+    onClick: T.function({ attribute: false }),
+  },
+  render() {
+    if (!this.content) return null;
+    return html\`
+      <div
+        class="flex flex-col items-center gap-1 cursor-pointer group min-w-[72px]"
+        @click=\${() => this.onClick && this.onClick(this.content)}
+      >
+        <div class="p-[3px] rounded-full bg-gradient-to-tr from-accent to-primary border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] group-hover:shadow-none transition-all">
+          <div class="w-16 h-16 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
+             <img src="\${this.content.image}" class="w-full h-full object-cover" />
+          </div>
+        </div>
+        <uix-link href="/event/\${this.content.slug}" class="text-xs font-black uppercase text-center max-w-[80px] truncate leading-tight">
+          \${this.content.name}
+        </uix-link>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/meetup-card-compact.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { CATEGORIES, getCategoryColor } from "./utils.js";
+
+export default {
+  style: true,
+  properties: {
+    content: T.object({ attribute: false }),
+    onClick: T.function({ attribute: false }),
+    type: T.string({ defaultValue: "" }), // e.g., "place", "event", "meetup", "group"
+    showTags: T.boolean({ defaultValue: true }),
+    showBadge: T.boolean({ defaultValue: true }),
+  },
+  getCategoryEmoji() {
+    return CATEGORIES[this.content?.category]?.icon || "\u{1F4CD}";
+  },
+  handleCardClick(e) {
+    if (e.target.closest(".join-button")) return;
+    if (this.onClick) this.onClick(this.content);
+  },
+  handleJoinClick(e) {
+    e.stopPropagation();
+  },
+  render() {
+    if (!this.content) return null;
+    const { showTags, showBadge } = this;
+    const isJoined = this.content.joined;
+    const hasTags = showTags && this.content.tags?.length > 0;
+    const hasBadge = showBadge && (this.content.recommended || this.content.viewCount >= 100);
+    const btnCls = \`join-button w-full py-2 px-4 border-2 border-black rounded-lg font-black uppercase text-xs transition-all duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] \${isJoined ? "bg-primary text-black hover:bg-primary-dark" : "bg-accent text-black hover:bg-accent"}\`;
+
+    return html\`
+      <uix-card
+        class="meetup-card-compact"
+        shadow="md"
+        hover
+        borderWidth="3"
+        padding="none"
+        @click=\${(e) => this.handleCardClick(e)}
+      >
+        <div slot="header" class="relative w-full h-48 bg-gray-100"
+          style="background-image: url(\${this.content.image}); background-size: cover; background-position: center;"
+        >
+          \${hasBadge ? html\`
+            <div class="absolute top-2 right-2">
+              <view-recommended-badge
+                .recommended=\${this.content.recommended}
+                .viewCount=\${this.content.viewCount || 0}
+              ></view-recommended-badge>
+            </div>
+          \` : null}
+        </div>
+        <div class="p-3 space-y-2 flex-1 flex flex-col">
+          <div>
+            <div class="inline-flex items-center gap-1 px-2 py-1 \${getCategoryColor(this.content.category)} border-2 border-black rounded-lg font-black text-xs uppercase text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              \${this.getCategoryEmoji()} \${$APP.i18n.t(\`categories.\${this.content.category}\`)}
+            </div>
+          </div>
+          <uix-link href="/\${this.type || this.content._type || 'place'}/\${this.content.slug}" class="text-lg font-black leading-tight line-clamp-2 uppercase">\${this.content.name}</uix-link>
+          \${hasTags ? html\`
+            <view-tags-display .tags=\${this.content.tags} .maxVisible=\${2}></view-tags-display>
+          \` : null}
+          <div class="flex-1"></div>
+        </div>
+        <div slot="footer" class="p-3 pt-0">
+          <button class="\${btnCls}" @click=\${(e) => this.handleJoinClick(e)}>
+            \${isJoined ? html\`\u2713 \${$APP.i18n.t("actions.joined")}\` : html\`\u2764\uFE0F \${$APP.i18n.t("actions.join")}\`}
+          </button>
+        </div>
+      </uix-card>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/guide-card.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor } from "./utils.js";
+
+export default {
+  properties: {
+    guide: T.object(),
+    featured: T.boolean({ defaultValue: false }),
+    onClick: T.function({ attribute: false }),
+  },
+
+  handleClick() {
+    if (this.onClick) this.onClick(this.guide);
+  },
+
+  render() {
+    const g = this.guide;
+    if (!g) return null;
+
+    const isArticle = g.guideType === "article";
+    const typeLabel = isArticle ? "Article" : "Curated List";
+    const typeColor = isArticle ? "bg-amber-300" : "bg-emerald-300";
+    const typeIcon = isArticle ? "\u{1F4DD}" : "\u{1F4CB}";
+
+    const hasBadge = g.recommended || g.viewCount >= 100;
+    const hasTags = g.tags?.length > 0;
+
+    // Featured card - larger layout
+    if (this.featured) {
+      return html\`
+        <div
+          class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+          @click=\${() => this.handleClick()}
+        >
+          <div class="relative h-48 bg-gray-200">
+            <img src="\${g.coverImage}" class="w-full h-full object-cover" />
+            <div class="absolute top-3 left-3 flex gap-2">
+              <span class="px-3 py-1 \${typeColor} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                \${typeIcon} \${typeLabel}
+              </span>
+            </div>
+            \${hasBadge ? html\`
+              <div class="absolute top-3 right-3">
+                <view-recommended-badge
+                  .recommended=\${g.recommended}
+                  .viewCount=\${g.viewCount || 0}
+                ></view-recommended-badge>
+              </div>
+            \` : null}
+          </div>
+          <div class="p-4 space-y-3">
+            <uix-link href="/guide/\${g.slug}" class="text-xl font-black uppercase leading-tight line-clamp-2">\${g.title}</uix-link>
+            <p class="text-sm font-medium text-gray-600 line-clamp-2">\${g.description}</p>
+            \${hasTags ? html\`
+              <view-tags-display .tags=\${g.tags} .maxVisible=\${3}></view-tags-display>
+            \` : null}
+            <div class="flex items-center gap-2 flex-wrap">
+              \${(g.categories || []).map(cat => html\`
+                <span class="px-2 py-1 \${getCategoryColor(cat)} border-2 border-black rounded-lg font-bold text-xs uppercase">
+                  \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
+                </span>
+              \`)}
+              \${!isArticle && g.items?.length ? html\`
+                <span class="px-2 py-1 bg-gray-100 border-2 border-black rounded-lg font-bold text-xs">
+                  \${g.items.length} places
+                </span>
+              \` : null}
+            </div>
+          </div>
+        </div>
+      \`;
+    }
+
+    // Regular card - compact grid style
+    return html\`
+      <div
+        class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex flex-col h-full"
+        @click=\${() => this.handleClick()}
+      >
+        <div class="relative h-32 bg-gray-200 flex-shrink-0">
+          <img src="\${g.coverImage}" class="w-full h-full object-cover" />
+          <div class="absolute top-2 left-2">
+            <span class="px-2 py-0.5 \${typeColor} border-2 border-black rounded font-bold text-[10px] uppercase">
+              \${typeIcon} \${isArticle ? "Article" : "List"}
+            </span>
+          </div>
+          \${hasBadge ? html\`
+            <div class="absolute top-2 right-2">
+              <view-recommended-badge
+                .recommended=\${g.recommended}
+                .viewCount=\${g.viewCount || 0}
+              ></view-recommended-badge>
+            </div>
+          \` : null}
+        </div>
+        <div class="p-3 flex-1 flex flex-col">
+          <uix-link href="/guide/\${g.slug}" class="text-sm font-black uppercase leading-tight mb-1 line-clamp-2">\${g.title}</uix-link>
+          <p class="text-xs font-medium text-gray-500 line-clamp-2 flex-1">\${g.description}</p>
+          \${hasTags ? html\`
+            <div class="mt-2">
+              <view-tags-display .tags=\${g.tags} .maxVisible=\${2}></view-tags-display>
+            </div>
+          \` : null}
+          <div class="flex items-center gap-1 mt-2 flex-wrap">
+            \${(g.categories || []).slice(0, 2).map(cat => html\`
+              <span class="px-1.5 py-0.5 \${getCategoryColor(cat)} border border-black rounded font-bold text-[9px] uppercase">
+                \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
+              </span>
+            \`)}
+            \${!isArticle && g.items?.length ? html\`
+              <span class="text-[10px] font-bold text-gray-500 ml-auto">
+                \${g.items.length} places
+              </span>
+            \` : null}
+          </div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/feedback/spinner.css":{content:`:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}
+`,mimeType:"text/css"},"/views/meetup-card-compact.css":{content:`.meetup-card-compact.uix-card{cursor:pointer;height:100%;background:#fff;border-color:var(--card-border-color, black);border-radius:1rem}.meetup-card-compact.uix-card>[slot=header]{border-bottom:3px solid var(--card-border-color, black);padding:0}.meetup-card-compact.uix-card>[slot=footer]{justify-content:stretch}.meetup-card-compact.uix-card>[slot=footer]>button{width:100%}
+`,mimeType:"text/css"},"/views/recommended-badge.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const POPULAR_THRESHOLD = 100;
+
+export default {
+  properties: {
+    recommended: T.boolean({ defaultValue: false }),
+    viewCount: T.number({ defaultValue: 0 }),
+    size: T.string({ defaultValue: "sm" }), // sm, md
+  },
+
+  render() {
+    const { recommended, viewCount, size } = this;
+
+    const isPopular = viewCount >= POPULAR_THRESHOLD;
+
+    if (!recommended && !isPopular) return null;
+
+    const sizeClasses = size === "md"
+      ? "px-3 py-1.5 text-sm"
+      : "px-2 py-1 text-xs";
+
+    // Recommended takes priority over Popular
+    if (recommended) {
+      return html\`
+        <span class="inline-flex items-center gap-1 bg-yellow-300 border-2 border-black rounded-lg font-black uppercase \${sizeClasses} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+          <span>\u2B50</span>
+          <span>Recommended</span>
+        </span>
+      \`;
+    }
+
+    return html\`
+      <span class="inline-flex items-center gap-1 bg-pink-400 border-2 border-black rounded-lg font-black uppercase \${sizeClasses} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+        <span>\u{1F525}</span>
+        <span>Popular</span>
+      </span>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/tags-display.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import { getTagInfo } from "./utils.js";
+
+export default {
+  properties: {
+    tags: T.array({ defaultValue: [] }),
+    maxVisible: T.number({ defaultValue: 3 }),
+    size: T.string({ defaultValue: "sm" }), // sm, md
+    showIcon: T.boolean({ defaultValue: true }),
+  },
+
+  render() {
+    const { tags, maxVisible, size, showIcon } = this;
+
+    if (!tags || tags.length === 0) return null;
+
+    const visibleTags = tags.slice(0, maxVisible);
+    const hiddenCount = tags.length - maxVisible;
+
+    const sizeClasses = size === "md"
+      ? "px-3 py-1.5 text-sm"
+      : "px-2 py-1 text-xs";
+
+    return html\`
+      <div class="flex flex-wrap gap-1.5">
+        \${visibleTags.map((tag) => {
+          const tagInfo = getTagInfo(tag);
+          return html\`
+            <span class="inline-flex items-center gap-1 bg-\${tagInfo.color} border-2 border-black rounded-lg font-bold \${sizeClasses}">
+              \${showIcon ? html\`<span>\${tagInfo.icon}</span>\` : null}
+              <span>\${tagInfo.label}</span>
+            </span>
+          \`;
+        })}
+        \${hiddenCount > 0 ? html\`
+          <span class="inline-flex items-center bg-gray-200 border-2 border-black rounded-lg font-bold \${sizeClasses}">
+            +\${hiddenCount}
+          </span>
+        \` : null}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  extends: "uix-container",
+  i18n: {},
+  style: true,
+  shadow: true,
+  properties: {
+    borderWidth: T.string({
+      defaultValue: "1",
+      enum: ["none", "1", "2", "3"],
+    }),
+    borderStyle: T.string({
+      defaultValue: "solid",
+      enum: ["solid", "dashed", "dotted"],
+    }),
+    shadow: T.string({
+      defaultValue: "none",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    hover: T.boolean({
+      defaultValue: false,
+    }),
+    gap: T.string({
+      defaultValue: "md",
+      enum: ["none", "xs", "sm", "md", "lg", "xl"],
+    }),
+  },
+  render() {
+    return html\`
+      <slot name="header" part="header"></slot>
+      <slot part="body"><slot></slot></slot>
+      
+      <slot part="footer" name="footer"></slot>
+    \`;
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * Card Component
+ *
+ * @component
+ * @category layout
+ * @tag uix-card
+ *
+ * A versatile container component for displaying grouped content with optional
+ * header and footer sections. Supports different variants and padding options.
+ *
+ * @slot header - Optional header content
+ * @slot - Default slot for card body content
+ * @slot footer - Optional footer content
+ * @part header - The card header container
+ * @part body - The card body container
+ * @part footer - The card footer container
+ *
+ * @example Basic Card
+ * \`\`\`html
+ * <uix-card>
+ *   <h3 slot="header">Card Title</h3>
+ *   <p>Card content goes here...</p>
+ * </uix-card>
+ * \`\`\`
+ *
+ * @example Card with Footer
+ * \`\`\`html
+ * <uix-card>
+ *   <header slot="header"><h3 class="flex">User Profile</h3></header>
+ *   <article>
+ *     <p>John Doe</p>
+ *     <p>Software Engineer</p>
+ *   </article>
+ *   <footer slot="footer">
+ *     <uix-button primary>Edit</uix-button>
+ *     <uix-button>Cancel</uix-button>
+ *   </footer>
+ * </uix-card>
+ * \`\`\`
+ *
+ * @example Card Variants
+ * \`\`\`html
+ * <div class="flex flex-row gap-2">
+ *  <uix-card variant="default">Default Card</uix-card>
+ *  <uix-card variant="elevated">Elevated Card</uix-card>
+ * </div>
+ * \`\`\`
+ *
+ * @example Card Padding Options
+ * \`\`\`html
+ * <div class="flex flex-row gap-2">
+ *  <uix-card padding="none">No Padding</uix-card>
+ *  <uix-card padding="sm">Small Padding</uix-card>
+ *  <uix-card padding="md">Medium Padding</uix-card>
+ *  <uix-card padding="lg">Large Padding</uix-card>
+ * </div>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/layout/container.js":{content:`/**
+ * UIX Container Component
+ * Generic container component with padding, overflow, and variant support
+ */
+
+import T from "/$app/types/index.js";
+
+export default {
+  style: true,
+  properties: {
+    padding: T.string({
+      defaultValue: "md",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    overflow: T.string({
+      enum: ["visible", "hidden", "auto", "scroll"],
+    }),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "filled", "outlined", "elevated"],
+    }),
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
+`,mimeType:"text/css"},"/$app/uix/layout/card.css":{content:`:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;background:var(--card-background, inherit);&::part(body){display:flex;flex-direction:column;flex:1}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, transparent)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, transparent);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}
+`,mimeType:"text/css"},"/views/templates/detail.js":{content:`import Router from "/$app/router/index.js";
+import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+
+const { brand, navTabs } = $APP.settings;
+
+export default {
+  class: "min-h-screen w-full bg-purple-50 flex flex-col font-sans",
+  properties: {
+    currentRoute: T.object({ sync: Router }),
+    currentLang: T.string("en"),
+    modalItem: T.object(null),
+    modalOpen: T.boolean(false),
+    userId: T.number({ sync: "local" }),
+  },
+  getActiveTabFromRoute() {
+    const rN = this.currentRoute?.name;
+    // Map detail views to their parent tab
+    const detailToTab = {
+      "place-detail": "discover",
+      "event-detail": "events",
+      "group-detail": "groups",
+      "guide-detail": "guides",
+      "meetup-detail": "discover",
+    };
+    if (detailToTab[rN]) return detailToTab[rN];
+    const tabIds = navTabs.map((t) => t.id).filter((id) => id !== "discover");
+    return tabIds.includes(rN) ? rN : "discover";
+  },
+  render() {
+    console.log(this.currentRoute, this.currentRoute?.route?.title);
+    const aT = this.getActiveTabFromRoute();
+    // Use dynamic title from Router.setTitle() if available, fallback to pageTitle
+    const displayTitle =
+      this.currentRoute?.route?.title || this.currentRoute?.pageTitle || "";
+
+    return html\`
+      <!-- Desktop Top Nav with Back Button -->
+      <nav class="hidden md:flex items-center justify-between px-6 py-4 bg-white border-b-3 border-black">
+        <div class="flex items-center gap-4">
+          <button
+            @click=\${() => window.history.back()}
+            class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors"
+          >
+            <uix-icon name="arrow-left" size="20"></uix-icon>
+          </button>
+          <uix-link href="/" class="text-2xl font-black uppercase tracking-tight">
+            \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
+          </uix-link>
+        </div>
+
+        <div class="font-black uppercase tracking-tight text-gray-600 truncate max-w-[300px]">
+          \${displayTitle}
+        </div>
+
+        <div class="flex items-center gap-6">
+          \${navTabs.map(
+            (tab) => html\`
+              <uix-link
+                href=\${tab.route}
+                class="font-bold uppercase text-sm transition-colors \${aT === tab.id ? brand.accentClass : \`text-black hover:\${brand.accentClass}\`}"
+              >
+                \${tab.label}
+              </uix-link>
+            \`,
+          )}
+          <uix-link
+            href="/profile"
+            class="w-10 h-10 rounded-full bg-green-300 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            <uix-icon name="user" size="sm"></uix-icon>
+          </uix-link>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-0">
+        \${this.currentRoute.component}
+      </main>
+
+      <!-- Mobile Bottom Nav -->
+      <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden bg-black rounded-full">
+        <div class="px-4 py-3 flex items-center gap-4">
+        \${navTabs.map(
+          (tab) => html\`
+            <uix-link
+              href=\${tab.route}
+              class="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 \${
+                aT === tab.id
+                  ? "bg-white/10 ring-2 ring-white text-white"
+                  : "text-gray-400 hover:text-white"
+              }"
+            >
+              <uix-icon name=\${tab.icon} size="md"></uix-icon>
+            </uix-link>
+          \`,
+        )}
+        </div>
+      </nav>
+
+      <!-- Modal -->
+      <view-item-modal .item=\${this.modalItem} .isOpen=\${this.modalOpen} @close=\${() => {
+        this.modalOpen = false;
+        this.modalItem = null;
+      }}></view-item-modal>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/place-detail-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor, isGuest, NBS } from "./utils.js";
+
+export default {
+  dataQuery: true,
+  properties: {
+    place: T.object(),
+    userId: T.string({ defaultValue: "guest" }),
+    currentUser: T.object({
+      sync: $APP.Model.users,
+      query: (inst) => ({
+        id: inst.userId,
+        includes: ["likedPlaces"],
+      }),
+      dependsOn: ["userId"],
+    }),
+    showAuthPrompt: T.boolean({ defaultValue: false }),
+    authPromptMessage: T.string({ defaultValue: "" }),
+    showAuthModal: T.boolean({ defaultValue: false }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+    // Track view count
+    if (this.place?.id) {
+      await $APP.Model.places.edit(this.place.id, {
+        viewCount: (this.place.viewCount || 0) + 1,
+      });
+    }
+  },
+  dataLoaded({ row }) {
+    if (row?.name) {
+      $APP.Router.setTitle(row.name);
+    }
+  },
+  isLiked() {
+    if (!this.currentUser || !this.place) return false;
+    return this.currentUser.likedPlaces.some(
+      (place) => place === this.place.id || place.id === this.place.id,
+    );
+  },
+  getRelatedMeetups() {
+    if (!this.place) return [];
+    return (this.meetups || []).filter((m) => m.place === this.place.id);
+  },
+  async handleLikeToggle() {
+    const p = this.place;
+    if (!p || !this.currentUser) return;
+    if (this.isLiked()) {
+      this.currentUser.likedPlaces = this.currentUser.likedPlaces.filter(
+        (id) => id !== p.id && id.id !== p.id,
+      );
+    } else {
+      this.currentUser.likedPlaces.push(p.id);
+    }
+    await $APP.Model.users.edit(this.currentUser);
+  },
+  async createMeetup() {
+    if (isGuest()) {
+      this.showAuthPrompt = true;
+      this.authPromptMessage = "Create an account to host meetups!";
+      return;
+    }
+    const p = this.place;
+    const n = {
+      id: Number(\`\${Date.now()}00\`),
+      name: \`Meetup at \${p.name}\`,
+      description: "Join me! I'm looking for a group to go with.",
+      category: p.category,
+      place: p.id,
+      image: p.image,
+      date: new Date().toISOString().split("T")[0],
+      time: "19:00",
+      venue: p.address,
+      attendees: [],
+      createdAt: new Date().toISOString(),
+      order: 0,
+    };
+    await $APP.Model.meetups.add(n);
+    alert("Meetup Created! Others can now join you.");
+  },
+  render() {
+    const m = this.place;
+    if (!m) return NBS.SPINNER;
+
+    const rM = this.getRelatedMeetups();
+    const isLiked = this.isLiked();
+    return html\`
+      <div class="bg-purple-50 min-h-screen pb-20">
+        <view-auth-modal
+          .isOpen=\${this.showAuthModal}
+          .onClose=\${() => (this.showAuthModal = false)}
+          .onSuccess=\${() => location.reload()}
+        ></view-auth-modal>
+        \${
+          this.showAuthPrompt
+            ? html\`
+          <div class="fixed bottom-20 left-4 right-4 z-40">
+            <view-auth-prompt
+              .message=\${this.authPromptMessage}
+              .onLogin=\${() => {
+                this.showAuthPrompt = false;
+                this.showAuthModal = true;
+              }}
+              .onDismiss=\${() => (this.showAuthPrompt = false)}
+            ></view-auth-prompt>
+          </div>
+        \`
+            : null
+        }
+        <!-- Hero Image -->
+        <div class="relative w-full h-64 sm:h-80 bg-gray-200 border-b-3 border-black overflow-hidden">
+          <img src="\${m.image}" class="w-full h-full object-cover" />
+          <div class="absolute bottom-4 left-4 flex gap-2">
+            <div class="px-3 py-1 \${getCategoryColor(m.category)} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              \${$APP.i18n.t(\`categories.\${m.category}\`)}
+            </div>
+          </div>
+          <!-- Share button & Badge -->
+          <div class="absolute top-4 right-4 flex items-center gap-2">
+            <button class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <uix-icon name="share" size="20"></uix-icon>
+            </button>
+            \${(m.recommended || m.viewCount >= 100) ? html\`
+              <view-recommended-badge
+                .recommended=\${m.recommended}
+                .viewCount=\${m.viewCount || 0}
+              ></view-recommended-badge>
+            \` : null}
+          </div>
+        </div>
+
+        <!-- 2-Column Grid -->
+        <div class="px-4 -mt-6 relative z-10">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Main Content (2/3) -->
+            <div class="md:col-span-2 space-y-6">
+              <div class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                <div class="flex items-center gap-2 text-sm font-bold text-gray-600 mb-2"><span>\u{1F4CD} \${m.address || "Rio de Janeiro"}</span></div>
+                \${m.tags?.length > 0 ? html\`
+                  <view-tags-display .tags=\${m.tags} .maxVisible=\${4} size="md"></view-tags-display>
+                \` : null}
+                <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-200">
+                  <p class="text-base font-medium text-gray-800 leading-relaxed">\${m.description}</p>
+                </div>
+                \${
+                  m.whatsappLink
+                    ? html\`
+                  <div class="mt-6 pt-6 border-t-2 border-dashed border-gray-300">
+                    <a href="\${m.whatsappLink}" target="_blank" class="block w-full text-center py-3 bg-green-400 border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+                      \u{1F4AC} WhatsApp
+                    </a>
+                  </div>
+                \`
+                    : null
+                }
+                <div class="mt-6 pt-6 border-t-2 border-dashed border-gray-300">
+                  <button @click=\${() => this.handleLikeToggle()} class="w-full py-4 \${isLiked ? "bg-pink-400" : "bg-primary"} cursor-pointer border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+                    \${isLiked ? "\u2764\uFE0F Saved" : "\u{1F90D} Save Place"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-xl font-black uppercase">Community Meetups</h3>
+                  <span class="bg-black text-white text-xs font-bold px-2 py-1 rounded-md">\${rM.length}</span>
+                </div>
+                <div class="space-y-4">
+                  \${
+                    rM.length > 0
+                      ? rM.map(
+                          (meetup) => html\`
+                      <div class="bg-white border-3 border-black rounded-xl p-4 flex gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:bg-gray-50" @click=\${() => $APP.Router.go("meetup-detail", { slug: meetup.slug })}>
+                        <div class="w-16 h-16 bg-gray-200 border-2 border-black rounded-lg flex-shrink-0 bg-cover bg-center" style="background-image: url('\${meetup.image}')"></div>
+                        <div class="flex-1 min-w-0">
+                          <h4 class="font-black text-sm truncate uppercase">\${meetup.name}</h4>
+                          <div class="text-xs font-bold text-gray-500 mb-2">\u{1F4C5} \${meetup.date} \u2022 \${meetup.time}</div>
+                          <div class="flex items-center gap-2">
+                            <div class="flex -space-x-2">
+                              \${meetup.attendees.map(() => html\`<div class="w-6 h-6 rounded-full bg-gray-300 border border-black"></div>\`)}
+                            </div>
+                            <span class="text-xs font-black text-gray-400">\${meetup.attendees.length} going</span>
+                          </div>
+                        </div>
+                      </div>
+                    \`,
+                        )
+                      : html\`
+                      <div class="bg-yellow-50 border-3 border-black border-dashed rounded-xl p-6 text-center">
+                        <div class="text-4xl mb-2">\u{1F997}</div>
+                        <p class="font-bold text-sm text-gray-600 mb-3">No community meetups yet.</p>
+                        <p class="text-xs text-gray-500">Be the first to create a meetup at this place!</p>
+                      </div>
+                    \`
+                  }
+                  <button @click=\${() => this.createMeetup()} class="w-full py-4 bg-white border-3 border-black rounded-xl font-black uppercase flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                    <span class="text-xl">+</span> Create a Meetup
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sidebar (1/3) -->
+            <div class="md:sticky md:top-20 space-y-6 self-start">
+              <view-related-content
+                .currentItem=\${m}
+                type="place"
+                .title=\${$APP.i18n?.t?.("related.places") || "Similar Places"}
+              ></view-related-content>
+            </div>
+          </div>
+          <div class="h-24"></div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/arrow-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 19l-7-7l7-7m7 7H5"/></svg>',mimeType:"image/svg+xml"},"/views/auth-modal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+
+export default {
+  style: true,
+  properties: {
+    isOpen: T.boolean({ defaultValue: false }),
+    onClose: T.function({ attribute: false }),
+    onSuccess: T.function({ attribute: false }),
+    loading: T.boolean({ defaultValue: false }),
+    error: T.string({ defaultValue: "" }),
+  },
+  async handleAuthSubmit(e) {
+    const { mode, name, email, password, passwordConfirm } = e.detail;
+    const authForm = this.querySelector("uix-auth-form");
+    this.loading = true;
+    this.error = "";
+
+    try {
+      let result;
+      if (mode === "register") {
+        result = await $APP.Auth.register({
+          name,
+          email,
+          password,
+          passwordConfirm: passwordConfirm || password,
+          username: \`@\${name.toLowerCase().replace(/\\s/g, "")}\`,
+          stats: { interested: 0, saved: 0, attending: 0 },
+          travelStatus: "visitor",
+          vibeTime: "night",
+          vibeSocial: "social",
+          vibeDrink: "caipirinha",
+          lookingFor: [],
+        });
+      } else {
+        result = await $APP.Auth.login(email, password);
+      }
+
+      if (result.success) {
+        if (this.onSuccess) this.onSuccess();
+      } else {
+        this.error = result.error || "Authentication failed";
+        authForm?.setError(this.error);
+      }
+    } catch (error) {
+      this.error = error.message || "An error occurred";
+      authForm?.setError(this.error);
+    } finally {
+      this.loading = false;
+    }
+  },
+  async handleOAuth(e) {
+    const { provider } = e.detail;
+    this.loading = true;
+    this.error = "";
+
+    try {
+      const result = await $APP.Auth.loginWithOAuth(provider);
+      if (result.error) {
+        this.error = result.error;
+        const authForm = this.querySelector("uix-auth-form");
+        authForm?.setError(this.error);
+      }
+    } catch (error) {
+      this.error = error.message || "OAuth failed";
+      const authForm = this.querySelector("uix-auth-form");
+      authForm?.setError(this.error);
+    } finally {
+      this.loading = false;
+    }
+  },
+  handleGuest() {
+    if (this.onClose) this.onClose();
+  },
+  render() {
+    if (!this.isOpen) return null;
+
+    return html\`
+      <uix-modal
+        .open=\${this.isOpen}
+        @modal-close=\${() => this.onClose?.()}
+        @modal-cancel=\${() => this.onClose?.()}
+      >
+        <div slot="header" class="flex justify-between items-center w-full">
+          <h2 class="text-2xl font-black uppercase">Join MEETUP.RIO</h2>
+        </div>
+        <uix-auth-form
+          .showTabs=\${true}
+          .showOAuth=\${true}
+          .showGuest=\${true}
+          .loading=\${this.loading}
+          registerTitle="Join MEETUP.RIO"
+          @auth-submit=\${this.handleAuthSubmit}
+          @auth-oauth=\${this.handleOAuth}
+          @auth-guest=\${this.handleGuest}
+        ></uix-auth-form>
+      </uix-modal>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/related-content.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  style: true,
+
+  properties: {
+    currentItem: T.object({ attribute: false }),
+    type: T.string({ defaultValue: "place" }), // place, event, guide, group
+    title: T.string({ defaultValue: "" }),
+    maxItems: T.number({ defaultValue: 4 }),
+    places: T.array({ sync: $APP.Model.places, query: {} }),
+    events: T.array({ sync: $APP.Model.events, query: {} }),
+    guides: T.array({ sync: $APP.Model.guides, query: {} }),
+    groups: T.array({ sync: $APP.Model.groups, query: {} }),
+  },
+
+  getCollection() {
+    switch (this.type) {
+      case "place":
+        return this.places || [];
+      case "event":
+        return this.events || [];
+      case "guide":
+        return this.guides || [];
+      case "group":
+        return this.groups || [];
+      default:
+        return [];
+    }
+  },
+
+  calculateScore(item) {
+    if (!this.currentItem) return 0;
+    let score = 0;
+
+    // Category match (+10 points)
+    const currentCategory =
+      this.currentItem.category || this.currentItem.categories?.[0];
+    const itemCategory = item.category || item.categories?.[0];
+    if (currentCategory && itemCategory && currentCategory === itemCategory) {
+      score += 10;
+    }
+
+    // Tag matches (+5 points each)
+    const currentTags = this.currentItem.tags || [];
+    const itemTags = item.tags || [];
+    const sharedTags = currentTags.filter((tag) => itemTags.includes(tag));
+    score += sharedTags.length * 5;
+
+    // Boost recommended items
+    if (item.recommended) score += 3;
+
+    // Boost popular items
+    if (item.viewCount >= 100) score += 2;
+
+    return score;
+  },
+
+  getRelatedItems() {
+    const collection = this.getCollection();
+    const currentId = this.currentItem?.id;
+
+    // Filter out current item and score the rest
+    const scored = collection
+      .filter((item) => item.id !== currentId)
+      .map((item) => ({ item, score: this.calculateScore(item) }))
+      .filter(({ score }) => score > 0) // Only items with some relevance
+      .sort((a, b) => b.score - a.score)
+      .slice(0, this.maxItems);
+
+    return scored.map(({ item }) => item);
+  },
+
+  getRouteType() {
+    return this.type === "guide" ? "guide" : this.type;
+  },
+
+  render() {
+    const relatedItems = this.getRelatedItems();
+
+    if (relatedItems.length === 0) return null;
+
+    const displayTitle =
+      this.title ||
+      $APP.i18n?.t?.(\`related.\${this.type}s\`) ||
+      \`Related \${this.type}s\`;
+
+    return html\`
+      <div class="space-y-2">
+        <h3 class="text-lg font-black uppercase">\${displayTitle}</h3>
+        <div class="grid grid-cols-2 md:grid-cols-1 gap-4">
+          \${relatedItems.map(
+            (item) => html\`
+            <div
+              class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+              @click=\${() => $APP.Router.go(\`\${this.getRouteType()}-detail\`, { slug: item.slug })}
+            >
+              <div class="relative h-16 bg-gray-200">
+                <img src="\${item.image || item.coverImage}" class="w-full h-full object-cover" />
+                \${
+                  item.recommended
+                    ? html\`
+                  <div class="absolute top-1 right-1">
+                    <span class="px-1.5 py-0.5 bg-yellow-300 border border-black rounded text-[9px] font-black">\u2B50</span>
+                  </div>
+                \`
+                    : null
+                }
+              </div>
+              <div class="p-1.5">
+                <div class="text-[10px] font-black leading-tight line-clamp-2">\${item.name || item.title}</div>
+              </div>
+            </div>
+          \`,
+          )}
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/share.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8m-4-6l-4-4l-4 4m4-4v13"/></svg>',mimeType:"image/svg+xml"},"/views/auth-modal.css":{content:`uix-modal::part(dialog){border:4px solid black;border-radius:1.5rem;box-shadow:8px 8px #ffffff80;max-width:28rem;padding:0;overflow:hidden}uix-modal::part(header){background:var(--color-primary);color:#000;border-bottom:3px solid black;padding:1.5rem}uix-modal::part(body){padding:0}
+`,mimeType:"text/css"},"/views/guide-detail-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor, NBS } from "./utils.js";
+
+export default {
+  dataQuery: true,
+  properties: {
+    guide: T.object({ attribute: false }),
+    linkedPlaces: T.array({ defaultValue: [] }),
+    linkedEvents: T.array({ defaultValue: [] }),
+  },
+
+  dataLoaded({ row }) {
+    console.log({ row });
+    if (row?.title) {
+      $APP.Router.setTitle(row.title);
+    }
+  },
+
+  async fetchLinkedItems() {
+    const items = this.guide.items || [];
+    // Fetch linked places and events by their IDs
+    const placeIds = items
+      .filter((i) => i.type === "place" && i.id)
+      .map((i) => i.id);
+    const eventIds = items
+      .filter((i) => i.type === "event" && i.id)
+      .map((i) => i.id);
+
+    if (placeIds.length > 0) {
+      const places = await $APP.Model.places.getAll();
+      this.linkedPlaces = places.filter((p) => placeIds.includes(p.id));
+    }
+    if (eventIds.length > 0) {
+      const events = await $APP.Model.events.getAll();
+      this.linkedEvents = events.filter((e) => eventIds.includes(e.id));
+    }
+  },
+
+  getLinkedItem(item) {
+    if (item.type === "place") {
+      return this.linkedPlaces.find((p) => p.id === item.id);
+    }
+    return this.linkedEvents.find((e) => e.id === item.id);
+  },
+
+  getTocItems() {
+    const g = this.guide;
+    if (!g) return [];
+
+    if (g.guideType === "article") {
+      // Parse headers from body
+      const body = g.body || "";
+      const headers = [];
+      let sectionIndex = 0;
+
+      body.split("\\n").forEach((line) => {
+        if (line.startsWith("## ")) {
+          headers.push({
+            id: \`section-\${sectionIndex}\`,
+            title: line.slice(3).trim(),
+            level: 2,
+          });
+          sectionIndex++;
+        }
+      });
+      return headers;
+    } else {
+      // List items become TOC
+      return (g.items || []).map((item, i) => ({
+        id: \`item-\${i}\`,
+        title: item.note || \`Item \${i + 1}\`,
+        level: 1,
+      }));
+    }
+  },
+
+  renderArticleBody() {
+    const body = this.guide.body || "";
+
+    // Simple markdown-like rendering
+    // Split by double newlines for paragraphs, render headers
+    const sections = body.split("\\n\\n");
+    let sectionIndex = 0;
+
+    return html\`
+      <div class="prose prose-lg max-w-none space-y-4">
+        \${sections.map((section) => {
+          const trimmed = section.trim();
+          if (trimmed.startsWith("## ")) {
+            const id = \`section-\${sectionIndex}\`;
+            sectionIndex++;
+            return html\`<h2
+              id=\${id}
+              class="text-xl font-black uppercase mt-6 mb-3 text-black scroll-mt-20"
+            >
+              \${trimmed.slice(3)}
+            </h2>\`;
+          }
+          if (trimmed.startsWith("# ")) {
+            return html\`<h1
+              class="text-2xl font-black uppercase mt-6 mb-3 text-black"
+            >
+              \${trimmed.slice(2)}
+            </h1>\`;
+          }
+          if (trimmed.startsWith("- ")) {
+            const items = trimmed.split("\\n").filter((l) => l.startsWith("- "));
+            return html\`
+              <ul class="list-disc list-inside space-y-1">
+                \${items.map(
+                  (item) =>
+                    html\`<li class="text-gray-800 font-medium">
+                      \${item.slice(2)}
+                    </li>\`,
+                )}
+              </ul>
+            \`;
+          }
+          if (trimmed.match(/^\\d+\\./)) {
+            const items = trimmed.split("\\n").filter((l) => l.match(/^\\d+\\./));
+            return html\`
+              <ol class="list-decimal list-inside space-y-1">
+                \${items.map(
+                  (item) =>
+                    html\`<li class="text-gray-800 font-medium">
+                      \${item.replace(/^\\d+\\.\\s*/, "")}
+                    </li>\`,
+                )}
+              </ol>
+            \`;
+          }
+          // Regular paragraph - handle **bold** text
+          const formatted = trimmed.replace(
+            /\\*\\*([^*]+)\\*\\*/g,
+            "<strong>$1</strong>",
+          );
+          return html\`<p
+            class="text-gray-800 font-medium leading-relaxed"
+            .innerHTML=\${formatted}
+          ></p>\`;
+        })}
+      </div>
+    \`;
+  },
+
+  renderListItems() {
+    const items = this.guide.items || [];
+
+    return html\`
+      <div class="space-y-4">
+        \${items.map((item, index) => {
+          const linked = this.getLinkedItem(item);
+          return html\`
+            <div
+              id="item-\${index}"
+              class="bg-gray-50 border-2 border-black rounded-xl p-4 flex gap-4 scroll-mt-20"
+            >
+              <div
+                class="flex-shrink-0 w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-black text-lg"
+              >
+                \${index + 1}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                  <span
+                    class="px-2 py-0.5 \${
+                      item.type === "place" ? "bg-blue-200" : "bg-purple-200"
+                    } border border-black rounded font-bold text-xs uppercase"
+                  >
+                    \${item.type === "place" ? "Place" : "Event"}
+                  </span>
+                  \${
+                    linked
+                      ? html\`
+                        <button
+                          @click=\${() =>
+                            $APP.Router.go(
+                              item.type === "place"
+                                ? "place-detail"
+                                : "event-detail",
+                              { slug: linked.slug },
+                            )}
+                          class="px-2 py-0.5 bg-black text-white rounded font-bold text-xs uppercase hover:bg-gray-800 transition-colors"
+                        >
+                          \${
+                            $APP.i18n?.t?.(
+                              \`guides.view\${item.type === "place" ? "Place" : "Event"}\`,
+                            ) || \`View \${item.type}\`
+                          }
+                        </button>
+                      \`
+                      : null
+                  }
+                </div>
+                \${
+                  linked
+                    ? html\`<h4 class="font-black text-sm mb-1">\${linked.name}</h4>\`
+                    : null
+                }
+                \${
+                  item.note
+                    ? html\`<p class="text-gray-700 font-medium text-sm">
+                      \${item.note}
+                    </p>\`
+                    : null
+                }
+              </div>
+            </div>
+          \`;
+        })}
+      </div>
+    \`;
+  },
+
+  render() {
+    const g = this.guide;
+    if (!g) return NBS.SPINNER;
+
+    const isArticle = g.guideType === "article";
+    const typeLabel = isArticle ? "Article" : "Curated List";
+    const typeColor = isArticle ? "bg-amber-300" : "bg-emerald-300";
+    const tocItems = this.getTocItems();
+
+    return html\`
+      <div class="bg-purple-50 min-h-screen pb-20">
+        <!-- Cover Image -->
+        <div
+          class="relative w-full h-64 sm:h-80 bg-gray-200 border-b-3 border-black overflow-hidden"
+        >
+          <img src="\${g.coverImage}" class="w-full h-full object-cover" />
+          <div class="absolute bottom-4 left-4 flex gap-2 flex-wrap">
+            <div
+              class="px-3 py-1 \${typeColor} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+            >
+              \${isArticle ? "Article" : "List"}
+            </div>
+            \${(g.categories || []).map(
+              (cat) => html\`
+                <div
+                  class="px-3 py-1 \${getCategoryColor(
+                    cat,
+                  )} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                >
+                  \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
+                </div>
+              \`,
+            )}
+          </div>
+          <!-- Share button & Badge -->
+          <div class="absolute top-4 right-4 flex items-center gap-2">
+            <button class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <uix-icon name="share" size="20"></uix-icon>
+            </button>
+            \${
+              g.recommended || g.viewCount >= 100
+                ? html\`
+                  <view-recommended-badge
+                    .recommended=\${g.recommended}
+                    .viewCount=\${g.viewCount || 0}
+                  ></view-recommended-badge>
+                \`
+                : null
+            }
+          </div>
+        </div>
+
+        <!-- Content - Two Column Layout -->
+        <div class="px-4 -mt-6 relative z-10">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Main Content (2/3 width on desktop) -->
+            <div class="md:col-span-2 space-y-6">
+              <!-- Info Card -->
+              <div
+                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <p class="text-gray-600 font-medium text-base mb-4">
+                  \${g.description}
+                </p>
+
+                \${
+                  g.tags?.length > 0
+                    ? html\`
+                      <view-tags-display
+                        .tags=\${g.tags}
+                        .maxVisible=\${4}
+                        size="md"
+                      ></view-tags-display>
+                    \`
+                    : null
+                }
+                \${
+                  g.publishedAt
+                    ? html\`
+                      <div
+                        class="flex items-center gap-3 mt-4 pt-4 border-t-2 border-dashed border-gray-200"
+                      >
+                        <div
+                          class="w-10 h-10 bg-amber-200 border-2 border-black rounded-full flex items-center justify-center font-black"
+                        >
+                          \${isArticle ? "A" : "L"}
+                        </div>
+                        <div>
+                          <div class="text-xs font-bold text-gray-500 uppercase">
+                            Published
+                          </div>
+                          <div class="font-bold text-sm">
+                            \${new Date(g.publishedAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    \`
+                    : null
+                }
+              </div>
+
+              <!-- Body (Article) or Items (List) -->
+              <div
+                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+              >
+                \${
+                  isArticle
+                    ? this.renderArticleBody()
+                    : html\`
+                      <h3
+                        class="text-lg font-black uppercase mb-4 flex items-center gap-2"
+                      >
+                        \${
+                          $APP.i18n?.t?.("guides.placesInGuide") ||
+                          "Places in this Guide"
+                        }
+                        <span
+                          class="bg-black text-white text-xs px-2 py-1 rounded-md"
+                        >
+                          \${g.items?.length || 0}
+                        </span>
+                      </h3>
+                      \${this.renderListItems()}
+                    \`
+                }
+              </div>
+            </div>
+
+            <!-- Sidebar (1/3 width on desktop) -->
+            <div class="space-y-6">
+              <view-detail-sidebar
+                type="guide"
+                .currentItem=\${g}
+                .tocItems=\${tocItems}
+                .showToc=\${tocItems.length > 0}
+              ></view-detail-sidebar>
+            </div>
+          </div>
+
+          <div class="h-24"></div>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/detail-sidebar.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  properties: {
+    type: T.string({ defaultValue: "guide" }), // "guide" | "event" | "group"
+    currentItem: T.object({ attribute: false }),
+    tocItems: T.array({ defaultValue: [] }),
+    showToc: T.boolean({ defaultValue: false }),
+  },
+
+  scrollToItem(id) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  },
+
+  renderToc() {
+    if (!this.showToc || !this.tocItems?.length) return null;
+
+    return html\`
+      <div
+        class="bg-white border-3 border-black rounded-xl p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+      >
+        <h4 class="font-black uppercase text-sm mb-3">
+          \${$APP.i18n?.t?.("guides.contents") || "Contents"}
+        </h4>
+        <ul class="space-y-2">
+          \${this.tocItems.map(
+            (item, i) => html\`
+              <li>
+                <a
+                  href="#\${item.id}"
+                  @click=\${(e) => {
+                    e.preventDefault();
+                    this.scrollToItem(item.id);
+                  }}
+                  class="text-sm font-medium text-gray-700 hover:text-black flex items-start gap-2 transition-colors"
+                >
+                  <span
+                    class="text-xs text-gray-400 font-bold mt-0.5 flex-shrink-0"
+                    >\${i + 1}.</span
+                  >
+                  <span class="line-clamp-2">\${item.title}</span>
+                </a>
+              </li>
+            \`
+          )}
+        </ul>
+      </div>
+    \`;
+  },
+
+  renderRelatedContent() {
+    if (!this.currentItem) return null;
+
+    const titleKey = \`related.\${this.type === "guide" ? "guides" : this.type === "event" ? "events" : "groups"}\`;
+    const defaultTitles = {
+      guide: "Related Guides",
+      event: "You Might Also Like",
+      group: "Similar Communities",
+    };
+
+    return html\`
+      <view-related-content
+        .currentItem=\${this.currentItem}
+        type=\${this.type}
+        .title=\${$APP.i18n?.t?.(titleKey) || defaultTitles[this.type]}
+      ></view-related-content>
+    \`;
+  },
+
+  render() {
+    return html\`
+      <div class="space-y-6 md:sticky md:top-20">
+        \${this.renderToc()} \${this.renderRelatedContent()}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/profile-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { NBS } from "./utils.js";
+
+export default {
+  properties: {
+    userId: T.string({ defaultValue: "guest" }),
+    currentUser: T.object({
+      sync: $APP.Model.users,
+      query: (inst) => ({
+        id: inst.userId,
+        includes: [
+          "likedPlaces",
+          "likedEvents",
+          "likedMeetups",
+          "likedGroups",
+          "interestedEvents",
+          "interestedMeetups",
+        ],
+      }),
+      dependsOn: ["userId"],
+    }),
+    meetupAttendance: T.array({ defaultValue: [] }),
+    activeTab: T.string({ defaultValue: "attending" }),
+    showOnboarding: T.boolean({ defaultValue: false }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+    this.meetupAttendance = await $APP.Model.meetup_attendance.getAll({
+      where: { user: this.userId },
+    });
+  },
+  getStats() {
+    if (!this.currentUser) return { eventsJoined: 0, saved: 0, attending: 0 };
+    const u = this.currentUser;
+    const joinedIds = new Set(
+      (this.meetupAttendance || []).map((a) => a.meetup),
+    );
+
+    return {
+      attending: (u.likedMeetups || []).filter((m) => joinedIds.has(m.id))
+        .length,
+      saved:
+        (u.likedPlaces?.length || 0) +
+        (u.likedEvents?.length || 0) +
+        (u.likedMeetups?.length || 0) +
+        (u.likedGroups?.length || 0),
+      eventsJoined: u.interestedEvents?.length || 0,
+    };
+  },
+  async handleSaveProfile(fD) {
+    const user = $APP.Auth.user;
+    if (user) await $APP.Model.users.edit({ id: user.id, ...fD });
+    this.showOnboarding = false;
+  },
+  getTabContent() {
+    if (!this.currentUser) return [];
+    const u = this.currentUser;
+    const joinedIds = new Set(
+      (this.meetupAttendance || []).map((a) => a.meetup),
+    );
+
+    switch (this.activeTab) {
+      case "attending":
+        // Meetups user has joined
+        return (u.likedMeetups || [])
+          .filter((m) => joinedIds.has(m.id))
+          .map((m) => ({ ...m, _type: "meetup" }));
+
+      case "saved":
+        // All liked items
+        return [
+          ...(u.likedPlaces || []).map((p) => ({ ...p, _type: "place" })),
+          ...(u.likedEvents || []).map((e) => ({ ...e, _type: "event" })),
+          ...(u.likedMeetups || []).map((m) => ({ ...m, _type: "meetup" })),
+          ...(u.likedGroups || []).map((g) => ({ ...g, _type: "group" })),
+        ];
+
+      case "history": {
+        // All interactions (liked + interested) - deduplicated
+        const all = new Map();
+        (u.likedPlaces || []).forEach((p) =>
+          all.set(\`place-\${p.id}\`, { ...p, _type: "place" }),
+        );
+        (u.likedEvents || []).forEach((e) =>
+          all.set(\`event-\${e.id}\`, { ...e, _type: "event" }),
+        );
+        (u.likedMeetups || []).forEach((m) =>
+          all.set(\`meetup-\${m.id}\`, { ...m, _type: "meetup" }),
+        );
+        (u.likedGroups || []).forEach((g) =>
+          all.set(\`group-\${g.id}\`, { ...g, _type: "group" }),
+        );
+        (u.interestedEvents || []).forEach((e) =>
+          all.set(\`event-\${e.id}\`, { ...e, _type: "event" }),
+        );
+        (u.interestedMeetups || []).forEach((m) =>
+          all.set(\`meetup-\${m.id}\`, { ...m, _type: "meetup" }),
+        );
+        return Array.from(all.values());
+      }
+
+      default:
+        return [];
+    }
+  },
+  render() {
+    const user = this.currentUser || $APP.Auth.user || {};
+    if (!user || !this.currentUser) return NBS.SPINNER;
+    const tC = this.getTabContent();
+    const s = this.getStats();
+    const dR =
+      user.arrivalDate && user.departureDate
+        ? \`\${new Date(user.arrivalDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })} - \${new Date(user.departureDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}\`
+        : "";
+    const editBtnCls =
+      "absolute top-6 right-6 bg-white p-2 rounded-xl border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all";
+    const tabBtnCls = (t) =>
+      \`flex-1 py-3 px-2 border-3 border-black rounded-xl font-black text-xs uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all \${NBS.ACTIVE_SM} \${this.activeTab === t ? "bg-accent text-black" : "bg-white text-black"}\`;
+    const emptyBtnCls =
+      "mt-4 px-6 py-2 bg-accent border-3 border-black rounded-xl font-black uppercase text-sm shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all";
+
+    return html\`
+      <div class="px-4 sm:px-8 mx-auto pb-20">
+        <view-onboarding-wizard
+          .isOpen=\${this.showOnboarding} .user=\${user}
+          .onClose=\${() => (this.showOnboarding = false)} .onSave=\${this.handleSaveProfile.bind(this)}
+        ></view-onboarding-wizard>
+        <div class="relative bg-white border-b-3 border-black rounded-b-[2.5rem] p-8 pb-16 shadow-[0px_4px_0px_0px_rgba(0,0,0,1)]">
+          <button @click=\${() => (this.showOnboarding = true)} class="\${editBtnCls}">\u270F\uFE0F Edit</button>
+          <div class="flex justify-center mb-4 mt-4">
+            <div class="w-32 h-32 rounded-3xl border-3 border-black bg-cover bg-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-white"
+              style="background-image: url(\${user.avatar})"
+            ></div>
+          </div>
+          <div class="text-center space-y-2">
+            <h1 class="text-3xl font-black flex items-center justify-center gap-2 text-black">
+              \${user.name}
+              <div class="bg-blue-400 text-white rounded-full p-1 border-2 border-black w-6 h-6 flex items-center justify-center text-[10px]">\u2713</div>
+            </h1>
+            <div class="flex flex-wrap justify-center gap-2 max-w-xs mx-auto">
+              <div class="px-3 py-1 bg-white border-2 border-black rounded-lg font-bold text-xs shadow-sm flex items-center gap-1">
+                \${user.travelStatus === "resident" ? "\u{1F3E0} Local" : "\u2708\uFE0F Visitor"}
+              </div>
+              \${
+                dR
+                  ? html\`
+                <div class="px-3 py-1 bg-accent border-2 border-black rounded-lg font-bold text-xs shadow-sm flex items-center gap-1">
+                  \u{1F5D3}\uFE0F \${dR}
+                </div>
+              \`
+                  : null
+              }
+            </div>
+            <div class="flex flex-wrap justify-center gap-2 pt-2">
+              \${user.vibeTime ? html\`<span class="px-2 py-1 bg-secondary-lighter border border-black rounded-md text-[10px] font-bold uppercase">\${user.vibeTime}</span>\` : null}
+              \${user.vibeDrink ? html\`<span class="px-2 py-1 bg-secondary-lighter border border-black rounded-md text-[10px] font-bold uppercase">\${user.vibeDrink}</span>\` : null}
+              \${(user.lookingFor || []).slice(0, 2).map((t) => html\`<span class="px-2 py-1 bg-primary-lighter border border-black rounded-md text-[10px] font-bold uppercase">Looking for \${t}</span>\`)}
+            </div>
+            \${user.bio ? html\`<p class="text-center text-sm font-bold text-gray-700 mt-4 max-w-md mx-auto">\${user.bio}</p>\` : null}
+          </div>
+        </div>
+        <div class="px-4 sm:px-6 -mt-10 relative z-10 mb-8">
+          <div class="grid grid-cols-3 bg-white border-3 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] divide-x-2 divide-black p-2">
+            <div class="text-center py-3"><div class="text-2xl font-black text-black">\${s.eventsJoined}</div><div class="text-[10px] font-bold uppercase text-gray-500 mt-1">Events Joined</div></div>
+            <div class="text-center py-3"><div class="text-2xl font-black text-black">\${s.saved}</div><div class="text-[10px] font-bold uppercase text-gray-500 mt-1">Saved</div></div>
+            <div class="text-center py-3"><div class="text-2xl font-black text-black">\${s.attending}</div><div class="text-[10px] font-bold uppercase text-gray-500 mt-1">Attending</div></div>
+          </div>
+        </div>
+        <div class="flex gap-2 p-4 sm:p-6 mb-2">
+          \${["attending", "saved", "history"].map(
+            (
+              t,
+            ) => html\`<button @click=\${() => (this.activeTab = t)} class="\${tabBtnCls(t)}">
+              \${t === "attending" ? "Attending" : t === "saved" ? "Saved" : "History"}
+            </button>\`,
+          )}
+        </div>
+        <div class="px-4 sm:px-6 mb-12">
+          \${
+            tC.length > 0
+              ? html\`<div class="grid grid-cols-2 gap-4">
+              \${tC.map((item) => html\`<view-meetup-card-compact .content=\${item} .onClick=\${(i) => $APP.Router.go(\`\${i._type}-detail\`, { slug: i.slug })}></view-meetup-card-compact>\`)}
+            </div>\`
+              : html\`<div class="bg-white border-3 border-black rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center space-y-4">
+              <div class="text-5xl mb-4">\${this.activeTab === "attending" ? "\u{1F4C5}" : this.activeTab === "saved" ? "\u{1F4BE}" : "\u{1F4DA}"}</div>
+              <p class="text-lg font-bold text-gray-600">
+                \${this.activeTab === "attending" ? "No events joined yet" : this.activeTab === "saved" ? "No saved places yet" : "No activity yet"}
+              </p>
+              <button @click=\${() => $APP.Router.go("discover")} class="\${emptyBtnCls}">Explore Events</button>
+            </div>\`
+          }
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/onboarding-wizard.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const NBS_S =
+  "border-3 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all";
+
+export default {
+  properties: {
+    isOpen: T.boolean({ defaultValue: false }),
+    user: T.object({ attribute: false }),
+    onSave: T.function({ attribute: false }),
+    onClose: T.function({ attribute: false }),
+    formData: T.object({ defaultValue: {} }),
+  },
+  connected() {
+    if (this.user) {
+      this.formData = {
+        travelStatus: this.user.travelStatus || "visitor",
+        arrivalDate: this.user.arrivalDate || "",
+        departureDate: this.user.departureDate || "",
+        vibeTime: this.user.vibeTime || "morning",
+        vibeSocial: this.user.vibeSocial || "social",
+        vibeDrink: this.user.vibeDrink || "caipirinha",
+        lookingFor: this.user.lookingFor || [],
+      };
+    }
+  },
+  updateField(f, v) {
+    this.formData = { ...this.formData, [f]: v };
+  },
+  toggleLookingFor(v) {
+    const c = this.formData.lookingFor || [];
+    this.updateField(
+      "lookingFor",
+      c.includes(v) ? c.filter((i) => i !== v) : [...c, v],
+    );
+  },
+  handleStepChange(e) {
+    if (
+      e.detail.step === 2 &&
+      e.detail.direction === "forward" &&
+      this.formData.travelStatus === "resident"
+    ) {
+      setTimeout(() => e.target.nextStep(), 0);
+    }
+  },
+  handleFinish() {
+    if (this.onSave) this.onSave(this.formData);
+  },
+  handleCancel() {
+    if (this.onClose) this.onClose();
+  },
+  render() {
+    if (!this.isOpen) return null;
+
+    const stepBtnCls = (s) =>
+      \`w-full p-4 border-3 border-black rounded-2xl font-black uppercase text-lg flex items-center justify-between \${NBS_S} \${this.formData.travelStatus === s ? "bg-accent" : "bg-white"}\`;
+    const optBtnCls = (v, f, a) =>
+      \`flex-1 py-3 border-2 border-black rounded-xl font-bold text-sm \${this.formData[f] === v ? a : "bg-white"}\`;
+    const lookingForOptions = [
+      { id: "friends", label: "New Friends \u{1F46F}" },
+      { id: "dates", label: "Dates \u2764\uFE0F" },
+      { id: "activities", label: "Activity Partners \u{1F3BE}" },
+      { id: "tips", label: "Local Tips \u{1F5FA}\uFE0F" },
+      { id: "party", label: "Parties \u{1F389}" },
+    ];
+
+    return html\`
+      <uix-wizard
+        modal
+        .totalSteps=\${4}
+        .showNavigation=\${false}
+        finishLabel="Complete Profile \u2728"
+        @step-change=\${this.handleStepChange}
+        @wizard-finish=\${this.handleFinish}
+        @wizard-cancel=\${this.handleCancel}
+      >
+        <!-- Step 1: Travel Status -->
+        <div slot="step-1">
+          <h2 class="text-2xl font-black uppercase text-center mb-6">
+            Are you a Local or Visiting?
+          </h2>
+          <div class="space-y-4">
+            \${["resident", "visitor", "nomad"].map(
+              (s) => html\`
+                <button
+                  @click=\${(e) => {
+                    this.updateField("travelStatus", s);
+                    e.target.closest("uix-wizard").nextStep();
+                  }}
+                  class="\${stepBtnCls(s)}"
+                >
+                  <span>
+                    \${
+                      s === "resident"
+                        ? "\u{1F3E0} I Live Here"
+                        : s === "visitor"
+                          ? "\u2708\uFE0F Just Visiting"
+                          : "\u{1F4BB} Digital Nomad"
+                    }
+                  </span>
+                  \${this.formData.travelStatus === s ? "\u2713" : "\u2192"}
+                </button>
+              \`,
+            )}
+          </div>
+        </div>
+
+        <!-- Step 2: Travel Dates (skipped for residents) -->
+        <div slot="step-2">
+          <h2 class="text-2xl font-black uppercase text-center mb-6">
+            When are you here?
+          </h2>
+          <div class="space-y-6">
+            <div>
+              <label class="block font-bold text-sm uppercase mb-2">Arrival Date</label>
+              <input
+                type="date"
+                class="w-full p-4 border-3 border-black rounded-xl font-bold bg-gray-50 focus:bg-yellow-100 outline-none"
+                .value=\${this.formData.arrivalDate}
+                @change=\${(e) => this.updateField("arrivalDate", e.target.value)}
+              />
+            </div>
+            <div>
+              <label class="block font-bold text-sm uppercase mb-2">Departure Date</label>
+              <input
+                type="date"
+                class="w-full p-4 border-3 border-black rounded-xl font-bold bg-gray-50 focus:bg-yellow-100 outline-none"
+                .value=\${this.formData.departureDate}
+                @change=\${(e) => this.updateField("departureDate", e.target.value)}
+              />
+            </div>
+            <button
+              @click=\${(e) => e.target.closest("uix-wizard").nextStep()}
+              class="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-wider hover:bg-gray-800"
+            >
+              Next Step \u2192
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Vibe -->
+        <div slot="step-3">
+          <h2 class="text-2xl font-black uppercase text-center mb-6">
+            What's your Vibe?
+          </h2>
+          <div class="space-y-6">
+            <div>
+              <label class="block font-bold text-xs uppercase mb-2 text-center text-gray-500">
+                Morning or Night?
+              </label>
+              <div class="flex gap-2">
+                <button
+                  @click=\${() => this.updateField("vibeTime", "morning")}
+                  class="\${optBtnCls("morning", "vibeTime", "bg-accent-light")}"
+                >
+                  \u2600\uFE0F Early Bird
+                </button>
+                <button
+                  @click=\${() => this.updateField("vibeTime", "night")}
+                  class="\${optBtnCls("night", "vibeTime", "bg-primary-dark")}"
+                >
+                  \u{1F319} Night Owl
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-xs uppercase mb-2 text-center text-gray-500">
+                Pick your poison
+              </label>
+              <div class="flex gap-2">
+                <button
+                  @click=\${() => this.updateField("vibeDrink", "coconut")}
+                  class="\${optBtnCls("coconut", "vibeDrink", "bg-green-300")}"
+                >
+                  \u{1F965} Coconut
+                </button>
+                <button
+                  @click=\${() => this.updateField("vibeDrink", "caipirinha")}
+                  class="\${optBtnCls("caipirinha", "vibeDrink", "bg-accent-light")}"
+                >
+                  \u{1F379} Caipi
+                </button>
+                <button
+                  @click=\${() => this.updateField("vibeDrink", "beer")}
+                  class="\${optBtnCls("beer", "vibeDrink", "bg-accent")}"
+                >
+                  \u{1F37A} Beer
+                </button>
+              </div>
+            </div>
+            <button
+              @click=\${(e) => e.target.closest("uix-wizard").nextStep()}
+              class="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-wider hover:bg-gray-800"
+            >
+              Next Step \u2192
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 4: Looking For -->
+        <div slot="step-4">
+          <h2 class="text-2xl font-black uppercase text-center mb-6">
+            Looking for...
+          </h2>
+          <div class="space-y-3 mb-8">
+            \${lookingForOptions.map(
+              (opt) => html\`
+                <button
+                  @click=\${() => this.toggleLookingFor(opt.id)}
+                  class="w-full py-3 px-4 border-2 border-black rounded-xl font-bold text-left flex justify-between items-center transition-all \${
+                    (this.formData.lookingFor || []).includes(opt.id)
+                      ? "bg-pink-300 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[1px] translate-y-[1px]"
+                      : "bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  }"
+                >
+                  <span>\${opt.label}</span>
+                  \${(this.formData.lookingFor || []).includes(opt.id) ? "\u2713" : "+"}
+                </button>
+              \`,
+            )}
+          </div>
+          <button
+            @click=\${(e) => e.target.closest("uix-wizard").nextStep()}
+            class="w-full py-4 bg-primary-dark border-3 border-black text-black rounded-xl font-black uppercase tracking-wider shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            Complete Profile \u2728
+          </button>
+        </div>
+      </uix-wizard>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/groups-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { NBS, ALL_TAGS, getTagInfo } from "./utils.js";
+
+const { brand } = $APP.settings;
+
+export default {
+  dataQuery: true,
+  properties: {
+    groups: T.array(),
+    selectedTags: T.array({ defaultValue: [] }),
+  },
+  goToGroup(group) {
+    $APP.Router.go("group-detail", { slug: group.slug });
+  },
+  toggleTag(tagId) {
+    if (this.selectedTags.includes(tagId)) {
+      this.selectedTags = this.selectedTags.filter((t) => t !== tagId);
+    } else {
+      this.selectedTags = [...this.selectedTags, tagId];
+    }
+  },
+  filterByTags(groups) {
+    if (this.selectedTags.length === 0) return groups;
+    return groups.filter((g) =>
+      this.selectedTags.some((tag) => g.tags?.includes(tag))
+    );
+  },
+  render() {
+    if (!this.groups) return NBS.SPINNER;
+
+    const filteredGroups = this.filterByTags(this.groups);
+    const featured = filteredGroups.filter((g) => g.featured);
+    const regular = filteredGroups.filter((g) => !g.featured);
+
+    return html\`
+      <div class="p-4 sm:p-6 space-y-6 pb-24">
+        <!-- Mobile Header with branding -->
+        <header class="md:hidden flex items-center justify-between">
+          <div class="text-xl font-black tracking-tight">
+            \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
+          </div>
+          <div class="bg-pink-300 border-2 border-black rounded-full w-10 h-10 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+            <span class="text-lg">\u{1F4AC}</span>
+          </div>
+        </header>
+
+        <!-- Page Title -->
+        <h1 class="text-2xl md:text-4xl font-black uppercase text-black tracking-tight">
+          Communities
+        </h1>
+
+        <!-- Tag Filters -->
+        <div class="flex gap-2 overflow-x-auto pb-2">
+          \${Object.entries(ALL_TAGS).slice(0, 6).map(([tagId, tagInfo]) => {
+            const isSelected = this.selectedTags.includes(tagId);
+            return html\`
+              <button
+                @click=\${() => this.toggleTag(tagId)}
+                class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs transition-all \${
+                  isSelected
+                    ? \`bg-\${tagInfo.color} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]\`
+                    : "bg-white hover:bg-gray-100"
+                }"
+              >
+                \${tagInfo.icon} \${tagInfo.label}
+              </button>
+            \`;
+          })}
+          \${this.selectedTags.length > 0 ? html\`
+            <button
+              @click=\${() => { this.selectedTags = []; }}
+              class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs bg-gray-100 hover:bg-gray-200 transition-all"
+            >
+              Clear
+            </button>
+          \` : null}
+        </div>
+
+        <!-- Featured Section -->
+        \${featured.length > 0 ? html\`
+          <div class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                \u2B50 Featured
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              \${featured.map((g) => html\`
+                <view-group
+                  .group=\${g}
+                  .featured=\${true}
+                  .onClick=\${(group) => this.goToGroup(group)}
+                ></view-group>
+              \`)}
+            </div>
+          </div>
+        \` : null}
+
+        <!-- All Groups Section -->
+        \${regular.length > 0 ? html\`
+          <div class="space-y-4">
+            <h2 class="text-xl font-black uppercase text-black">All Communities</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              \${regular.map((g) => html\`
+                <view-group
+                  .group=\${g}
+                  .onClick=\${(group) => this.goToGroup(group)}
+                ></view-group>
+              \`)}
+            </div>
+          </div>
+        \` : null}
+
+        <!-- Empty State -->
+        \${this.groups.length === 0 ? html\`
+          <div class="bg-white border-3 border-black rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center">
+            <div class="text-5xl mb-4">\u{1F997}</div>
+            <h3 class="text-xl font-black uppercase mb-2">No Communities Yet</h3>
+            <p class="text-gray-600 font-medium">Be the first to start a community!</p>
+          </div>
+        \` : null}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/group.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  properties: {
+    group: T.object(),
+    featured: T.boolean({ defaultValue: false }),
+    onClick: T.function({ attribute: false }),
+  },
+  handleCardClick(e) {
+    // Don't navigate if clicking the WhatsApp button
+    if (e.target.closest(".whatsapp-btn")) return;
+    if (this.onClick) this.onClick(this.group);
+  },
+  render() {
+    if (!this.group) return null;
+    const g = this.group;
+    const hasBadge = g.recommended || g.viewCount >= 100;
+    const hasTags = g.tags?.length > 0;
+
+    // Featured cards get a different, larger layout
+    if (this.featured) {
+      return html\`
+        <div
+          class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+          @click=\${(e) => this.handleCardClick(e)}
+        >
+          <div class="relative h-40 bg-gray-200">
+            <img src="\${g.image}" class="w-full h-full object-cover" />
+            <div class="absolute top-3 left-3">
+              \${hasBadge ? html\`
+                <view-recommended-badge
+                  .recommended=\${g.recommended}
+                  .viewCount=\${g.viewCount || 0}
+                ></view-recommended-badge>
+              \` : html\`
+                <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  \u2B50 Featured
+                </span>
+              \`}
+            </div>
+          </div>
+          <div class="p-4 space-y-3">
+            <uix-link href="/group/\${g.slug}" class="text-xl font-black uppercase leading-tight">\${g.name}</uix-link>
+            <p class="text-sm font-medium text-gray-600 line-clamp-2">\${g.description}</p>
+            \${hasTags ? html\`
+              <view-tags-display .tags=\${g.tags} .maxVisible=\${3}></view-tags-display>
+            \` : null}
+            <div class="flex items-center justify-between pt-2">
+              <div class="flex items-center gap-2">
+                <span class="px-3 py-1 bg-gray-100 border-2 border-black rounded-lg font-black text-xs">
+                  \u{1F465} \${g.memberCount}
+                </span>
+              </div>
+              <a
+                href="\${g.whatsappLink}"
+                target="_blank"
+                class="whatsapp-btn px-4 py-2 bg-green-400 border-2 border-black rounded-xl font-black uppercase text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                @click=\${(e) => e.stopPropagation()}
+              >
+                \u{1F4AC} Join
+              </a>
+            </div>
+          </div>
+        </div>
+      \`;
+    }
+
+    // Regular card - compact grid style
+    return html\`
+      <div
+        class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex flex-col h-full"
+        @click=\${(e) => this.handleCardClick(e)}
+      >
+        <div class="relative h-32 bg-gray-200 flex-shrink-0">
+          <img src="\${g.image}" class="w-full h-full object-cover" />
+          \${hasBadge ? html\`
+            <div class="absolute top-2 right-2">
+              <view-recommended-badge
+                .recommended=\${g.recommended}
+                .viewCount=\${g.viewCount || 0}
+              ></view-recommended-badge>
+            </div>
+          \` : null}
+          <div class="absolute bottom-2 right-2">
+            <span class="px-2 py-1 bg-white border-2 border-black rounded-lg font-black text-[10px]">
+              \u{1F465} \${g.memberCount}
+            </span>
+          </div>
+        </div>
+        <div class="p-3 flex-1 flex flex-col">
+          <uix-link href="/group/\${g.slug}" class="text-sm font-black uppercase leading-tight mb-1 line-clamp-2">\${g.name}</uix-link>
+          <p class="text-xs font-medium text-gray-500 line-clamp-2 flex-1">\${g.description}</p>
+          \${hasTags ? html\`
+            <div class="mt-2">
+              <view-tags-display .tags=\${g.tags} .maxVisible=\${2}></view-tags-display>
+            </div>
+          \` : null}
+          <a
+            href="\${g.whatsappLink}"
+            target="_blank"
+            class="whatsapp-btn mt-3 block w-full text-center py-2 bg-green-400 border-2 border-black rounded-xl font-black uppercase text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+            @click=\${(e) => e.stopPropagation()}
+          >
+            \u{1F4AC} Join Chat
+          </a>
+        </div>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/views/group-detail-view.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { getCategoryColor, NBS } from "./utils.js";
+
+export default {
+  dataQuery: true,
+  properties: {
+    group: T.object({ attribute: false }),
+    userId: T.string({ defaultValue: "guest" }),
+    currentUser: T.object({
+      sync: $APP.Model.users,
+      query: (inst) => ({
+        id: inst.userId,
+        includes: ["likedGroups"],
+      }),
+      dependsOn: ["userId"],
+    }),
+    showAuthPrompt: T.boolean({ defaultValue: false }),
+    authPromptMessage: T.string({ defaultValue: "" }),
+    showAuthModal: T.boolean({ defaultValue: false }),
+  },
+  async connected() {
+    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
+  },
+  dataLoaded({ row }) {
+    if (row?.name) {
+      $APP.Router.setTitle(row.name);
+    }
+  },
+  isLiked() {
+    if (!this.currentUser || !this.group) return false;
+    return (
+      this.currentUser.likedGroups?.some((g) => g.id === this.group.id) || false
+    );
+  },
+  async handleLikeToggle() {
+    const g = this.group;
+    if (!g || !this.currentUser) return;
+
+    if (this.isLiked()) {
+      // Remove from liked
+      this.currentUser.likedGroups = this.currentUser.likedGroups.filter(
+        (i) => i.id !== g.id,
+      );
+    } else {
+      // Add to liked
+      this.currentUser.likedGroups = [
+        ...this.currentUser.likedGroups,
+        { id: g.id },
+      ];
+    }
+    await $APP.Model.users.edit(this.currentUser);
+  },
+  render() {
+    const m = this.group;
+    if (!m) return NBS.SPINNER;
+    const isLiked = this.isLiked();
+
+    return html\`
+      <div class="bg-purple-50 min-h-screen pb-20">
+        <view-auth-modal
+          .isOpen=\${this.showAuthModal}
+          .onClose=\${() => (this.showAuthModal = false)}
+          .onSuccess=\${() => location.reload()}
+        ></view-auth-modal>
+        \${
+          this.showAuthPrompt
+            ? html\`
+              <div class="fixed bottom-20 left-4 right-4 z-40">
+                <view-auth-prompt
+                  .message=\${this.authPromptMessage}
+                  .onLogin=\${() => {
+                    this.showAuthPrompt = false;
+                    this.showAuthModal = true;
+                  }}
+                  .onDismiss=\${() => (this.showAuthPrompt = false)}
+                ></view-auth-prompt>
+              </div>
+            \`
+            : null
+        }
+        <!-- Hero Image -->
+        <div
+          class="relative w-full h-64 sm:h-80 bg-gray-200 border-b-3 border-black overflow-hidden"
+        >
+          <img src="\${m.image}" class="w-full h-full object-cover" />
+          <div class="absolute bottom-4 left-4 flex gap-2">
+            <div
+              class="px-3 py-1 \${getCategoryColor(
+                m.category,
+              )} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+            >
+              \${$APP.i18n.t(\`categories.\${m.category}\`)}
+            </div>
+            \${
+              m.featured
+                ? html\`<div
+                  class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                >
+                  \u2B50 Featured
+                </div>\`
+                : null
+            }
+          </div>
+          <!-- Share button & Badge -->
+          <div class="absolute top-4 right-4 flex items-center gap-2">
+            <button class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <uix-icon name="share" size="20"></uix-icon>
+            </button>
+            \${
+              m.recommended || m.viewCount >= 100
+                ? html\`
+                  <view-recommended-badge
+                    .recommended=\${m.recommended}
+                    .viewCount=\${m.viewCount || 0}
+                  ></view-recommended-badge>
+                \`
+                : null
+            }
+          </div>
+        </div>
+
+        <!-- Content - Two Column Layout -->
+        <div class="px-4 -mt-6 relative z-10">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Main Content (2/3 width on desktop) -->
+            <div class="md:col-span-2 space-y-6">
+              <!-- Info Card -->
+              <div
+                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+              >
+                \${
+                  m.groupName
+                    ? html\`<div
+                      class="flex items-center gap-2 text-sm font-bold text-gray-600 mb-2"
+                    >
+                      <span>\u{1F4AC} \${m.groupName}</span>
+                    </div>\`
+                    : null
+                }
+                \${
+                  m.memberCount
+                    ? html\`<div
+                      class="flex items-center gap-2 text-sm font-bold text-gray-600"
+                    >
+                      <span>\u{1F465} \${m.memberCount}</span>
+                    </div>\`
+                    : null
+                }
+                \${
+                  m.tags?.length > 0
+                    ? html\`
+                      <div class="mt-4">
+                        <view-tags-display
+                          .tags=\${m.tags}
+                          .maxVisible=\${4}
+                          size="md"
+                        ></view-tags-display>
+                      </div>
+                    \`
+                    : null
+                }
+                <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-200">
+                  <p class="text-base font-medium text-gray-800 leading-relaxed">
+                    \${m.description}
+                  </p>
+                </div>
+                \${
+                  m.whatsappLink
+                    ? html\`
+                      <div
+                        class="mt-6 pt-6 border-t-2 border-dashed border-gray-300"
+                      >
+                        <a
+                          href="\${m.whatsappLink}"
+                          target="_blank"
+                          class="block w-full text-center py-3 bg-green-400 border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+                        >
+                          \u{1F4AC} Join WhatsApp Group
+                        </a>
+                      </div>
+                    \`
+                    : null
+                }
+                <div
+                  class="mt-6 pt-6 border-t-2 border-dashed border-gray-300"
+                >
+                  <button
+                    @click=\${() => this.handleLikeToggle()}
+                    class="w-full py-4 \${
+                      isLiked ? "bg-pink-400" : "bg-primary"
+                    } border-3 border-black rounded-xl font-black uppercase text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+                  >
+                    \${isLiked ? "\u2764\uFE0F Saved" : "\u{1F90D} Save Group"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sidebar (1/3 width on desktop) -->
+            <div class="space-y-6">
+              <view-detail-sidebar
+                type="group"
+                .currentItem=\${m}
+                .showToc=\${false}
+              ></view-detail-sidebar>
+            </div>
+          </div>
+
+          <div class="h-24"></div>
+        </div>
+      </div>
+    \`;
+  },
+};
 `,mimeType:"text/javascript"},"/views/events-view.js":{content:`import T from "/$app/types/index.js";
 import $APP from "/$app.js";
 import { html } from "/npm/lit-html";
@@ -26479,3809 +31675,7 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-
-export default {
-  style: true,
-  properties: {
-    item: T.object({ attribute: false }),
-    isOpen: T.boolean({ defaultValue: false }),
-  },
-  handleClose() {
-    this.isOpen = false;
-    this.item = null;
-    this.dispatchEvent(
-      new CustomEvent("close", { bubbles: true, composed: true }),
-    );
-  },
-  render() {
-    if (!this.item) return null;
-
-    return html\`
-      <uix-modal
-        .open=\${this.isOpen}
-        @modal-close=\${this.handleClose.bind(this)}
-        @modal-cancel=\${this.handleClose.bind(this)}
-      >
-        <view-content-card .content=\${this.item}></view-content-card>
-        <div slot="footer" class="pt-4">
-          <button
-            data-close
-            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
-          >
-            \u2715 \${$APP.i18n.t("actions.close")}
-          </button>
-        </div>
-      </uix-modal>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
-
-// Category definitions
-export const CATEGORIES = {
-  all: { id: "all", color: "gray-200", icon: "\u{1F4CD}" },
-  beaches: { id: "beaches", color: "blue-300", icon: "\u{1F3D6}\uFE0F" },
-  hiking: { id: "hiking", color: "green-400", icon: "\u{1F97E}" },
-  culture: { id: "culture", color: "amber-300", icon: "\u{1F3DB}\uFE0F" },
-  parties: { id: "parties", color: "purple-300", icon: "\u{1F389}" },
-  food: { id: "food", color: "orange-300", icon: "\u{1F37D}\uFE0F" },
-  sports: { id: "sports", color: "red-300", icon: "\u26BD" },
-  dancing: { id: "dancing", color: "pink-300", icon: "\u{1F483}" },
-  groups: { id: "groups", color: "rose-300", icon: "\u{1F4AC}" },
-};
-
-// Place categories (excludes groups which is for WhatsApp communities)
-export const PLACE_CATEGORIES = ["beaches", "hiking", "culture", "parties", "food", "sports", "dancing"];
-
-// Attribute tags - practical characteristics
-export const ATTRIBUTE_TAGS = {
-  "pet-friendly": { icon: "\u{1F415}", color: "emerald-200", label: "Pet Friendly" },
-  "wheelchair-accessible": { icon: "\u267F", color: "blue-200", label: "Accessible" },
-  "free-entry": { icon: "\u{1F193}", color: "green-200", label: "Free Entry" },
-  "family-friendly": { icon: "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}", color: "yellow-200", label: "Family Friendly" },
-  "must-see": { icon: "\u2B50", color: "amber-200", label: "Must See" },
-};
-
-// Vibe tags - atmosphere and experience
-export const VIBE_TAGS = {
-  chill: { icon: "\u{1F60E}", color: "sky-200", label: "Chill" },
-  romantic: { icon: "\u{1F495}", color: "pink-200", label: "Romantic" },
-  adventure: { icon: "\u{1F3D4}\uFE0F", color: "orange-200", label: "Adventure" },
-  party: { icon: "\u{1F389}", color: "purple-200", label: "Party" },
-  "local-favorite": { icon: "\u{1F1E7}\u{1F1F7}", color: "lime-200", label: "Local Favorite" },
-};
-
-// All tags combined
-export const ALL_TAGS = { ...ATTRIBUTE_TAGS, ...VIBE_TAGS };
-
-// Helper to get tag info
-export const getTagInfo = (tagId) => ALL_TAGS[tagId] || { icon: "\u{1F3F7}\uFE0F", color: "gray-200", label: tagId };
-
-// Neubrutalist Shadow styles
-export const NBS = {
-  S: "border-3 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
-  M: "border-3 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all",
-  L: "border-3 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
-  ACTIVE_SM:
-    "active:shadow-none active:translate-x-[2px] active:translate-y-[2px]",
-  ACTIVE_LG:
-    "active:shadow-none active:translate-x-[4px] active:translate-y-[4px]",
-  SPINNER: html\`<div class="flex items-center justify-center min-h-screen"><uix-spinner></uix-spinner></div>\`,
-};
-
-// Helper functions
-export const getCategoryColor = (category) =>
-  CATEGORIES[category]?.color
-    ? \`bg-\${CATEGORIES[category].color}\`
-    : "bg-gray-200";
-
-export const getUser = () => $APP.Auth?.user || null;
-
-export const isGuest = () => $APP.Auth?.isGuest ?? true;
-
-export const styleTag = (css) => html\`<style>\${css}</style>\`;
-`,mimeType:"text/javascript"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
-`,mimeType:"text/css"},"/$app/uix/display/link.css":{content:`:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}
-`,mimeType:"text/css"},"/$app/uix/display/icon.css":{content:`:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}
-`,mimeType:"text/css"},"/$app/uix/feedback/spinner.js":{content:`/**
- * Spinner Component
- *
- * @component
- * @category feedback
- * @tag uix-spinner
- *
- * A loading spinner component with multiple animation variants and sizes.
- * Uses pure CSS animations for performance.
- *
- * @example Basic Spinner
- * \`\`\`html
- * <uix-spinner></uix-spinner>
- * \`\`\`
- *
- * @example Spinner Variants
- * Different animation styles
- * \`\`\`html
- * <div class="flex gap-4">
- *   <uix-spinner variant="circular"></uix-spinner>
- *   <uix-spinner variant="dots"></uix-spinner>
- *   <uix-spinner variant="bars"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Spinner Sizes
- * \`\`\`html
- * <div class="flex gap-4 items-center">
- *   <uix-spinner size="xs"></uix-spinner>
- *   <uix-spinner size="sm"></uix-spinner>
- *   <uix-spinner size="md"></uix-spinner>
- *   <uix-spinner size="lg"></uix-spinner>
- *   <uix-spinner size="xl"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Colored Spinner
- * \`\`\`html
- * <uix-spinner primary></uix-spinner>
- * <uix-spinner secondary></uix-spinner>
- * <uix-spinner success></uix-spinner>
- * <uix-spinner danger></uix-spinner>
- * \`\`\`
- *
- * @example Custom Color
- * \`\`\`html
- * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
- * \`\`\`
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-spinner",
-  properties: {
-    variant: T.string({
-      defaultValue: "circular",
-      enum: ["circular", "dots", "bars"],
-    }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    primary: T.boolean(),
-    secondary: T.boolean(),
-    success: T.boolean(),
-    danger: T.boolean(),
-    warning: T.boolean(),
-    info: T.boolean(),
-  },
-  style: true,
-  render() {
-    // Circular variant uses CSS ::before pseudo-element
-    if (this.variant === "circular") {
-      return html\`\`;
-    }
-
-    // Dots and bars variants need 3 elements
-    if (this.variant === "dots") {
-      return html\`
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      \`;
-    }
-
-    if (this.variant === "bars") {
-      return html\`
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-      \`;
-    }
-
-    return html\`\`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/compass.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16.24 7.76l-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/calendar.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8 2v4m8-4v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/book-open.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/feedback/spinner.css":{content:`:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}
-`,mimeType:"text/css"},"/views/groups-view.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { NBS, ALL_TAGS, getTagInfo } from "./utils.js";
-
-const { brand } = $APP.settings;
-
-export default {
-  dataQuery: true,
-  properties: {
-    groups: T.array(),
-    selectedTags: T.array({ defaultValue: [] }),
-  },
-  goToGroup(group) {
-    $APP.Router.go("group-detail", { slug: group.slug });
-  },
-  toggleTag(tagId) {
-    if (this.selectedTags.includes(tagId)) {
-      this.selectedTags = this.selectedTags.filter((t) => t !== tagId);
-    } else {
-      this.selectedTags = [...this.selectedTags, tagId];
-    }
-  },
-  filterByTags(groups) {
-    if (this.selectedTags.length === 0) return groups;
-    return groups.filter((g) =>
-      this.selectedTags.some((tag) => g.tags?.includes(tag))
-    );
-  },
-  render() {
-    if (!this.groups) return NBS.SPINNER;
-
-    const filteredGroups = this.filterByTags(this.groups);
-    const featured = filteredGroups.filter((g) => g.featured);
-    const regular = filteredGroups.filter((g) => !g.featured);
-
-    return html\`
-      <div class="p-4 sm:p-6 space-y-6 pb-24">
-        <!-- Mobile Header with branding -->
-        <header class="md:hidden flex items-center justify-between">
-          <div class="text-xl font-black tracking-tight">
-            \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
-          </div>
-          <div class="bg-pink-300 border-2 border-black rounded-full w-10 h-10 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            <span class="text-lg">\u{1F4AC}</span>
-          </div>
-        </header>
-
-        <!-- Page Title -->
-        <h1 class="text-2xl md:text-4xl font-black uppercase text-black tracking-tight">
-          Communities
-        </h1>
-
-        <!-- Tag Filters -->
-        <div class="flex gap-2 overflow-x-auto pb-2">
-          \${Object.entries(ALL_TAGS).slice(0, 6).map(([tagId, tagInfo]) => {
-            const isSelected = this.selectedTags.includes(tagId);
-            return html\`
-              <button
-                @click=\${() => this.toggleTag(tagId)}
-                class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs transition-all \${
-                  isSelected
-                    ? \`bg-\${tagInfo.color} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]\`
-                    : "bg-white hover:bg-gray-100"
-                }"
-              >
-                \${tagInfo.icon} \${tagInfo.label}
-              </button>
-            \`;
-          })}
-          \${this.selectedTags.length > 0 ? html\`
-            <button
-              @click=\${() => { this.selectedTags = []; }}
-              class="flex-shrink-0 px-3 py-1.5 border-2 border-black rounded-lg font-bold text-xs bg-gray-100 hover:bg-gray-200 transition-all"
-            >
-              Clear
-            </button>
-          \` : null}
-        </div>
-
-        <!-- Featured Section -->
-        \${featured.length > 0 ? html\`
-          <div class="space-y-4">
-            <div class="flex items-center gap-2">
-              <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transform -rotate-1">
-                \u2B50 Featured
-              </span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              \${featured.map((g) => html\`
-                <view-group
-                  .group=\${g}
-                  .featured=\${true}
-                  .onClick=\${(group) => this.goToGroup(group)}
-                ></view-group>
-              \`)}
-            </div>
-          </div>
-        \` : null}
-
-        <!-- All Groups Section -->
-        \${regular.length > 0 ? html\`
-          <div class="space-y-4">
-            <h2 class="text-xl font-black uppercase text-black">All Communities</h2>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              \${regular.map((g) => html\`
-                <view-group
-                  .group=\${g}
-                  .onClick=\${(group) => this.goToGroup(group)}
-                ></view-group>
-              \`)}
-            </div>
-          </div>
-        \` : null}
-
-        <!-- Empty State -->
-        \${this.groups.length === 0 ? html\`
-          <div class="bg-white border-3 border-black rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center">
-            <div class="text-5xl mb-4">\u{1F997}</div>
-            <h3 class="text-xl font-black uppercase mb-2">No Communities Yet</h3>
-            <p class="text-gray-600 font-medium">Be the first to start a community!</p>
-          </div>
-        \` : null}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/group.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  properties: {
-    group: T.object(),
-    featured: T.boolean({ defaultValue: false }),
-    onClick: T.function({ attribute: false }),
-  },
-  handleCardClick(e) {
-    // Don't navigate if clicking the WhatsApp button
-    if (e.target.closest(".whatsapp-btn")) return;
-    if (this.onClick) this.onClick(this.group);
-  },
-  render() {
-    if (!this.group) return null;
-    const g = this.group;
-    const hasBadge = g.recommended || g.viewCount >= 100;
-    const hasTags = g.tags?.length > 0;
-
-    // Featured cards get a different, larger layout
-    if (this.featured) {
-      return html\`
-        <div
-          class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-          @click=\${(e) => this.handleCardClick(e)}
-        >
-          <div class="relative h-40 bg-gray-200">
-            <img src="\${g.image}" class="w-full h-full object-cover" />
-            <div class="absolute top-3 left-3">
-              \${hasBadge ? html\`
-                <view-recommended-badge
-                  .recommended=\${g.recommended}
-                  .viewCount=\${g.viewCount || 0}
-                ></view-recommended-badge>
-              \` : html\`
-                <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                  \u2B50 Featured
-                </span>
-              \`}
-            </div>
-          </div>
-          <div class="p-4 space-y-3">
-            <uix-link href="/group/\${g.slug}" class="text-xl font-black uppercase leading-tight">\${g.name}</uix-link>
-            <p class="text-sm font-medium text-gray-600 line-clamp-2">\${g.description}</p>
-            \${hasTags ? html\`
-              <view-tags-display .tags=\${g.tags} .maxVisible=\${3}></view-tags-display>
-            \` : null}
-            <div class="flex items-center justify-between pt-2">
-              <div class="flex items-center gap-2">
-                <span class="px-3 py-1 bg-gray-100 border-2 border-black rounded-lg font-black text-xs">
-                  \u{1F465} \${g.memberCount}
-                </span>
-              </div>
-              <a
-                href="\${g.whatsappLink}"
-                target="_blank"
-                class="whatsapp-btn px-4 py-2 bg-green-400 border-2 border-black rounded-xl font-black uppercase text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-                @click=\${(e) => e.stopPropagation()}
-              >
-                \u{1F4AC} Join
-              </a>
-            </div>
-          </div>
-        </div>
-      \`;
-    }
-
-    // Regular card - compact grid style
-    return html\`
-      <div
-        class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex flex-col h-full"
-        @click=\${(e) => this.handleCardClick(e)}
-      >
-        <div class="relative h-32 bg-gray-200 flex-shrink-0">
-          <img src="\${g.image}" class="w-full h-full object-cover" />
-          \${hasBadge ? html\`
-            <div class="absolute top-2 right-2">
-              <view-recommended-badge
-                .recommended=\${g.recommended}
-                .viewCount=\${g.viewCount || 0}
-              ></view-recommended-badge>
-            </div>
-          \` : null}
-          <div class="absolute bottom-2 right-2">
-            <span class="px-2 py-1 bg-white border-2 border-black rounded-lg font-black text-[10px]">
-              \u{1F465} \${g.memberCount}
-            </span>
-          </div>
-        </div>
-        <div class="p-3 flex-1 flex flex-col">
-          <uix-link href="/group/\${g.slug}" class="text-sm font-black uppercase leading-tight mb-1 line-clamp-2">\${g.name}</uix-link>
-          <p class="text-xs font-medium text-gray-500 line-clamp-2 flex-1">\${g.description}</p>
-          \${hasTags ? html\`
-            <div class="mt-2">
-              <view-tags-display .tags=\${g.tags} .maxVisible=\${2}></view-tags-display>
-            </div>
-          \` : null}
-          <a
-            href="\${g.whatsappLink}"
-            target="_blank"
-            class="whatsapp-btn mt-3 block w-full text-center py-2 bg-green-400 border-2 border-black rounded-xl font-black uppercase text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-            @click=\${(e) => e.stopPropagation()}
-          >
-            \u{1F4AC} Join Chat
-          </a>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/recommended-badge.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const POPULAR_THRESHOLD = 100;
-
-export default {
-  properties: {
-    recommended: T.boolean({ defaultValue: false }),
-    viewCount: T.number({ defaultValue: 0 }),
-    size: T.string({ defaultValue: "sm" }), // sm, md
-  },
-
-  render() {
-    const { recommended, viewCount, size } = this;
-
-    const isPopular = viewCount >= POPULAR_THRESHOLD;
-
-    if (!recommended && !isPopular) return null;
-
-    const sizeClasses = size === "md"
-      ? "px-3 py-1.5 text-sm"
-      : "px-2 py-1 text-xs";
-
-    // Recommended takes priority over Popular
-    if (recommended) {
-      return html\`
-        <span class="inline-flex items-center gap-1 bg-yellow-300 border-2 border-black rounded-lg font-black uppercase \${sizeClasses} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-          <span>\u2B50</span>
-          <span>Recommended</span>
-        </span>
-      \`;
-    }
-
-    return html\`
-      <span class="inline-flex items-center gap-1 bg-pink-400 border-2 border-black rounded-lg font-black uppercase \${sizeClasses} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-        <span>\u{1F525}</span>
-        <span>Popular</span>
-      </span>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/tags-display.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import { getTagInfo } from "./utils.js";
-
-export default {
-  properties: {
-    tags: T.array({ defaultValue: [] }),
-    maxVisible: T.number({ defaultValue: 3 }),
-    size: T.string({ defaultValue: "sm" }), // sm, md
-    showIcon: T.boolean({ defaultValue: true }),
-  },
-
-  render() {
-    const { tags, maxVisible, size, showIcon } = this;
-
-    if (!tags || tags.length === 0) return null;
-
-    const visibleTags = tags.slice(0, maxVisible);
-    const hiddenCount = tags.length - maxVisible;
-
-    const sizeClasses = size === "md"
-      ? "px-3 py-1.5 text-sm"
-      : "px-2 py-1 text-xs";
-
-    return html\`
-      <div class="flex flex-wrap gap-1.5">
-        \${visibleTags.map((tag) => {
-          const tagInfo = getTagInfo(tag);
-          return html\`
-            <span class="inline-flex items-center gap-1 bg-\${tagInfo.color} border-2 border-black rounded-lg font-bold \${sizeClasses}">
-              \${showIcon ? html\`<span>\${tagInfo.icon}</span>\` : null}
-              <span>\${tagInfo.label}</span>
-            </span>
-          \`;
-        })}
-        \${hiddenCount > 0 ? html\`
-          <span class="inline-flex items-center bg-gray-200 border-2 border-black rounded-lg font-bold \${sizeClasses}">
-            +\${hiddenCount}
-          </span>
-        \` : null}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/theme.css":{content:`html,body{font-family:var(--font-family);background-color:var(--background-color);color:var(--text-color);width:100%;min-height:100%;height:100%;padding:0;margin:0}a{color:inherit;text-decoration:none;cursor:pointer}html{font-size:14px}@media (max-width: 768px){html{font-size:18px}}@media (max-width: 480px){html{font-size:20px}}textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}:root{box-sizing:border-box;text-size-adjust:none;line-height:1.2}*,*:before,*:after{box-sizing:border-box}*{margin:0}body{font-family:var(--font-family)}button,textarea,select{background-color:inherit;border-width:0;color:inherit}img,picture,video,canvas,svg{display:block;max-width:100%}input,button,textarea,select{font:inherit;background:inherit;border:inherit}p,h1,h2,h3,h4,h5,h6{font-family:var(--font-family);overflow-wrap:break-word}dialog::backdrop{background-color:#000c}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#79797966;border-radius:0}::-webkit-scrollbar-thumb:hover{background:#646464b3}::-webkit-scrollbar-thumb:active{background:#555c}::-webkit-scrollbar-corner{background:transparent}*{scrollbar-width:thin;scrollbar-color:rgba(121,121,121,.4) transparent}*:not(:defined){display:block;height:100%;opacity:0;transition:opacity .5s ease-in-out;border:1px solid red}.dark{filter:invert(1) hue-rotate(180deg)}.dark img,.dark dialog,.dark video,.dark iframe{filter:invert(1) hue-rotate(180deg)}[direction=horizontal]{--flex-direction: row;flex-direction:row}[direction=vertical]{--flex-direction: column;flex-direction:row}[cursor-pointer]{cursor:pointer}[w-full]{width:100%}[h-full]{height:100%}[min-h-0]{min-height:0}[min-w-0]{min-width:0}[flex]{display:flex}[flex-col]{flex-direction:column}[flex-1]{flex:1}[flex-grow]{flex-grow:1}[flex-shrink-0]{flex-shrink:0}
-`,mimeType:"text/css"},"/manifest.json":{content:`{
-  "name": "meetup.rio",
-  "short_name": "meetup.rio",
-  "description": "Discover the best of Rio de Janeiro - Places, Events, and Things to Do",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#fef3c7",
-  "theme_color": "#facc15",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAxMGMwIDQuOTkzLTUuNTM5IDEwLjE5My03LjM5OSAxMS43OTlhMSAxIDAgMCAxLTEuMjAyIDBDOS41MzkgMjAuMTkzIDQgMTQuOTkzIDQgMTBhOCA4IDAgMCAxIDE2IDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIi8+PC9zdmc+",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["travel", "lifestyle"],
-  "lang": "en",
-  "dir": "ltr"
-}
-`,mimeType:"application/json"},"/views/guides-view.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { NBS } from "./utils.js";
-
-const { brand } = $APP.settings;
-
-export default {
-  dataQuery: true,
-  properties: {
-    guides: T.array(),
-    selectedType: T.string({ defaultValue: "all" }),
-  },
-
-  goToGuide(guide) {
-    $APP.Router.go("guide-detail", { slug: guide.slug });
-  },
-
-  getFilteredGuides() {
-    let filtered = this.guides || [];
-
-    if (this.selectedType !== "all") {
-      filtered = filtered.filter((g) => g.guideType === this.selectedType);
-    }
-
-    return filtered;
-  },
-
-  render() {
-    if (!this.guides) return NBS.SPINNER;
-
-    const featured = this.guides.filter((g) => g.featured);
-    const filtered = this.getFilteredGuides();
-
-    return html\`
-      <div class="p-4 sm:p-6 space-y-6 pb-24">
-        <!-- Mobile Header with branding -->
-        <header class="md:hidden flex items-center justify-between">
-          <div class="text-xl font-black tracking-tight">
-            \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
-          </div>
-          <div class="bg-amber-300 border-2 border-black rounded-full w-10 h-10 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            <span class="text-lg">\u{1F4DA}</span>
-          </div>
-        </header>
-
-        <!-- Page Title -->
-        <h1 class="text-2xl md:text-4xl font-black uppercase text-black tracking-tight">
-          Guides
-        </h1>
-
-        <!-- Type Filter Tabs -->
-        <div class="flex gap-2 overflow-x-auto pb-2">
-          \${["all", "article", "list"].map(
-            (type) => html\`
-              <button
-                @click=\${() => (this.selectedType = type)}
-                class="px-4 py-2 border-2 border-black rounded-lg font-bold text-sm uppercase whitespace-nowrap
-                \${this.selectedType === type
-                  ? "bg-black text-white"
-                  : "bg-white hover:bg-gray-100"}
-                shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
-              >
-                \${type === "all"
-                  ? "All"
-                  : type === "article"
-                    ? "Articles"
-                    : "Curated Lists"}
-              </button>
-            \`
-          )}
-        </div>
-
-        <!-- Featured Section -->
-        \${featured.length > 0 && this.selectedType === "all"
-          ? html\`
-              <div class="space-y-4">
-                <div class="flex items-center gap-2">
-                  <span
-                    class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transform -rotate-1"
-                  >
-                    Featured
-                  </span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  \${featured.map(
-                    (g) => html\`
-                      <view-guide-card
-                        .guide=\${g}
-                        .featured=\${true}
-                        .onClick=\${(guide) => this.goToGuide(guide)}
-                      ></view-guide-card>
-                    \`
-                  )}
-                </div>
-              </div>
-            \`
-          : null}
-
-        <!-- All Guides Section -->
-        \${filtered.length > 0
-          ? html\`
-              <div class="space-y-4">
-                <h2 class="text-xl font-black uppercase text-black">
-                  \${this.selectedType === "all"
-                    ? "All Guides"
-                    : this.selectedType === "article"
-                      ? "Articles"
-                      : "Curated Lists"}
-                </h2>
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  \${filtered.map(
-                    (g) => html\`
-                      <view-guide-card
-                        .guide=\${g}
-                        .onClick=\${(guide) => this.goToGuide(guide)}
-                      ></view-guide-card>
-                    \`
-                  )}
-                </div>
-              </div>
-            \`
-          : null}
-
-        <!-- Empty State -->
-        \${filtered.length === 0
-          ? html\`
-              <div
-                class="bg-white border-3 border-black rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center"
-              >
-                <div class="text-5xl mb-4">\u{1F4DA}</div>
-                <h3 class="text-xl font-black uppercase mb-2">No Guides Yet</h3>
-                <p class="text-gray-600 font-medium">
-                  Check back soon for local insights and tips!
-                </p>
-              </div>
-            \`
-          : null}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/discover-view.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { NBS } from "./utils.js";
-
-const { brand } = $APP.settings;
-
-export default {
-  style: true,
-
-  properties: {
-    userId: T.string({ defaultValue: "guest" }),
-    places: T.array({ sync: $APP.Model.places, query: {} }),
-    events: T.array({ sync: $APP.Model.events, query: {} }),
-    groups: T.array({ sync: $APP.Model.groups, query: {} }),
-    guides: T.array({ sync: $APP.Model.guides, query: {} }),
-    // TODO: MEETUPS HIDDEN - Restore when feature returns
-    // meetups: T.array({ sync: $APP.Model.meetups, query: {} }),
-    // meetupAttendance: T.array({ defaultValue: [] }),
-    searchQuery: T.string({ defaultValue: "" }),
-  },
-  async connected() {
-    this.userId = $APP.Auth.isAuthenticated ? $APP.Auth.currentUserId : "guest";
-    // TODO: MEETUPS HIDDEN - Restore when feature returns
-    // this.meetupAttendance = await $APP.Model.meetup_attendance.getAll({
-    //   where: { user: this.userId },
-    // });
-  },
-  isLoading() {
-    return !this.places || !this.events || !this.groups;
-  },
-  // TODO: MEETUPS HIDDEN - Restore when feature returns
-  // isJoined(meetupId) {
-  //   return this.meetupAttendance?.some((a) => a.meetup === meetupId) || false;
-  // },
-  getNextEvents() {
-    return (this.events || []).sort(
-      (a, b) => new Date(a.date) - new Date(b.date),
-    );
-  },
-  // TODO: MEETUPS HIDDEN - Restore when feature returns
-  // getMyMeetups() {
-  //   const joinedMeetupIds = new Set(
-  //     (this.meetupAttendance || []).map((a) => a.meetup),
-  //   );
-  //   return (this.meetups || []).filter((m) => joinedMeetupIds.has(m.id));
-  // },
-  getFeaturedGuides() {
-    return (this.guides || []).filter((g) => g.featured).slice(0, 2);
-  },
-  getRecommendedItems() {
-    // Combine recommended places and events
-    const recPlaces = (this.places || []).filter((p) => p.recommended || p.viewCount >= 100);
-    const recEvents = (this.events || []).filter((e) => e.recommended || e.viewCount >= 100);
-    return [...recPlaces, ...recEvents].slice(0, 4);
-  },
-  render() {
-    if (this.isLoading()) return NBS.SPINNER;
-
-    const nE = this.events ?? [];
-    const nY = this.places ?? [];
-    const featuredGuides = this.getFeaturedGuides();
-    const recommendedItems = this.getRecommendedItems();
-
-    return html\`
-      <div class="space-y-6 pb-8">
-        <!-- Header with branding and search -->
-        <header class="px-4 pt-4">
-          <div class="flex items-center justify-between mb-4 md:hidden">
-            <div class="text-xl font-black tracking-tight">
-              \${brand.name}<span class="\${brand.accentClass}">\${brand.accent}</span>
-            </div>
-          </div>
-          <view-global-search></view-global-search>
-        </header>
-
-        <!-- Today in Rio (Events) -->
-        <div class="md:px-6 overflow-hidden mx-1 max-w-screen">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">Today in Rio</h2>
-            <button @click=\${() => $APP.Router.go("events")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View all</button>
-          </div>
-          <div class="flex gap-4 overflow-x-auto pb-4">
-            \${
-              nE.length === 0
-                ? html\`<div class="text-sm font-bold text-gray-500 italic">No upcoming events found.</div>\`
-                : nE.map(
-                    (event) => html\`
-                <view-story-circle .content=\${event} .onClick=\${(e) => $APP.Router.go("event-detail", { slug: e.slug })} class="last:mr-1"></view-story-circle>
-              \`,
-                  )
-            }
-          </div>
-        </div>
-
-        <!-- Recommended Section -->
-        \${recommendedItems.length > 0 ? html\`
-          <div class="px-6 overflow-hidden">
-            <div class="flex items-center gap-3 mb-4">
-              <span class="px-3 py-1 bg-yellow-300 border-2 border-black rounded-lg font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                \u2B50 \${$APP.i18n?.t?.("badges.recommended") || "Recommended"}
-              </span>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              \${recommendedItems.map((item) => {
-                const isEvent = item.date !== undefined;
-                const type = isEvent ? "event" : "place";
-                return html\`
-                  <div
-                    class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-                    @click=\${() => $APP.Router.go(\`\${type}-detail\`, { slug: item.slug })}
-                  >
-                    <div class="relative h-28 bg-gray-200">
-                      <img src="\${item.image}" class="w-full h-full object-cover" />
-                      <div class="absolute top-2 right-2">
-                        <span class="px-2 py-0.5 bg-yellow-300 border-2 border-black rounded text-[10px] font-black">\u2B50</span>
-                      </div>
-                    </div>
-                    <div class="p-2">
-                      <div class="text-xs font-black leading-tight line-clamp-2 uppercase">\${item.name}</div>
-                      \${isEvent && item.date ? html\`
-                        <div class="text-[10px] font-bold text-gray-500 mt-1">\u{1F4C5} \${new Date(item.date).toLocaleDateString()}</div>
-                      \` : null}
-                    </div>
-                  </div>
-                \`;
-              })}
-            </div>
-          </div>
-        \` : null}
-
-        <!-- Featured Guides -->
-        \${featuredGuides.length > 0 ? html\`
-          <div class="px-6 overflow-hidden">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-black uppercase text-black">Guides</h2>
-              <button @click=\${() => $APP.Router.go("guides")} class="text-xs font-bold text-pink-500 uppercase hover:underline">View all</button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              \${featuredGuides.map(
-                (guide) => html\`
-                  <view-guide-card
-                    .guide=\${guide}
-                    .featured=\${true}
-                    .onClick=\${(g) => $APP.Router.go("guide-detail", { slug: g.slug })}
-                  ></view-guide-card>
-                \`,
-              )}
-            </div>
-          </div>
-        \` : null}
-
-        <!-- TODO: MEETUPS HIDDEN - Restore when feature returns
-        <div class="px-6 overflow-hidden">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">My Meetups</h2>
-            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">View more</button>
-          </div>
-          ...meetups section...
-        </div>
-        -->
-
-        <!-- Near You (Places) -->
-        <div class="px-6">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-black uppercase text-black">Near You</h2>
-            <button class="text-xs font-bold text-pink-500 uppercase hover:underline">Filter</button>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 p-2 md:p-4 lg:p-8">
-            \${nY.map(
-              (place) => html\`
-                <view-meetup-card-compact .content=\${place} type="place" .onClick=\${(p) => $APP.Router.go("place-detail", { slug: p.slug })}></view-meetup-card-compact>
-              \`,
-            )}
-          </div>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/guide-card.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { getCategoryColor } from "./utils.js";
-
-export default {
-  properties: {
-    guide: T.object(),
-    featured: T.boolean({ defaultValue: false }),
-    onClick: T.function({ attribute: false }),
-  },
-
-  handleClick() {
-    if (this.onClick) this.onClick(this.guide);
-  },
-
-  render() {
-    const g = this.guide;
-    if (!g) return null;
-
-    const isArticle = g.guideType === "article";
-    const typeLabel = isArticle ? "Article" : "Curated List";
-    const typeColor = isArticle ? "bg-amber-300" : "bg-emerald-300";
-    const typeIcon = isArticle ? "\u{1F4DD}" : "\u{1F4CB}";
-
-    const hasBadge = g.recommended || g.viewCount >= 100;
-    const hasTags = g.tags?.length > 0;
-
-    // Featured card - larger layout
-    if (this.featured) {
-      return html\`
-        <div
-          class="bg-white border-3 border-black rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-          @click=\${() => this.handleClick()}
-        >
-          <div class="relative h-48 bg-gray-200">
-            <img src="\${g.coverImage}" class="w-full h-full object-cover" />
-            <div class="absolute top-3 left-3 flex gap-2">
-              <span class="px-3 py-1 \${typeColor} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                \${typeIcon} \${typeLabel}
-              </span>
-            </div>
-            \${hasBadge ? html\`
-              <div class="absolute top-3 right-3">
-                <view-recommended-badge
-                  .recommended=\${g.recommended}
-                  .viewCount=\${g.viewCount || 0}
-                ></view-recommended-badge>
-              </div>
-            \` : null}
-          </div>
-          <div class="p-4 space-y-3">
-            <uix-link href="/guide/\${g.slug}" class="text-xl font-black uppercase leading-tight line-clamp-2">\${g.title}</uix-link>
-            <p class="text-sm font-medium text-gray-600 line-clamp-2">\${g.description}</p>
-            \${hasTags ? html\`
-              <view-tags-display .tags=\${g.tags} .maxVisible=\${3}></view-tags-display>
-            \` : null}
-            <div class="flex items-center gap-2 flex-wrap">
-              \${(g.categories || []).map(cat => html\`
-                <span class="px-2 py-1 \${getCategoryColor(cat)} border-2 border-black rounded-lg font-bold text-xs uppercase">
-                  \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
-                </span>
-              \`)}
-              \${!isArticle && g.items?.length ? html\`
-                <span class="px-2 py-1 bg-gray-100 border-2 border-black rounded-lg font-bold text-xs">
-                  \${g.items.length} places
-                </span>
-              \` : null}
-            </div>
-          </div>
-        </div>
-      \`;
-    }
-
-    // Regular card - compact grid style
-    return html\`
-      <div
-        class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex flex-col h-full"
-        @click=\${() => this.handleClick()}
-      >
-        <div class="relative h-32 bg-gray-200 flex-shrink-0">
-          <img src="\${g.coverImage}" class="w-full h-full object-cover" />
-          <div class="absolute top-2 left-2">
-            <span class="px-2 py-0.5 \${typeColor} border-2 border-black rounded font-bold text-[10px] uppercase">
-              \${typeIcon} \${isArticle ? "Article" : "List"}
-            </span>
-          </div>
-          \${hasBadge ? html\`
-            <div class="absolute top-2 right-2">
-              <view-recommended-badge
-                .recommended=\${g.recommended}
-                .viewCount=\${g.viewCount || 0}
-              ></view-recommended-badge>
-            </div>
-          \` : null}
-        </div>
-        <div class="p-3 flex-1 flex flex-col">
-          <uix-link href="/guide/\${g.slug}" class="text-sm font-black uppercase leading-tight mb-1 line-clamp-2">\${g.title}</uix-link>
-          <p class="text-xs font-medium text-gray-500 line-clamp-2 flex-1">\${g.description}</p>
-          \${hasTags ? html\`
-            <div class="mt-2">
-              <view-tags-display .tags=\${g.tags} .maxVisible=\${2}></view-tags-display>
-            </div>
-          \` : null}
-          <div class="flex items-center gap-1 mt-2 flex-wrap">
-            \${(g.categories || []).slice(0, 2).map(cat => html\`
-              <span class="px-1.5 py-0.5 \${getCategoryColor(cat)} border border-black rounded font-bold text-[9px] uppercase">
-                \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
-              </span>
-            \`)}
-            \${!isArticle && g.items?.length ? html\`
-              <span class="text-[10px] font-bold text-gray-500 ml-auto">
-                \${g.items.length} places
-              </span>
-            \` : null}
-          </div>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/discover-view.css":{content:`.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}.scrollbar-hide::-webkit-scrollbar{display:none}
-`,mimeType:"text/css"},"/views/guide-detail-view.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { getCategoryColor, NBS } from "./utils.js";
-
-export default {
-  dataQuery: true,
-  properties: {
-    guide: T.object({ attribute: false }),
-    linkedPlaces: T.array({ defaultValue: [] }),
-    linkedEvents: T.array({ defaultValue: [] }),
-  },
-
-  async updated(changedProps) {
-    // When guide loads and it's a list type, fetch linked items
-    if (
-      changedProps.has("guide") &&
-      this.guide?.guideType === "list" &&
-      this.guide.items?.length > 0
-    ) {
-      await this.fetchLinkedItems();
-    }
-
-    // Track view count when guide loads
-    if (changedProps.has("guide") && this.guide?.id) {
-      await $APP.Model.guides.edit(this.guide.id, {
-        viewCount: (this.guide.viewCount || 0) + 1,
-      });
-    }
-  },
-
-  async fetchLinkedItems() {
-    const items = this.guide.items || [];
-    // Fetch linked places and events by their IDs
-    const placeIds = items.filter((i) => i.type === "place" && i.id).map((i) => i.id);
-    const eventIds = items.filter((i) => i.type === "event" && i.id).map((i) => i.id);
-
-    if (placeIds.length > 0) {
-      const places = await $APP.Model.places.getAll();
-      this.linkedPlaces = places.filter((p) => placeIds.includes(p.id));
-    }
-    if (eventIds.length > 0) {
-      const events = await $APP.Model.events.getAll();
-      this.linkedEvents = events.filter((e) => eventIds.includes(e.id));
-    }
-  },
-
-  getLinkedItem(item) {
-    if (item.type === "place") {
-      return this.linkedPlaces.find((p) => p.id === item.id);
-    }
-    return this.linkedEvents.find((e) => e.id === item.id);
-  },
-
-  getTocItems() {
-    const g = this.guide;
-    if (!g) return [];
-
-    if (g.guideType === "article") {
-      // Parse headers from body
-      const body = g.body || "";
-      const headers = [];
-      let sectionIndex = 0;
-
-      body.split("\\n").forEach((line) => {
-        if (line.startsWith("## ")) {
-          headers.push({
-            id: \`section-\${sectionIndex}\`,
-            title: line.slice(3).trim(),
-            level: 2,
-          });
-          sectionIndex++;
-        }
-      });
-      return headers;
-    } else {
-      // List items become TOC
-      return (g.items || []).map((item, i) => ({
-        id: \`item-\${i}\`,
-        title: item.note || \`Item \${i + 1}\`,
-        level: 1,
-      }));
-    }
-  },
-
-  renderArticleBody() {
-    const body = this.guide.body || "";
-
-    // Simple markdown-like rendering
-    // Split by double newlines for paragraphs, render headers
-    const sections = body.split("\\n\\n");
-    let sectionIndex = 0;
-
-    return html\`
-      <div class="prose prose-lg max-w-none space-y-4">
-        \${sections.map((section) => {
-          const trimmed = section.trim();
-          if (trimmed.startsWith("## ")) {
-            const id = \`section-\${sectionIndex}\`;
-            sectionIndex++;
-            return html\`<h2
-              id=\${id}
-              class="text-xl font-black uppercase mt-6 mb-3 text-black scroll-mt-20"
-            >
-              \${trimmed.slice(3)}
-            </h2>\`;
-          }
-          if (trimmed.startsWith("# ")) {
-            return html\`<h1
-              class="text-2xl font-black uppercase mt-6 mb-3 text-black"
-            >
-              \${trimmed.slice(2)}
-            </h1>\`;
-          }
-          if (trimmed.startsWith("- ")) {
-            const items = trimmed.split("\\n").filter((l) => l.startsWith("- "));
-            return html\`
-              <ul class="list-disc list-inside space-y-1">
-                \${items.map(
-                  (item) =>
-                    html\`<li class="text-gray-800 font-medium">
-                      \${item.slice(2)}
-                    </li>\`,
-                )}
-              </ul>
-            \`;
-          }
-          if (trimmed.match(/^\\d+\\./)) {
-            const items = trimmed.split("\\n").filter((l) => l.match(/^\\d+\\./));
-            return html\`
-              <ol class="list-decimal list-inside space-y-1">
-                \${items.map(
-                  (item) =>
-                    html\`<li class="text-gray-800 font-medium">
-                      \${item.replace(/^\\d+\\.\\s*/, "")}
-                    </li>\`,
-                )}
-              </ol>
-            \`;
-          }
-          // Regular paragraph - handle **bold** text
-          const formatted = trimmed.replace(
-            /\\*\\*([^*]+)\\*\\*/g,
-            "<strong>$1</strong>",
-          );
-          return html\`<p
-            class="text-gray-800 font-medium leading-relaxed"
-            .innerHTML=\${formatted}
-          ></p>\`;
-        })}
-      </div>
-    \`;
-  },
-
-  renderListItems() {
-    const items = this.guide.items || [];
-
-    return html\`
-      <div class="space-y-4">
-        \${items.map((item, index) => {
-          const linked = this.getLinkedItem(item);
-          return html\`
-            <div
-              id="item-\${index}"
-              class="bg-gray-50 border-2 border-black rounded-xl p-4 flex gap-4 scroll-mt-20"
-            >
-              <div
-                class="flex-shrink-0 w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-black text-lg"
-              >
-                \${index + 1}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                  <span
-                    class="px-2 py-0.5 \${item.type === "place"
-                      ? "bg-blue-200"
-                      : "bg-purple-200"} border border-black rounded font-bold text-xs uppercase"
-                  >
-                    \${item.type === "place" ? "Place" : "Event"}
-                  </span>
-                  \${linked
-                    ? html\`
-                        <button
-                          @click=\${() =>
-                            $APP.Router.go(
-                              item.type === "place"
-                                ? "place-detail"
-                                : "event-detail",
-                              { slug: linked.slug },
-                            )}
-                          class="px-2 py-0.5 bg-black text-white rounded font-bold text-xs uppercase hover:bg-gray-800 transition-colors"
-                        >
-                          \${$APP.i18n?.t?.(
-                            \`guides.view\${item.type === "place" ? "Place" : "Event"}\`,
-                          ) || \`View \${item.type}\`}
-                        </button>
-                      \`
-                    : null}
-                </div>
-                \${linked
-                  ? html\`<h4 class="font-black text-sm mb-1">\${linked.name}</h4>\`
-                  : null}
-                \${item.note
-                  ? html\`<p class="text-gray-700 font-medium text-sm">
-                      \${item.note}
-                    </p>\`
-                  : null}
-              </div>
-            </div>
-          \`;
-        })}
-      </div>
-    \`;
-  },
-
-  render() {
-    const g = this.guide;
-    if (!g) return NBS.SPINNER;
-
-    const isArticle = g.guideType === "article";
-    const typeLabel = isArticle ? "Article" : "Curated List";
-    const typeColor = isArticle ? "bg-amber-300" : "bg-emerald-300";
-    const tocItems = this.getTocItems();
-
-    return html\`
-      <div class="bg-purple-50 min-h-screen pb-20">
-        <!-- Header -->
-        <div
-          class="sticky top-0 z-20 bg-white border-b-3 border-black px-4 py-3 flex items-center justify-between shadow-sm"
-        >
-          <button
-            @click=\${() => window.history.back()}
-            class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors"
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-          <div
-            class="font-black uppercase tracking-tight truncate max-w-[200px]"
-          >
-            \${typeLabel}
-          </div>
-          <button
-            class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-xl bg-white hover:bg-gray-100 transition-colors"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3"
-            >
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Cover Image -->
-        <div
-          class="relative w-full h-64 sm:h-80 bg-gray-200 border-b-3 border-black overflow-hidden"
-        >
-          <img src="\${g.coverImage}" class="w-full h-full object-cover" />
-          <div class="absolute bottom-4 left-4 flex gap-2 flex-wrap">
-            <div
-              class="px-3 py-1 \${typeColor} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-            >
-              \${isArticle ? "Article" : "List"}
-            </div>
-            \${(g.categories || []).map(
-              (cat) => html\`
-                <div
-                  class="px-3 py-1 \${getCategoryColor(
-                    cat,
-                  )} border-2 border-black rounded-lg font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                >
-                  \${$APP.i18n?.t?.(\`categories.\${cat}\`) || cat}
-                </div>
-              \`,
-            )}
-          </div>
-          \${g.recommended || g.viewCount >= 100
-            ? html\`
-                <div class="absolute top-4 right-4">
-                  <view-recommended-badge
-                    .recommended=\${g.recommended}
-                    .viewCount=\${g.viewCount || 0}
-                  ></view-recommended-badge>
-                </div>
-              \`
-            : null}
-        </div>
-
-        <!-- Content - Two Column Layout -->
-        <div class="px-4 -mt-6 relative z-10">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Main Content (2/3 width on desktop) -->
-            <div class="md:col-span-2 space-y-6">
-              <!-- Title Card -->
-              <div
-                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
-              >
-                <h1
-                  class="text-2xl sm:text-3xl font-black uppercase leading-tight mb-3"
-                >
-                  \${g.title}
-                </h1>
-                <p class="text-gray-600 font-medium text-base mb-4">
-                  \${g.description}
-                </p>
-
-                \${g.tags?.length > 0
-                  ? html\`
-                      <view-tags-display
-                        .tags=\${g.tags}
-                        .maxVisible=\${4}
-                        size="md"
-                      ></view-tags-display>
-                    \`
-                  : null}
-                \${g.publishedAt
-                  ? html\`
-                      <div
-                        class="flex items-center gap-3 mt-4 pt-4 border-t-2 border-dashed border-gray-200"
-                      >
-                        <div
-                          class="w-10 h-10 bg-amber-200 border-2 border-black rounded-full flex items-center justify-center font-black"
-                        >
-                          \${isArticle ? "A" : "L"}
-                        </div>
-                        <div>
-                          <div class="text-xs font-bold text-gray-500 uppercase">
-                            Published
-                          </div>
-                          <div class="font-bold text-sm">
-                            \${new Date(g.publishedAt).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    \`
-                  : null}
-              </div>
-
-              <!-- Body (Article) or Items (List) -->
-              <div
-                class="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
-              >
-                \${isArticle
-                  ? this.renderArticleBody()
-                  : html\`
-                      <h3
-                        class="text-lg font-black uppercase mb-4 flex items-center gap-2"
-                      >
-                        \${$APP.i18n?.t?.("guides.placesInGuide") ||
-                        "Places in this Guide"}
-                        <span
-                          class="bg-black text-white text-xs px-2 py-1 rounded-md"
-                        >
-                          \${g.items?.length || 0}
-                        </span>
-                      </h3>
-                      \${this.renderListItems()}
-                    \`}
-              </div>
-            </div>
-
-            <!-- Sidebar (1/3 width on desktop) -->
-            <div class="space-y-6">
-              <view-detail-sidebar
-                type="guide"
-                .currentItem=\${g}
-                .tocItems=\${tocItems}
-                .showToc=\${tocItems.length > 0}
-              ></view-detail-sidebar>
-            </div>
-          </div>
-
-          <div class="h-24"></div>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/detail-sidebar.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  properties: {
-    type: T.string({ defaultValue: "guide" }), // "guide" | "event" | "group"
-    currentItem: T.object({ attribute: false }),
-    tocItems: T.array({ defaultValue: [] }),
-    showToc: T.boolean({ defaultValue: false }),
-  },
-
-  scrollToItem(id) {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  },
-
-  renderToc() {
-    if (!this.showToc || !this.tocItems?.length) return null;
-
-    return html\`
-      <div
-        class="bg-white border-3 border-black rounded-xl p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-      >
-        <h4 class="font-black uppercase text-sm mb-3">
-          \${$APP.i18n?.t?.("guides.contents") || "Contents"}
-        </h4>
-        <ul class="space-y-2">
-          \${this.tocItems.map(
-            (item, i) => html\`
-              <li>
-                <a
-                  href="#\${item.id}"
-                  @click=\${(e) => {
-                    e.preventDefault();
-                    this.scrollToItem(item.id);
-                  }}
-                  class="text-sm font-medium text-gray-700 hover:text-black flex items-start gap-2 transition-colors"
-                >
-                  <span
-                    class="text-xs text-gray-400 font-bold mt-0.5 flex-shrink-0"
-                    >\${i + 1}.</span
-                  >
-                  <span class="line-clamp-2">\${item.title}</span>
-                </a>
-              </li>
-            \`
-          )}
-        </ul>
-      </div>
-    \`;
-  },
-
-  renderRelatedContent() {
-    if (!this.currentItem) return null;
-
-    const titleKey = \`related.\${this.type === "guide" ? "guides" : this.type === "event" ? "events" : "groups"}\`;
-    const defaultTitles = {
-      guide: "Related Guides",
-      event: "You Might Also Like",
-      group: "Similar Communities",
-    };
-
-    return html\`
-      <view-related-content
-        .currentItem=\${this.currentItem}
-        type=\${this.type}
-        .title=\${$APP.i18n?.t?.(titleKey) || defaultTitles[this.type]}
-      ></view-related-content>
-    \`;
-  },
-
-  render() {
-    return html\`
-      <div class="space-y-6 md:sticky md:top-20">
-        \${this.renderToc()} \${this.renderRelatedContent()}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/related-content.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  style: true,
-
-  properties: {
-    currentItem: T.object({ attribute: false }),
-    type: T.string({ defaultValue: "place" }), // place, event, guide, group
-    title: T.string({ defaultValue: "" }),
-    maxItems: T.number({ defaultValue: 4 }),
-    places: T.array({ sync: $APP.Model.places, query: {} }),
-    events: T.array({ sync: $APP.Model.events, query: {} }),
-    guides: T.array({ sync: $APP.Model.guides, query: {} }),
-    groups: T.array({ sync: $APP.Model.groups, query: {} }),
-  },
-
-  getCollection() {
-    switch (this.type) {
-      case "place":
-        return this.places || [];
-      case "event":
-        return this.events || [];
-      case "guide":
-        return this.guides || [];
-      case "group":
-        return this.groups || [];
-      default:
-        return [];
-    }
-  },
-
-  calculateScore(item) {
-    if (!this.currentItem) return 0;
-    let score = 0;
-
-    // Category match (+10 points)
-    const currentCategory =
-      this.currentItem.category || this.currentItem.categories?.[0];
-    const itemCategory = item.category || item.categories?.[0];
-    if (currentCategory && itemCategory && currentCategory === itemCategory) {
-      score += 10;
-    }
-
-    // Tag matches (+5 points each)
-    const currentTags = this.currentItem.tags || [];
-    const itemTags = item.tags || [];
-    const sharedTags = currentTags.filter((tag) => itemTags.includes(tag));
-    score += sharedTags.length * 5;
-
-    // Boost recommended items
-    if (item.recommended) score += 3;
-
-    // Boost popular items
-    if (item.viewCount >= 100) score += 2;
-
-    return score;
-  },
-
-  getRelatedItems() {
-    const collection = this.getCollection();
-    const currentId = this.currentItem?.id;
-
-    // Filter out current item and score the rest
-    const scored = collection
-      .filter((item) => item.id !== currentId)
-      .map((item) => ({ item, score: this.calculateScore(item) }))
-      .filter(({ score }) => score > 0) // Only items with some relevance
-      .sort((a, b) => b.score - a.score)
-      .slice(0, this.maxItems);
-
-    return scored.map(({ item }) => item);
-  },
-
-  getRouteType() {
-    return this.type === "guide" ? "guide" : this.type;
-  },
-
-  render() {
-    const relatedItems = this.getRelatedItems();
-
-    if (relatedItems.length === 0) return null;
-
-    const displayTitle =
-      this.title ||
-      $APP.i18n?.t?.(\`related.\${this.type}s\`) ||
-      \`Related \${this.type}s\`;
-
-    return html\`
-      <div class="space-y-2">
-        <h3 class="text-lg font-black uppercase">\${displayTitle}</h3>
-        <div class="grid grid-cols-2 md:grid-cols-1 gap-4">
-          \${relatedItems.map(
-            (item) => html\`
-            <div
-              class="bg-white border-3 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-              @click=\${() => $APP.Router.go(\`\${this.getRouteType()}-detail\`, { slug: item.slug })}
-            >
-              <div class="relative h-24 bg-gray-200">
-                <img src="\${item.image || item.coverImage}" class="w-full h-full object-cover" />
-                \${
-                  item.recommended
-                    ? html\`
-                  <div class="absolute top-1 right-1">
-                    <span class="px-1.5 py-0.5 bg-yellow-300 border border-black rounded text-[9px] font-black">\u2B50</span>
-                  </div>
-                \`
-                    : null
-                }
-              </div>
-              <div class="p-2">
-                <div class="text-xs font-black leading-tight line-clamp-2">\${item.name || item.title}</div>
-              </div>
-            </div>
-          \`,
-          )}
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/views/calendar-view.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import { CATEGORIES } from "./utils.js";
-
-export default {
-  properties: {
-    events: T.array({ sync: $APP.Model.events, query: {} }),
-    selectedCategory: T.string({ defaultValue: "all" }),
-  },
-  getFilteredEvents() {
-    const events = (this.events || []).map((e) => ({ ...e, title: e.name }));
-    return this.selectedCategory === "all"
-      ? events
-      : events.filter((e) => e.category === this.selectedCategory);
-  },
-  handleCategoryChange(category) {
-    this.selectedCategory = category;
-  },
-  handleEventClick(e) {
-    const event = e.detail.event;
-    $APP.Router.go("event-detail", {
-      id: event.recurrenceParentId || event.id,
-    });
-  },
-  render() {
-    return html\`
-      <div class="min-h-screen bg-surface pb-20">
-        <div class="bg-white border-b-3 border-black px-6 py-4">
-          <div class="flex items-center justify-between mb-4">
-            <button
-              @click=\${() => $APP.Router.back()}
-              class="w-10 h-10 flex items-center justify-center border-2 border-black rounded-lg"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <h1 class="text-2xl font-black uppercase">Calendar</h1>
-            <div class="w-10"></div>
-          </div>
-          <div class="overflow-x-auto pb-2">
-            <div class="flex gap-2 min-w-max">
-              \${Object.keys(CATEGORIES)
-                .filter((c) => c !== "groups")
-                .map(
-                  (c) => html\`
-                    <button
-                      @click=\${() => this.handleCategoryChange(c)}
-                      class="px-4 py-1.5 border-2 border-black rounded-lg font-bold text-xs uppercase \${this.selectedCategory === c ? "bg-accent" : "bg-white"}"
-                    >
-                      \${c}
-                    </button>
-                  \`,
-                )}
-            </div>
-          </div>
-        </div>
-        <div class="px-6 py-6">
-          <uix-calendar
-            .events=\${this.getFilteredEvents()}
-            @event-click=\${this.handleEventClick}
-          ></uix-calendar>
-        </div>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/display/calendar.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-// Utility functions for calendar logic
-const generateRecurringInstances = (event, startDate, endDate) => {
-  if (!event.isRecurring) return [];
-  const instances = [];
-  const current = new Date(startDate);
-  const end = new Date(endDate);
-  const recurrenceEnd = event.recurrenceEndDate
-    ? new Date(event.recurrenceEndDate)
-    : new Date(current.getTime() + 31536000000); // 1 year default
-  const originalDate = new Date(event.date);
-
-  const shouldGenerate = (date, evt, origDate) => {
-    switch (evt.recurrencePattern) {
-      case "daily":
-        return true;
-      case "weekly":
-        return date.getDay() === origDate.getDay();
-      case "monthly":
-        return date.getDate() === origDate.getDate();
-      case "custom":
-        return evt.recurrenceDays?.includes(date.getDay());
-      default:
-        return false;
-    }
-  };
-
-  const advance = (date, pattern) => {
-    switch (pattern) {
-      case "daily":
-        date.setDate(date.getDate() + 1);
-        break;
-      case "weekly":
-        date.setDate(date.getDate() + 7);
-        break;
-      case "monthly":
-        date.setMonth(date.getMonth() + 1);
-        break;
-      case "custom":
-        date.setDate(date.getDate() + 1);
-        break;
-    }
-  };
-
-  while (current <= end && current <= recurrenceEnd) {
-    if (shouldGenerate(current, event, originalDate)) {
-      instances.push({
-        ...event,
-        id: \`\${event.id}-\${current.toISOString().split("T")[0]}\`,
-        date: current.toISOString().split("T")[0],
-        recurrenceParentId: event.id,
-        isRecurring: false,
-      });
-    }
-    advance(current, event.recurrencePattern);
-  }
-  return instances;
-};
-
-const isSameDay = (d1, d2) =>
-  d1.getFullYear() === d2.getFullYear() &&
-  d1.getMonth() === d2.getMonth() &&
-  d1.getDate() === d2.getDate();
-
-const isThisWeek = (date) => {
-  const today = new Date();
-  const weekFromNow = new Date(today.getTime() + 604800000);
-  return date >= today && date <= weekFromNow;
-};
-
-const getDateSection = (dateStr, locale) => {
-  const date = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (isSameDay(date, today)) return "TODAY";
-  if (isSameDay(date, tomorrow)) return "TOMORROW";
-  if (isThisWeek(date))
-    return date.toLocaleDateString(locale, { weekday: "long" }).toUpperCase();
-  return date
-    .toLocaleDateString(locale, { month: "short", day: "numeric" })
-    .toUpperCase();
-};
-
-const groupEventsByDate = (events) =>
-  events.reduce(
-    (groups, event) => ({
-      ...groups,
-      [event.date]: [...(groups[event.date] || []), event],
-    }),
-    {},
-  );
-
-const getEventsInRange = (startDate, endDate, events) => {
-  const withRecurring = [];
-
-  events.forEach((event) => {
-    if (event.isRecurring) {
-      withRecurring.push(...generateRecurringInstances(event, startDate, endDate));
-    } else {
-      const eventDate = new Date(event.date);
-      if (eventDate >= startDate && eventDate <= endDate) {
-        withRecurring.push(event);
-      }
-    }
-  });
-  return withRecurring.sort((a, b) => new Date(a.date) - new Date(b.date));
-};
-
-const formatMonthYear = (month, year, locale) =>
-  new Date(year, month, 1)
-    .toLocaleDateString(locale, { month: "long", year: "numeric" })
-    .toUpperCase();
-
-const getDaysInMonth = (year, month, events) => {
-  const days = [];
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const firstDayOfWeek = firstDay.getDay();
-  const daysInMonth = lastDay.getDate();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const eventsByDate = events.reduce(
-    (groups, event) => ({
-      ...groups,
-      [event.date]: [...(groups[event.date] || []), event],
-    }),
-    {},
-  );
-
-  // Previous month padding
-  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-    const date = new Date(year, month, -i);
-    const dateStr = date.toISOString().split("T")[0];
-    days.push({
-      date,
-      day: date.getDate(),
-      isCurrentMonth: false,
-      isToday: false,
-      events: eventsByDate[dateStr] || [],
-    });
-  }
-
-  // Current month days
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split("T")[0];
-    date.setHours(0, 0, 0, 0);
-    days.push({
-      date,
-      day,
-      isCurrentMonth: true,
-      isToday: date.getTime() === today.getTime(),
-      events: eventsByDate[dateStr] || [],
-    });
-  }
-
-  // Next month padding (fill to 42 days = 6 weeks)
-  const remaining = 42 - days.length;
-  for (let i = 1; i <= remaining; i++) {
-    const date = new Date(year, month + 1, i);
-    const dateStr = date.toISOString().split("T")[0];
-    days.push({
-      date,
-      day: date.getDate(),
-      isCurrentMonth: false,
-      isToday: false,
-      events: eventsByDate[dateStr] || [],
-    });
-  }
-
-  return days;
-};
-
-export default {
-  tag: "uix-calendar",
-  style: true,
-  shadow: true,
-  properties: {
-    // Data
-    events: T.array({ defaultValue: [] }),
-
-    // View state
-    viewMode: T.string({ defaultValue: "month", enum: ["list", "month"] }),
-    currentMonth: T.number(new Date().getMonth()),
-    currentYear: T.number(new Date().getFullYear()),
-    selectedDate: T.string(""),
-    showDayPanel: T.boolean(false),
-
-    // Config
-    showViewToggle: T.boolean(true),
-    showNavigation: T.boolean(true),
-    showTodayButton: T.boolean(true),
-    locale: T.string("en"),
-    monthsAhead: T.number(3),
-  },
-
-  // Get events for the calendar range (for list view)
-  getEventsForCalendar() {
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setMonth(endDate.getMonth() + this.monthsAhead);
-    return getEventsInRange(today, endDate, this.events || []);
-  },
-
-  // Navigation handlers
-  handleNav(direction) {
-    if (direction === -1) {
-      if (this.currentMonth === 0) {
-        this.currentMonth = 11;
-        this.currentYear--;
-      } else {
-        this.currentMonth--;
-      }
-    } else {
-      if (this.currentMonth === 11) {
-        this.currentMonth = 0;
-        this.currentYear++;
-      } else {
-        this.currentMonth++;
-      }
-    }
-    this.showDayPanel = false;
-    this.emit("month-change", {
-      month: this.currentMonth,
-      year: this.currentYear,
-    });
-  },
-
-  handleTodayClick() {
-    const today = new Date();
-    this.currentMonth = today.getMonth();
-    this.currentYear = today.getFullYear();
-    this.showDayPanel = false;
-  },
-
-  handleViewToggle(mode) {
-    this.viewMode = mode;
-  },
-
-  handleDayClick(dayObj) {
-    const dateStr = dayObj.date.toISOString().split("T")[0];
-    const hasEvents = dayObj.events.length > 0;
-    if (this.selectedDate === dateStr) {
-      this.showDayPanel = !this.showDayPanel && hasEvents;
-    } else {
-      this.selectedDate = dateStr;
-      this.showDayPanel = hasEvents;
-    }
-    this.emit("day-click", { date: dateStr, events: dayObj.events });
-  },
-
-  handleClosePanel() {
-    this.showDayPanel = false;
-  },
-
-  handleEventClick(event, e) {
-    e?.stopPropagation();
-    this.emit("event-click", { event });
-  },
-
-  getEventsForSelectedDay() {
-    if (!this.selectedDate) return [];
-    return this.getEventsForCalendar().filter(
-      (e) => e.date === this.selectedDate,
-    );
-  },
-
-  render() {
-    const events = this.getEventsForCalendar();
-    const groupedEvents = groupEventsByDate(events);
-
-    return html\`
-      <style>
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      </style>
-
-      <div class="calendar-container" part="container">
-        \${this.showViewToggle ? this.renderViewToggle() : null}
-        \${this.viewMode === "list"
-          ? this.renderListView(groupedEvents)
-          : this.renderGridView(events)}
-      </div>
-    \`;
-  },
-
-  renderViewToggle() {
-    return html\`
-      <div class="view-toggle" part="view-toggle">
-        <button
-          @click=\${() => this.handleViewToggle("list")}
-          class="toggle-btn \${this.viewMode === "list" ? "active" : ""}"
-          part="toggle-btn \${this.viewMode === "list" ? "toggle-btn-active" : ""}"
-        >
-          List
-        </button>
-        <button
-          @click=\${() => this.handleViewToggle("month")}
-          class="toggle-btn \${this.viewMode === "month" ? "active" : ""}"
-          part="toggle-btn \${this.viewMode === "month" ? "toggle-btn-active" : ""}"
-        >
-          Month
-        </button>
-      </div>
-    \`;
-  },
-
-  renderListView(groupedEvents) {
-    const dateKeys = Object.keys(groupedEvents).sort();
-
-    if (dateKeys.length === 0) {
-      return html\`
-        <div class="empty-state" part="empty">
-          <div class="empty-icon">\u{1F4C5}</div>
-          <p class="empty-text">No events scheduled</p>
-        </div>
-      \`;
-    }
-
-    return html\`
-      <div class="list-view" part="list">
-        \${dateKeys.map((dateKey) => {
-          const eventsForDate = groupedEvents[dateKey];
-          const section = getDateSection(dateKey, this.locale);
-          return html\`
-            <div class="list-section" part="list-section">
-              <h2 class="list-section-title" part="list-section-title">\${section}</h2>
-              <div class="list-items">
-                \${eventsForDate.map(
-                  (event) => html\`
-                    <div
-                      @click=\${(e) => this.handleEventClick(event, e)}
-                      class="list-item"
-                      part="list-item"
-                      data-category="\${event.category || ""}"
-                    >
-                      \${event.image
-                        ? html\`<img
-                            src="\${event.image}"
-                            alt="\${event.title}"
-                            class="list-item-image"
-                            part="list-item-image"
-                          />\`
-                        : null}
-                      <div class="list-item-content" part="list-item-content">
-                        <div class="list-item-header">
-                          <h3 class="list-item-title" part="list-item-title">\${event.title}</h3>
-                          \${event.recurrenceParentId
-                            ? html\`<span class="recurring-badge" part="recurring-badge">\u{1F501}</span>\`
-                            : null}
-                        </div>
-                        <p class="list-item-meta" part="list-item-meta">
-                          \${event.time || ""} \${event.venue || event.address ? \`\u2022 \${event.venue || event.address}\` : ""}
-                        </p>
-                        <slot name="list-item-extra" .event=\${event}></slot>
-                      </div>
-                    </div>
-                  \`,
-                )}
-              </div>
-            </div>
-          \`;
-        })}
-      </div>
-    \`;
-  },
-
-  renderGridView(events) {
-    const days = getDaysInMonth(this.currentYear, this.currentMonth, events);
-    const monthYearLabel = formatMonthYear(this.currentMonth, this.currentYear, this.locale);
-    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-    return html\`
-      <div class="grid-view" part="grid-view">
-        \${this.showNavigation ? html\`
-          <div class="grid-header" part="header">
-            <button
-              @click=\${() => this.handleNav(-1)}
-              class="nav-btn"
-              part="nav-btn nav-btn-prev"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <h2 class="month-label" part="month-label">\${monthYearLabel}</h2>
-            <button
-              @click=\${() => this.handleNav(1)}
-              class="nav-btn"
-              part="nav-btn nav-btn-next"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-          </div>
-        \` : null}
-
-        \${this.showTodayButton ? html\`
-          <button
-            @click=\${this.handleTodayClick.bind(this)}
-            class="today-btn"
-            part="today-btn"
-          >
-            Jump to Today
-          </button>
-        \` : null}
-
-        <div class="grid-container" part="grid">
-          <div class="weekday-header" part="weekday-header">
-            \${weekDays.map(
-              (day) => html\`<div class="weekday" part="weekday">\${day}</div>\`,
-            )}
-          </div>
-          <div class="days-grid" part="days-grid">
-            \${days.map((dayObj) => {
-              const isSelected =
-                this.selectedDate === dayObj.date.toISOString().split("T")[0];
-              const hasEvents = dayObj.events.length > 0;
-              return html\`
-                <div
-                  @click=\${() => this.handleDayClick(dayObj)}
-                  class="day-cell \${dayObj.isToday ? "today" : ""} \${isSelected ? "selected" : ""} \${!dayObj.isCurrentMonth ? "other-month" : ""} \${hasEvents ? "has-events" : ""}"
-                  part="day \${dayObj.isToday ? "day-today" : ""} \${isSelected ? "day-selected" : ""} \${!dayObj.isCurrentMonth ? "day-other-month" : ""}"
-                >
-                  <span class="day-number" part="day-number">\${dayObj.day}</span>
-                  \${hasEvents
-                    ? html\`
-                        <div class="day-events" part="day-events">
-                          \${dayObj.events.slice(0, 2).map(
-                            (event) => html\`
-                              <div
-                                class="event-indicator"
-                                part="event"
-                                data-category="\${event.category || ""}"
-                              >
-                                \${event.title.length > 12
-                                  ? event.title.substring(0, 12) + "..."
-                                  : event.title}
-                              </div>
-                            \`,
-                          )}
-                          \${dayObj.events.length > 2
-                            ? html\`<div class="more-events" part="more-events">+\${dayObj.events.length - 2} more</div>\`
-                            : null}
-                        </div>
-                      \`
-                    : null}
-                </div>
-              \`;
-            })}
-          </div>
-        </div>
-
-        \${this.showDayPanel ? this.renderDayDetailPanel() : null}
-      </div>
-    \`;
-  },
-
-  renderDayDetailPanel() {
-    const selectedEvents = this.getEventsForSelectedDay();
-    const selectedDateObj = new Date(this.selectedDate);
-    const dateLabel = selectedDateObj
-      .toLocaleDateString(this.locale, {
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-      })
-      .toUpperCase();
-
-    return html\`
-      <div
-        @click=\${this.handleClosePanel.bind(this)}
-        class="panel-overlay"
-        part="panel-overlay"
-        style="animation: fadeIn 0.2s ease-out;"
-      ></div>
-      <div class="day-panel" part="panel" style="animation: slideUp 0.3s ease-out;">
-        <div class="panel-header" part="panel-header">
-          <h3 class="panel-title" part="panel-title">\${dateLabel}</h3>
-          <button
-            @click=\${this.handleClosePanel.bind(this)}
-            class="panel-close"
-            part="panel-close"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <div class="panel-content" part="panel-content">
-          \${selectedEvents.length === 0
-            ? html\`<p class="panel-empty" part="panel-empty">No events on this day</p>\`
-            : selectedEvents.map(
-                (event) => html\`
-                  <div
-                    @click=\${(e) => this.handleEventClick(event, e)}
-                    class="panel-item"
-                    part="panel-item"
-                    data-category="\${event.category || ""}"
-                  >
-                    \${event.image
-                      ? html\`<img
-                          src="\${event.image}"
-                          alt="\${event.title}"
-                          class="panel-item-image"
-                          part="panel-item-image"
-                        />\`
-                      : null}
-                    <div class="panel-item-content" part="panel-item-content">
-                      <div class="panel-item-header">
-                        <h4 class="panel-item-title" part="panel-item-title">\${event.title}</h4>
-                        \${event.recurrenceParentId
-                          ? html\`<span class="recurring-badge" part="recurring-badge">\u{1F501}</span>\`
-                          : null}
-                      </div>
-                      <p class="panel-item-meta" part="panel-item-meta">
-                        \${event.time || ""} \${event.venue || event.address ? \`\u2022 \${event.venue || event.address}\` : ""}
-                      </p>
-                    </div>
-                  </div>
-                \`,
-              )}
-        </div>
-      </div>
-    \`;
-  },
-};
-
-/**
- * Calendar Component
- *
- * @component
- * @category display
- * @tag uix-calendar
- *
- * A full-featured calendar component with list and month grid views,
- * recurring event support, and day detail panels.
- *
- * @slot - Default slot for additional content
- *
- * @part container - Main calendar container
- * @part view-toggle - View mode toggle container
- * @part toggle-btn - Toggle button
- * @part toggle-btn-active - Active toggle button
- * @part header - Grid view header with navigation
- * @part nav-btn - Navigation buttons
- * @part month-label - Current month/year label
- * @part today-btn - Jump to today button
- * @part grid - Calendar grid container
- * @part weekday-header - Weekday names row
- * @part weekday - Individual weekday name
- * @part days-grid - Grid of day cells
- * @part day - Individual day cell
- * @part day-today - Today's day cell
- * @part day-selected - Selected day cell
- * @part day-other-month - Day cell from adjacent month
- * @part day-number - Day number text
- * @part day-events - Container for event indicators
- * @part event - Event indicator in grid
- * @part more-events - "+N more" indicator
- * @part list - List view container
- * @part list-section - Date section in list view
- * @part list-section-title - Section title (TODAY, TOMORROW, etc.)
- * @part list-item - Event item in list view
- * @part list-item-image - Event image in list
- * @part list-item-content - Event content container
- * @part list-item-title - Event title
- * @part list-item-meta - Event time/venue info
- * @part recurring-badge - Recurring event indicator
- * @part panel - Day detail panel
- * @part panel-overlay - Panel backdrop overlay
- * @part panel-header - Panel header
- * @part panel-title - Panel date title
- * @part panel-close - Panel close button
- * @part panel-content - Panel event list
- * @part panel-item - Event item in panel
- * @part panel-empty - Empty panel message
- * @part empty - Empty state container
- *
- * @fires day-click - When a day is clicked. Detail: { date: string, events: array }
- * @fires event-click - When an event is clicked. Detail: { event: object }
- * @fires month-change - When month changes. Detail: { month: number, year: number }
- *
- * @example Basic Calendar
- * \`\`\`html
- * <uix-calendar
- *   .events=\${[
- *     { id: "1", date: "2024-01-15", title: "Meeting" },
- *     { id: "2", date: "2024-01-20", title: "Conference", isRecurring: true, recurrencePattern: "weekly" }
- *   ]}
- * ></uix-calendar>
- * \`\`\`
- *
- * @example List View Only
- * \`\`\`html
- * <uix-calendar
- *   viewMode="list"
- *   .showViewToggle=\${false}
- *   .events=\${events}
- * ></uix-calendar>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/display/calendar.css":{content:`:where(.uix-calendar,uix-calendar){display:block;--calendar-border-width: 2px;--calendar-border-color: black;--calendar-border-radius: .75rem;--calendar-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);--calendar-shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 1);--calendar-today-bg: #fef3c7;--calendar-today-border: #eab308;--calendar-selected-bg: var(--color-accent, #f472b6);--calendar-font-family: inherit;&::part(view-toggle){display:flex;gap:.5rem;margin-bottom:1rem}&::part(toggle-btn){flex:1;padding:.5rem 1rem;font-weight:900;font-size:.875rem;text-transform:uppercase;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);background:#fff;box-shadow:3px 3px #000;cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:1px 1px #000}}&::part(toggle-btn-active){background:var(--calendar-selected-bg)}&::part(header){display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}&::part(nav-btn){width:2.5rem;height:2.5rem;display:flex;align-items:center;justify-content:center;background:#fff;border:3px solid var(--calendar-border-color);border-radius:.5rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(month-label){font-size:1.125rem;font-weight:900;text-transform:uppercase}&::part(today-btn){width:100%;margin-bottom:1rem;padding:.5rem 1rem;background:#f9a8d4;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);font-weight:900;font-size:.875rem;text-transform:uppercase;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(grid){background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;box-shadow:6px 6px #000}&::part(weekday-header){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem;margin-bottom:.5rem}&::part(weekday){text-align:center;font-weight:900;font-size:.75rem;color:#4b5563}&::part(days-grid){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}&::part(day){aspect-ratio:1;position:relative;display:flex;flex-direction:column;align-items:flex-start;padding:.25rem;border-radius:.5rem;border:2px solid #d1d5db;cursor:pointer;overflow:hidden;transition:all .15s ease;&:active{transform:translate(1px,1px)}}&::part(day-today){background:var(--calendar-today-bg);border-color:var(--calendar-today-border);border-width:3px}&::part(day-selected){background:var(--calendar-selected-bg);border-color:var(--calendar-border-color);border-width:3px;box-shadow:var(--calendar-shadow-sm)}&::part(day-other-month){opacity:.4}&::part(day-number){font-size:.75rem;font-weight:700;margin-bottom:.125rem}&::part(day-events){width:100%;display:flex;flex-direction:column;gap:.125rem}&::part(event){font-size:9px;line-height:1.1;font-weight:700;padding:.125rem .25rem;border-radius:.25rem;border:1px solid var(--calendar-border-color);background:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(more-events){font-size:8px;font-weight:700;color:#4b5563;padding:0 .25rem}&::part(list){display:flex;flex-direction:column;gap:1.5rem}&::part(list-section-title){font-size:.875rem;font-weight:900;text-transform:uppercase;color:#4b5563;margin-bottom:.75rem}&::part(list-item){display:flex;gap:1rem;background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:1rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(list-item-image){width:5rem;height:5rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(list-item-title){font-weight:900;font-size:.875rem;line-height:1.25}&::part(list-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(recurring-badge){flex-shrink:0;font-size:.75rem;font-weight:700;background:#ddd6fe;border:1px solid var(--calendar-border-color);padding:.125rem .5rem;border-radius:.25rem}&::part(panel-overlay){position:fixed;inset:0;background:#00000080;z-index:40}&::part(panel){position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:3px solid var(--calendar-border-color);border-radius:1rem 1rem 0 0;z-index:50;max-height:70vh;overflow-y:auto}&::part(panel-header){position:sticky;top:0;background:#fff;border-bottom:2px solid var(--calendar-border-color);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}&::part(panel-title){font-weight:900;font-size:1.125rem}&::part(panel-close){width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--calendar-border-color);border-radius:.5rem;background:#fff;cursor:pointer;&:hover{background:#f3f4f6}}&::part(panel-content){padding:1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem}&::part(panel-item){display:flex;gap:.75rem;background:#f9fafb;border:2px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;cursor:pointer;box-shadow:3px 3px #000;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:none}}&::part(panel-item-image){width:4rem;height:4rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(panel-item-title){font-weight:700;font-size:.875rem;line-height:1.25}&::part(panel-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(panel-empty){text-align:center;font-size:.875rem;font-weight:700;color:#9ca3af;padding:2rem 0}&::part(empty){display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5rem 0;.empty-icon{font-size:3.75rem;margin-bottom:1rem}.empty-text{font-size:1.125rem;font-weight:700;color:#9ca3af}}}
-`,mimeType:"text/css"},"/$app/bundler/views/ui.js":{content:`import Bundler from "/$app/bundler/index.js";
-import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-$APP.define("credentials-manager", {
-  dataQuery: true,
-  properties: {
-    row: T.object(),
-  },
-  render() {
-    if (!this.row)
-      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">GitHub Credentials</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="Owner"
-            .value=\${this.row.owner}
-            @change=\${(e) => (this.row.owner = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Repository"
-            .value=\${this.row.repo}
-            @change=\${(e) => (this.row.repo = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Branch"
-            .value=\${this.row.branch}
-            @change=\${(e) => (this.row.branch = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="GitHub Token"
-            type="password"
-            .value=\${this.row.token}
-            @change=\${(e) => (this.row.token = e.target.value)}
-          ></uix-input>
-        </div>
-        <div slot="footer">
-          <uix-button
-            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row })}
-            label="Save Credentials"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("cloudflare-credentials-manager", {
-  dataQuery: true,
-  properties: {
-    row: T.object(),
-  },
-  render() {
-    if (!this.row)
-      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
-    if (!this.row.cloudflare) this.row.cloudflare = {};
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">Cloudflare Credentials</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="Account ID"
-            .value=\${this.row.cloudflare.accountId}
-            @change=\${(e) => (this.row.cloudflare.accountId = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Pages Project Name"
-            .value=\${this.row.cloudflare.projectName}
-            @change=\${(e) => (this.row.cloudflare.projectName = e.target.value)}
-          ></uix-input>
-          <uix-input
-            class="bundler-full-width"
-            label="API Token"
-            type="password"
-            .value=\${this.row.cloudflare.apiToken}
-            @change=\${(e) => (this.row.cloudflare.apiToken = e.target.value)}
-          ></uix-input>
-        </div>
-        <p class="bundler-help-text">
-          The bundler will automatically create a Cloudflare Pages project if one with the given name doesn't exist.
-        </p>
-        <div slot="footer">
-          <uix-button
-            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row, cloudflare: this.row.cloudflare })}
-            label="Save Cloudflare Credentials"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("release-creator", {
-  properties: {
-    version: T.string(\`v\${new Date().toISOString().slice(0, 10)}\`),
-    notes: T.string(""),
-    deployMode: T.string("spa"),
-    deployTarget: T.string("localhost"),
-    isDeploying: T.boolean(false),
-  },
-
-  getTargetOptions() {
-    const targets = Bundler.getTargets();
-    console.log(targets);
-    return targets.map((t) => ({
-      value: t.name,
-      label: t.label,
-    }));
-  },
-
-  getModeOptions() {
-    // When cloudflare target is selected, only worker mode makes sense
-    if (this.deployTarget === "cloudflare") {
-      return [{ value: "worker", label: "Cloudflare Workers" }];
-    }
-    return [
-      { value: "spa", label: "SPA" },
-      { value: "ssg", label: "SSG" },
-      { value: "hybrid", label: "Hybrid" },
-    ];
-  },
-
-  needsCredentials() {
-    // ZIP, TAR.GZ, and localhost don't need credentials
-    return !["zip", "targz", "localhost"].includes(this.deployTarget);
-  },
-
-  async handleDeploy() {
-    if (this.isDeploying) return;
-
-    this.isDeploying = true;
-    const credentials = await $APP.Model.bundler_credentials.get("singleton");
-
-    // Validate credentials for targets that need them
-    if (this.needsCredentials()) {
-      if (this.deployTarget === "cloudflare") {
-        if (
-          !credentials?.cloudflare?.apiToken ||
-          !credentials?.cloudflare?.accountId ||
-          !credentials?.cloudflare?.projectName
-        ) {
-          alert(
-            "Please provide your Cloudflare Account ID, API Token, and a Project Name before deploying.",
-          );
-          this.isDeploying = false;
-          return;
-        }
-      } else if (this.deployTarget === "github") {
-        if (!credentials || !credentials.token) {
-          alert("Please provide a GitHub token before deploying.");
-          this.isDeploying = false;
-          return;
-        }
-      }
-    }
-    const release = {
-      version: this.version,
-      notes: this.notes,
-      status: "pending",
-      deployedAt: Date.now(),
-      deployType: this.deployMode,
-      deployTarget: this.deployTarget,
-    };
-    try {
-      const [_, newRelease] = await $APP.Model.bundler_releases.add(release);
-      const result = await Bundler.deploy({
-        ...credentials,
-        mode: this.deployMode,
-        target: this.deployTarget,
-        version: this.version,
-      });
-      await $APP.Model.bundler_releases.edit({
-        id: newRelease.id,
-        status: "success",
-        result,
-      });
-
-      const targetLabel =
-        Bundler.getTargets().find((t) => t.name === this.deployTarget)?.label ||
-        this.deployTarget;
-      alert(\`Deployment to \${targetLabel} successful!\`);
-    } catch (error) {
-      console.error(\`Deployment failed:\`, { error });
-      console.trace();
-      alert(\`Deployment failed: \${error.message}\`);
-      if (release?._id) {
-        await $APP.Model.bundler_releases.add({
-          ...release,
-          status: "failed",
-          error: error.message,
-        });
-      }
-    } finally {
-      this.isDeploying = false;
-    }
-  },
-
-  render() {
-    const targetOptions = this.getTargetOptions();
-    const modeOptions = this.getModeOptions();
-
-    // Auto-switch to worker mode when cloudflare is selected
-    if (this.deployTarget === "cloudflare" && this.deployMode !== "worker") {
-      this.deployMode = "worker";
-    }
-    // Switch away from worker mode when not cloudflare
-    if (this.deployTarget !== "cloudflare" && this.deployMode === "worker") {
-      this.deployMode = "hybrid";
-    }
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">New Release</h2>
-        <div class="bundler-form">
-          <uix-input
-            label="Version"
-            .value=\${this.version}
-            @change=\${(e) => (this.version = e.target.value)}
-          ></uix-input>
-          <uix-textarea
-            label="Release Notes"
-            .value=\${this.notes}
-            @change=\${(e) => (this.notes = e.target.value)}
-          ></uix-textarea>
-          <uix-checkbox
-            ?checked=\${!!$APP.settings.obfuscate}
-            @change=\${(e) => ($APP.settings.obfuscate = e.target.checked)}
-            label="Obfuscate"
-          ></uix-checkbox>
-        </div>
-        <div class="bundler-deploy-row">
-          <uix-select
-            label="Build Mode"
-            value=\${this.deployMode}
-            .options=\${modeOptions}
-            @change=\${(e) => (this.deployMode = e.target.value)}
-          >
-          </uix-select>
-          <uix-select
-            label="Deploy Target"
-            value=\${this.deployTarget}
-            .options=\${targetOptions}
-            @change=\${(e) => (this.deployTarget = e.target.value)}
-          >
-          </uix-select>
-          <uix-button
-            @click=\${() => this.handleDeploy()}
-            label=\${this.isDeploying ? \`Deploying...\` : "Deploy"}
-            ?disabled=\${this.isDeploying}
-          ></uix-button>
-        </div>
-        \${
-          !this.needsCredentials()
-            ? html\`<p class="bundler-help-text">This target downloads directly to your browser - no credentials needed.</p>\`
-            : ""
-        }
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("release-history", {
-  dataQuery: true,
-  properties: {
-    rows: T.array(),
-    limit: T.number(0),
-  },
-  render() {
-    let sortedRows = this.rows?.length
-      ? [...this.rows].sort(
-          (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
-        )
-      : [];
-
-    if (this.limit > 0) {
-      sortedRows = sortedRows.slice(0, this.limit);
-    }
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">Release History</h2>
-        <div class="bundler-releases">
-          \${
-            sortedRows.length > 0
-              ? sortedRows.map(
-                  (release) => html\`
-                  <div class="bundler-release bundler-release-\${release.status}">
-                    <div class="bundler-release-row">
-                      <span class="bundler-release-version">\${release.version}</span>
-                      <span class="bundler-release-status">\${release.status}</span>
-                      \${
-                        release.deployType
-                          ? html\`<span class="bundler-release-type">\${release.deployType.toUpperCase()}</span>\`
-                          : ""
-                      }
-                      \${
-                        release.deployTarget
-                          ? html\`<span class="bundler-release-target">\${release.deployTarget}</span>\`
-                          : ""
-                      }
-                      <span class="bundler-release-date">\${new Date(release.deployedAt).toLocaleString()}</span>
-                    </div>
-                    \${
-                      release.notes
-                        ? html\`<p class="bundler-release-notes">\${release.notes}</p>\`
-                        : ""
-                    }
-                  </div>
-                \`,
-                )
-              : html\`<p class="bundler-empty">No releases yet.</p>\`
-          }
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("settings-editor", {
-  properties: {
-    _settings: T.object(null),
-  },
-  connected() {
-    this._settings = $APP.settings;
-  },
-  async handleSave() {
-    try {
-      await $APP.settings.set(this._settings);
-      alert("Settings saved successfully!");
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      alert("Error saving settings. Check the console for details.");
-    }
-  },
-  render() {
-    if (!this._settings) {
-      return html\`<div class="bundler-loading">Loading settings...</div>\`;
-    }
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">App Settings</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="App Name"
-            .value=\${this._settings.name}
-            @change=\${(e) => (this._settings.name = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Short Name"
-            .value=\${this._settings.short_name}
-            @change=\${(e) => (this._settings.short_name = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Emoji Icon"
-            .value=\${this._settings.emojiIcon}
-            @change=\${(e) => (this._settings.emojiIcon = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Icon"
-            .value=\${this._settings.icon}
-            @change=\${(e) => (this._settings.icon = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Start URL"
-            .value=\${this._settings.url}
-            @change=\${(e) => (this._settings.url = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Theme Color"
-            type="color"
-            .value=\${this._settings.theme_color}
-            @change=\${(e) => (this._settings.theme_color = e.target.value)}
-          ></uix-input>
-          <uix-input
-            class="bundler-full-width"
-            label="Open Graph Image URL"
-            .value=\${this._settings.og_image}
-            @change=\${(e) => (this._settings.og_image = e.target.value)}
-          ></uix-input>
-          <uix-textarea
-            class="bundler-full-width"
-            label="Description"
-            .value=\${this._settings.description}
-            @change=\${(e) => (this._settings.description = e.target.value)}
-          ></uix-textarea>
-        </div>
-        <div slot="footer">
-          <uix-button
-            @click=\${this.handleSave.bind(this)}
-            label="Save Settings"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-export default {
-  tag: "bundler-ui",
-  style: true,
-  properties: {
-    activeTab: T.number(0),
-    releaseStats: T.object({
-      defaultValue: {
-        total: 0,
-        success: 0,
-        failed: 0,
-        pending: 0,
-        lastDeploy: null,
-      },
-    }),
-    releases: T.array(),
-  },
-
-  async connected() {
-    await this.loadStats();
-  },
-
-  async loadStats() {
-    try {
-      const releases = await $APP.Model.bundler_releases.getAll();
-      this.releases = releases || [];
-      this.releaseStats = {
-        total: this.releases.length,
-        success: this.releases.filter((r) => r.status === "success").length,
-        failed: this.releases.filter((r) => r.status === "failed").length,
-        pending: this.releases.filter((r) => r.status === "pending").length,
-        lastDeploy:
-          this.releases.length > 0
-            ? [...this.releases].sort(
-                (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
-              )[0]?.deployedAt
-            : null,
-      };
-    } catch (error) {
-      console.error("Failed to load release stats:", error);
-    }
-  },
-
-  formatDate(date) {
-    if (!date) return "Never";
-    return new Date(date).toLocaleDateString();
-  },
-
-  render() {
-    return html\`
-      <div class="bundler-ui">
-        <h1 class="bundler-page-title">Release Manager</h1>
-        <uix-tabs .activeTab=\${this.activeTab} @tab-change=\${(e) => (this.activeTab = e.detail)}>
-          <button slot="tab"><uix-icon name="layout-dashboard"></uix-icon> Dashboard</button>
-          <button slot="tab"><uix-icon name="settings"></uix-icon> Settings</button>
-          <button slot="tab"><uix-icon name="rocket"></uix-icon> Deploy</button>
-          <button slot="tab"><uix-icon name="key"></uix-icon> Credentials</button>
-
-          <div slot="panel">\${this.renderDashboard()}</div>
-          <div slot="panel">\${this.renderSettings()}</div>
-          <div slot="panel">\${this.renderDeploy()}</div>
-          <div slot="panel">\${this.renderCredentials()}</div>
-        </uix-tabs>
-      </div>
-    \`;
-  },
-
-  renderDashboard() {
-    return html\`
-      <div class="bundler-dashboard">
-        <div class="bundler-stats-grid">
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Total Releases" value=\${this.releaseStats.total} centered>
-              <uix-icon slot="figure" name="package" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Successful" value=\${this.releaseStats.success} variant="success" centered>
-              <uix-icon slot="figure" name="circle-check" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Failed" value=\${this.releaseStats.failed} variant="danger" centered>
-              <uix-icon slot="figure" name="circle-x" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Last Deploy" value=\${this.formatDate(this.releaseStats.lastDeploy)} centered>
-              <uix-icon slot="figure" name="clock" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-        </div>
-
-        <uix-card shadow="none" borderWidth="0">
-          <h3 slot="header">Quick Actions</h3>
-          <div class="bundler-quick-actions">
-            <uix-button @click=\${() => (this.activeTab = 2)}>
-              <uix-icon name="rocket"></uix-icon> Deploy Now
-            </uix-button>
-            <uix-button @click=\${() => (this.activeTab = 1)}>
-              <uix-icon name="settings"></uix-icon> Settings
-            </uix-button>
-            <uix-button @click=\${() => this.loadStats()}>
-              <uix-icon name="refresh-cw"></uix-icon> Refresh
-            </uix-button>
-          </div>
-        </uix-card>
-
-        <release-history
-          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
-        ></release-history>
-      </div>
-    \`;
-  },
-
-  renderSettings() {
-    return html\`
-      <div class="bundler-tab-content">
-        <settings-editor></settings-editor>
-      </div>
-    \`;
-  },
-
-  renderDeploy() {
-    return html\`
-      <div class="bundler-tab-content bundler-deploy-content">
-        <release-creator></release-creator>
-        <release-history
-          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
-        ></release-history>
-      </div>
-    \`;
-  },
-
-  renderCredentials() {
-    return html\`
-      <div class="bundler-tab-content bundler-credentials-content">
-        <credentials-manager
-          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
-        ></credentials-manager>
-        <cloudflare-credentials-manager
-          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
-        ></cloudflare-credentials-manager>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/bundler/views/ui.css":{content:`.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}
-`,mimeType:"text/css"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-tabs",
-  properties: {
-    activeTab: T.number(0),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "pills", "underline"],
-    }),
-    vertical: T.boolean(),
-  },
-  style: true,
-  shadow: true,
-
-  firstUpdated() {
-    const slot = this.shadowRoot.querySelector("slot[name=panel]");
-    slot.addEventListener("slotchange", () => {
-      this.updateActivePanels();
-    });
-  },
-
-  updateActivePanels() {
-    const panelSlot = this.shadowRoot.querySelector("slot[name=panel]");
-    const tabSlot = this.shadowRoot.querySelector("slot[name=tab]");
-
-    if (!panelSlot) return;
-
-    const panels = panelSlot.assignedNodes({ flatten: true });
-    const tabs = tabSlot?.assignedElements() || [];
-
-    // Update panel visibility
-    if (panels.length > 1) {
-      panels.forEach((panel, index) => {
-        if (index === this.activeTab) {
-          panel.removeAttribute("hide");
-        } else {
-          panel.setAttribute("hide", "");
-        }
-      });
-    }
-
-    // Update tab active state
-    tabs.forEach((tab, index) => {
-      if (index === this.activeTab) {
-        tab.setAttribute("active", "");
-      } else {
-        tab.removeAttribute("active");
-      }
-    });
-  },
-
-  selectTab(e) {
-    const clickedElement = e.target;
-    const slot = clickedElement.assignedSlot;
-    if (slot && slot.name === "tab") {
-      const tabs = slot.assignedElements();
-      const index = tabs.indexOf(clickedElement);
-      this.activeTab = index;
-      this.updateActivePanels();
-      this.emit("tab-change", index);
-    }
-  },
-
-  render() {
-    return html\`
-        <div
-          part="tab-list"
-          role="tablist"
-          aria-orientation=\${this.vertical ? "vertical" : "horizontal"}
-        >
-          <slot name="tab" part="tab" @click=\${this.selectTab.bind(this)}></slot>
-        </div>
-        <slot part="tab-panel" name="panel" part="panel"></slot>
-     
-    \`;
-  },
-};
-
-/**
- * Tabs Component
- *
- * @component
- * @category navigation
- * @tag uix-tabs
- *
- * Accessible tabs with keyboard navigation and flexible content
- *
- * @example
- * // Pattern 1: Static tabs with multiple panels (each panel rendered separately)
- * \`\`\`html
- * <uix-tabs activeTab=2>
- *   <button slot="tab">Profile</button>
- *   <button slot="tab">Settings</button>
- *   <button slot="tab">Account</button>
- *
- *   <div slot="panel">Profile content...</div>
- *   <div slot="panel">Settings content...</div>
- *   <div slot="panel">Account content...</div>
- * </uix-tabs>
- * \`\`\`
- *
- * @example
- * // Pattern 2: Dynamic tabs with single panel (content switches based on active tab)
- * \`\`\`js
- * html\`<uix-tabs>
- *   \${sections.map(section => html\`
- *     <button slot="tab">
- *       <uix-icon name=\${section.icon}></uix-icon>
- *       \${section.label}
- *     </button>
- *   \`)}
- *   <div slot="panel">
- *     \${sections[this.activeTab].render()}
- *   </div>
- * </uix-tabs>\`
- * \`\`\`
- * @example
- * // With variants
- *
- * \`\`\`html
- * <uix-tabs variant="pills">
- *   <button slot="tab">Tab 1</button>
- *   <button slot="tab">Tab 2</button>
- *   <div slot="panel">Panel 1</div>
- *   <div slot="panel">Panel 2</div>
- * </uix-tabs>
- * \`\`\`
- *
- * @example
- * // Vertical orientation
- * \`\`\`html
- * <uix-tabs vertical variant="underline">
- *   <button slot="tab">Navigation</button>
- *   <button slot="tab">Content</button>
- *   <div slot="panel">Nav content</div>
- *   <div slot="panel">Main content</div>
- * </uix-tabs>
- * \`\`\`
- * @example
- * // Controlled with property binding
- * \`\`\`js
- * html\`<uix-tabs .activeTab=\${this.currentTab} @tab-change=\${this.handleTabChange}>
- *   <button slot="tab">First</button>
- *   <button slot="tab">Second</button>
- *   <div slot="panel">First panel</div>
- *   <div slot="panel">Second panel</div>
- * </uix-tabs>\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/display/stat.js":{content:`import T from "/$app/types/index.js";
-import { html, nothing } from "/npm/lit-html";
-
-export default {
-  tag: "uix-stat",
-  properties: {
-    title: T.string(""),
-    value: T.any(""),
-    desc: T.string(""),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["sm", "md", "lg"],
-    }),
-    variant: T.string({
-      defaultValue: "default",
-      enum: [
-        "default",
-        "primary",
-        "secondary",
-        "success",
-        "danger",
-        "warning",
-        "info",
-      ],
-    }),
-    centered: T.boolean(false),
-  },
-  style: true,
-  shadow: true,
-
-  render() {
-    return html\`
-      <div part="figure">
-        <slot name="figure"></slot>
-      </div>
-      <div part="body">
-        \${this.title ? html\`<div part="title">\${this.title}</div>\` : nothing}
-        \${this.value !== "" ? html\`<div part="value">\${this.value}</div>\` : nothing}
-        <div part="desc">
-          \${this.desc ? this.desc : html\`<slot></slot>\`}
-        </div>
-      </div>
-    \`;
-  },
-};
-
-/**
- * Stat Component
- *
- * @component
- * @category display
- * @tag uix-stat
- *
- * Display statistics with title, value, and description in a clean format.
- * Supports icons/figures and works great when grouped with uix-join.
- *
- * @slot default - Description content below the value
- * @slot figure - Icon, avatar, or image to display alongside the stat
- *
- * @part figure - Container for the figure slot
- * @part body - Container for title, value, and description
- * @part title - The stat title/label
- * @part value - The main stat value (hero element)
- * @part desc - Description text below the value
- *
- * @example
- * // Basic stat
- * \`\`\`html
- * <uix-stat title="Total Users" value="1,234"></uix-stat>
- * \`\`\`
- *
- * @example
- * // With description
- * \`\`\`html
- * <uix-stat title="Downloads" value="31K" desc="Jan 1st - Feb 1st"></uix-stat>
- * \`\`\`
- *
- * @example
- * // With icon figure
- * \`\`\`html
- * <uix-stat title="Total Likes" value="25.6K" variant="primary">
- *   <uix-icon slot="figure" name="heart" size="lg"></uix-icon>
- *   21% more than last month
- * </uix-stat>
- * \`\`\`
- *
- * @example
- * // With colored variants
- * \`\`\`html
- * <uix-stat title="Active" value="85" variant="success">\u2191 12%</uix-stat>
- * <uix-stat title="Errors" value="3" variant="danger">\u2193 5%</uix-stat>
- * \`\`\`
- *
- * @example
- * // Grouped stats with uix-join
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
- *   <uix-stat title="New Users" value="4,200">\u2191 400 (22%)</uix-stat>
- *   <uix-stat title="New Registers" value="1,200">\u2193 90 (14%)</uix-stat>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // Stats with icons grouped
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Total Likes" value="25.6K" variant="primary">
- *     <uix-icon slot="figure" name="heart"></uix-icon>
- *     21% more than last month
- *   </uix-stat>
- *   <uix-stat title="Page Views" value="2.6M" variant="secondary">
- *     <uix-icon slot="figure" name="zap"></uix-icon>
- *     21% more than last month
- *   </uix-stat>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // Centered stats
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Passed" value="85" variant="success" centered></uix-stat>
- *   <uix-stat title="Failed" value="3" variant="danger" centered></uix-stat>
- *   <uix-stat title="Pending" value="12" variant="warning" centered></uix-stat>
- * </uix-join>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/form/input.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-input-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-input",
-  properties: {
-    label: T.string(),
-    name: T.string(),
-    id: T.string(),
-    value: T.string(""),
-    placeholder: T.string(""),
-    type: T.string({
-      defaultValue: "text",
-      enum: ["text", "email", "tel", "url", "search", "password"],
-    }),
-    size: T.string({
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    disabled: T.boolean(false),
-    readonly: T.boolean(false),
-    required: T.boolean(false),
-    error: T.boolean(false),
-    fullWidth: T.boolean(false),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-  },
-  style: true,
-  shadow: false,
-
-  connected() {
-    if (!this.id && !this._inputId) {
-      this._inputId = generateId();
-    }
-  },
-
-  getInputId() {
-    return this.id || this._inputId || (this._inputId = generateId());
-  },
-
-  handleInput(e) {
-    this.value = e.target.value;
-    this.emit("input", { value: this.value });
-  },
-
-  handleChange(e) {
-    this.value = e.target.value;
-    this.emit("change", { value: this.value });
-  },
-
-  render() {
-    const id = this.getInputId();
-    return html\`
-      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-      <input
-        id=\${id}
-        name=\${this.name ?? id}
-        class="input"
-        type=\${this.type}
-        value=\${this.value}
-        placeholder=\${this.placeholder}
-        ?disabled=\${this.disabled}
-        ?readonly=\${this.readonly}
-        ?required=\${this.required}
-        @input=\${this.handleInput.bind(this)}
-        @change=\${this.handleChange.bind(this)}
-      />
-    \`;
-  },
-};
-
-/**
- * Input Component
- *
- * @component
- * @category form
- * @tag uix-input
- *
- * Text input field with size variants matching button sizes for use in uix-join
- *
- * @example
- * // Basic input
- * \`\`\`html
- * <uix-input placeholder="Enter text..."></uix-input>
- * \`\`\`
- *
- * @example
- * // With sizes
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input size="xs" placeholder="Extra small"></uix-input>
- *   <uix-input size="sm" placeholder="Small"></uix-input>
- *   <uix-input size="md" placeholder="Medium"></uix-input>
- *   <uix-input size="lg" placeholder="Large"></uix-input>
- *   <uix-input size="xl" placeholder="Extra large"></uix-input>
- * </div>
- * \`\`\`
- *
- * @example
- * // Different input types
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input type="text" placeholder="Text"></uix-input>
- *   <uix-input type="email" placeholder="Email"></uix-input>
- *   <uix-input type="tel" placeholder="Phone"></uix-input>
- *   <uix-input type="url" placeholder="URL"></uix-input>
- *   <uix-input type="search" placeholder="Search"></uix-input>
- *   <uix-input type="password" placeholder="Password"></uix-input>
- * </div>
- * \`\`\`
- *
- * @example
- * // In button group with uix-join
- * \`\`\`html
- * <uix-join>
- *   <uix-input placeholder="Search..." size="md"></uix-input>
- *   <uix-button variant="primary" size="md">Search</uix-button>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // With binding
- * \`\`\`js
- * html\`<uix-input
- *   .value=\${this.searchQuery}
- *   @input=\${(e) => this.searchQuery = e.detail.value}
- *   placeholder="Search..."
- * ></uix-input>\`
- * \`\`\`
- *
- * @example
- * // States
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input placeholder="Normal"></uix-input>
- *   <uix-input placeholder="Disabled" disabled></uix-input>
- *   <uix-input placeholder="Readonly" value="Read only text" readonly></uix-input>
- *   <uix-input placeholder="Required" required></uix-input>
- * </div>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-textarea",
-  properties: {
-    label: T.string(),
-    id: T.string(),
-    value: T.string(""),
-    placeholder: T.string(""),
-    rows: T.number({ defaultValue: 4 }),
-    cols: T.number({ defaultValue: 50 }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    disabled: T.boolean(false),
-    readonly: T.boolean(false),
-    required: T.boolean(false),
-    maxlength: T.number({ defaultValue: null }),
-    minlength: T.number({ defaultValue: null }),
-    resize: T.string({
-      defaultValue: "vertical",
-      enum: ["none", "both", "horizontal", "vertical"],
-    }),
-    error: T.boolean(false),
-    fullWidth: T.boolean(false),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-    name: T.string(),
-  },
-  style: true,
-  shadow: false,
-  formAssociated: true,
-
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._internals.setFormValue(this.value);
-    if (!this.id && !this._textareaId) {
-      this._textareaId = generateId();
-    }
-  },
-
-  get textareaId() {
-    return this.id || this._textareaId || (this._textareaId = generateId());
-  },
-
-  handleInput(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("input", { value: this.value });
-  },
-
-  handleChange(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("change", { value: this.value });
-  },
-
-  render() {
-    const id = this.textareaId;
-    const attrs = {};
-    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
-    if (this.minlength !== null) attrs.minlength = this.minlength;
-
-    return html\`
-      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-      <textarea
-        id=\${id}
-        class="textarea"
-        name=\${this.name}
-        value=\${this.value}
-        placeholder=\${this.placeholder}
-        rows=\${this.rows}
-        cols=\${this.cols}
-        ?disabled=\${this.disabled}
-        ?readonly=\${this.readonly}
-        ?required=\${this.required}
-        @input=\${this.handleInput.bind(this)}
-        @change=\${this.handleChange.bind(this)}
-      ></textarea>
-    \`;
-  },
-};
-
-/**
- * Textarea Component
- *
- * @component
- * @category form
- * @tag uix-textarea
- *
- * Multi-line text input field with size variants and resize options.
- *
- * @example
- * // Basic textarea
- * \`\`\`html
- * <uix-textarea placeholder="Enter your message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // With custom rows
- * \`\`\`html
- * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
- *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
- *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
- *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
- *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // Resize options
- * \`\`\`html
- * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
- *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
- *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
- *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
- *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With character limit
- * \`\`\`html
- * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
- * \`\`\`
- *
- * @example
- * // States
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea placeholder="Normal"></uix-textarea>
- *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
- *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
- *   <uix-textarea placeholder="Required" required></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With binding
- * \`\`\`js
- * html\`<uix-textarea
- *   .value=\${this.message}
- *   @input=\${(e) => this.message = e.detail.value}
- *   placeholder="Type your message..."
- * ></uix-textarea>\`
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-checkbox-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-checkbox",
-  properties: {
-    id: T.string(),
-    label: T.string(),
-    checked: T.boolean(false),
-    value: T.string(""),
-    name: T.string(""),
-    disabled: T.boolean(false),
-    required: T.boolean(false),
-    indeterminate: T.boolean(false),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    variant: T.string({
-      defaultValue: "primary",
-      enum: ["primary", "secondary", "success", "warning", "error"],
-    }),
-  },
-  style: true,
-  shadow: false,
-  formAssociated: true,
-
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._updateFormValue();
-    if (!this.id && !this._checkboxId) {
-      this._checkboxId = generateId();
-    }
-  },
-
-  get checkboxId() {
-    return this.id || this._checkboxId || (this._checkboxId = generateId());
-  },
-
-  updated({ changedProps }) {
-    if (changedProps.has("checked")) {
-      this._updateFormValue();
-    }
-    // Handle indeterminate state
-    if (changedProps.has("indeterminate")) {
-      const input =
-        this.shadowRoot?.querySelector("input") || this.querySelector("input");
-      if (input) {
-        input.indeterminate = this.indeterminate;
-      }
-    }
-  },
-
-  _updateFormValue() {
-    if (this._internals) {
-      this._internals.setFormValue(this.checked ? this.value || "on" : null);
-    }
-  },
-
-  handleChange(e) {
-    this.checked = e.target.checked;
-    this.indeterminate = false;
-    this._updateFormValue();
-    this.emit("change", { checked: this.checked, value: this.value });
-  },
-
-  render() {
-    const id = this.checkboxId;
-    return html\`
-      <input
-        type="checkbox"
-        id=\${id}
-        class="checkbox"
-        ?checked=\${this.checked}
-        .indeterminate=\${this.indeterminate}
-        value=\${this.value}
-        name=\${this.name}
-        ?disabled=\${this.disabled}
-        ?required=\${this.required}
-        @change=\${this.handleChange.bind(this)}
-      />
-      \${this.label ? html\`<uix-label inline for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-    \`;
-  },
-};
-
-/**
- * Checkbox Component
- *
- * @component
- * @category form
- * @tag uix-checkbox
- *
- * A checkbox input for boolean selections with label support.
- *
- * @example
- * // Basic checkbox
- * \`\`\`html
- * <uix-checkbox label="Accept terms and conditions"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Checked by default
- * \`\`\`html
- * <uix-checkbox checked label="Subscribe to newsletter"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox size="xs" label="Extra small"></uix-checkbox>
- *   <uix-checkbox size="sm" label="Small"></uix-checkbox>
- *   <uix-checkbox size="md" checked label="Medium"></uix-checkbox>
- *   <uix-checkbox size="lg" label="Large"></uix-checkbox>
- *   <uix-checkbox size="xl" label="Extra large"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // Color variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox variant="primary" checked label="Primary"></uix-checkbox>
- *   <uix-checkbox variant="secondary" checked label="Secondary"></uix-checkbox>
- *   <uix-checkbox variant="success" checked label="Success"></uix-checkbox>
- *   <uix-checkbox variant="warning" checked label="Warning"></uix-checkbox>
- *   <uix-checkbox variant="error" checked label="Error"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // Indeterminate state
- * \`\`\`html
- * <uix-checkbox indeterminate label="Select all"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Disabled state
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox disabled label="Disabled unchecked"></uix-checkbox>
- *   <uix-checkbox checked disabled label="Disabled checked"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // With event handling
- * \`\`\`js
- * html\`<uix-checkbox
- *   .checked=\${this.agreed}
- *   @change=\${(e) => this.agreed = e.detail.checked}
- *   label="I agree to the terms"
- * ></uix-checkbox>\`
- * \`\`\`
- *
- * @example
- * // In a form
- * \`\`\`html
- * <form>
- *   <uix-checkbox name="newsletter" value="yes" label="Subscribe to newsletter"></uix-checkbox>
- *   <uix-checkbox name="terms" value="accepted" required label="Accept terms"></uix-checkbox>
- *   <button type="submit">Submit</button>
- * </form>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/form/select.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-select-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-select",
-  style: true,
-  formAssociated: true,
-  properties: {
-    id: T.string(),
-    value: T.string(),
-    disabled: T.boolean(),
-    required: T.boolean(),
-    placeholder: T.string(),
-    name: T.string(),
-    label: T.string(),
-    options: T.array({ defaultValue: [] }),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-  },
-  formResetCallback() {
-    const $select = this.querySelector("select");
-    if ($select) {
-      $select.value = this._defaultValue || "";
-      this.value = $select.value;
-    }
-  },
-  formDisabledCallback(disabled) {
-    const $select = this.querySelector("select");
-    if ($select) $select.disabled = disabled;
-  },
-  formStateRestoreCallback(state) {
-    const $select = this.querySelector("select");
-    if ($select) $select.value = state;
-    this.value = state;
-  },
-  reportValidity() {
-    const $select = this.querySelector("select");
-    if (!$select) return true;
-    const validity = $select.reportValidity() !== false;
-    $select?.classList.toggle("input-error", !validity);
-    return validity;
-  },
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._defaultValue = this.value;
-    if (!this.id && !this._selectId) {
-      this._selectId = generateId();
-    }
-  },
-
-  get selectId() {
-    return this.id || this._selectId || (this._selectId = generateId());
-  },
-
-  _onInput(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-  },
-
-  _onChange(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-  },
-
-  render() {
-    const { value, disabled, required, placeholder, name, label, options } = this;
-    const id = this.selectId;
-    return html\`
-        \${label ? html\`<uix-label for=\${id} text=\${label} ?required=\${required}></uix-label>\` : ""}
-        <div class="select-wrapper">
-          <select
-            id=\${id}
-            name=\${name || ""}
-            value=\${value || ""}
-            ?disabled=\${disabled}
-            ?required=\${required}
-            @input=\${this._onInput.bind(this)}
-            @change=\${this._onChange.bind(this)}
-          >
-            \${
-              placeholder && !value
-                ? html\`<option value="" disabled selected hidden>
-                  \${placeholder}
-                </option>\`
-                : ""
-            }
-            \${options.map(
-              (option) => html\`
-                <option
-                  value=\${option.value ?? option}
-                  ?selected=\${(option.value ?? option) === this.value}
-                >
-                  \${option.label ?? option}
-                </option>
-              \`,
-            )}
-          </select>
-          <uix-icon name="chevron-down" class="select-arrow"></uix-icon>
-        </div>
-    \`;
-  },
-};
-
-/**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * Select Component
- *
- * @component
- * @category form
- * @tag uix-select
- *
- * A native select dropdown with consistent styling. Accepts an options array
- * and integrates with HTML forms.
- *
- * @example Basic Select
- * \`\`\`html
- * <uix-select
- *   value="option2"
- *   options='["Option 1", "Option 2", "Option 3"]'
- * ></uix-select>
- * \`\`\`
- *
- * @example With Label and Placeholder
- * \`\`\`html
- * <uix-select
- *   label="Choose Color"
- *   placeholder="Select a color..."
- *   options='[
- *     { "value": "red", "label": "Red" },
- *     { "value": "green", "label": "Green" },
- *     { "value": "blue", "label": "Blue" }
- *   ]'
- * ></uix-select>
- * \`\`\`
- *
- * @example In a Form
- * \`\`\`html
- * <form>
- *   <uix-select
- *     name="country"
- *     label="Country"
- *     required
- *     options='["USA", "UK", "Canada"]'
- *   ></uix-select>
- * </form>
- * \`\`\`
- *
- * @example Disabled State
- * \`\`\`html
- * <uix-select
- *   disabled
- *   value="disabled"
- *   options='["This select is disabled"]'
- * ></uix-select>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-`,mimeType:"text/css"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
-`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
-`,mimeType:"text/css"},"/$app/uix/form/textarea.css":{content:`:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
-`,mimeType:"text/css"},"/$app/uix/form/checkbox.css":{content:`:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}
-`,mimeType:"text/css"},"/$app/uix/form/select.css":{content:`:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
-`,mimeType:"text/css"},"/$app/uix/form/label.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-label",
-  properties: {
-    for: T.string(),
-    text: T.string(),
-    required: T.boolean(false),
-    inline: T.boolean(false),
-  },
-  style: true,
-  shadow: false,
-
-  render() {
-    return html\`
-      <label class="label" for=\${this.for || ""}>\${this.text}\${this.required ? html\`<span class="label-required">*</span>\` : ""}</label>
-    \`;
-  },
-};
-
-/**
- * Label Component
- *
- * @component
- * @category form
- * @tag uix-label
- *
- * A form label with consistent styling and required indicator support.
- *
- * @example
- * // Basic label
- * \`\`\`html
- * <uix-label for="username">Username</uix-label>
- * <uix-input id="username"></uix-input>
- * \`\`\`
- *
- * @example
- * // Required label
- * \`\`\`html
- * <uix-label for="email" required>Email</uix-label>
- * <uix-input id="email" required></uix-input>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/form/label.css":{content:`:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}
-`,mimeType:"text/css"},"/lit-html":{content:`export*from"/lit-html@3.3.1/es2022/lit-html.mjs";
+`,mimeType:"text/javascript"},"/lit-html":{content:`export*from"/lit-html@3.3.1/es2022/lit-html.mjs";
 `,mimeType:"application/javascript"},"/lit-html@3.3.1/es2022/lit-html.mjs":{content:`var M=globalThis,b=M.trustedTypes,P=b?b.createPolicy("lit-html",{createHTML:e=>e}):void 0,w="$lit$",d=\`lit$\${Math.random().toFixed(9).slice(2)}$\`,S="?"+d,X=\`<\${S}>\`,c=document,f=()=>c.createComment(""),y=e=>e===null||typeof e!="object"&&typeof e!="function",I=Array.isArray,R=e=>I(e)||typeof e?.[Symbol.iterator]=="function",E=\`[ 	
 \\f\\r]\`,H=/<(?:(!--|\\/[^a-zA-Z])|(\\/?[a-zA-Z][^>\\s]*)|(\\/?$))/g,L=/-->/g,O=/>/g,u=RegExp(\`>|\${E}(?:([^\\\\s"'>=/]+)(\${E}*=\${E}*(?:[^ 	
 \\f\\r"'\\\`<>=]|("|')|))|$)\`,"g"),W=/'/g,j=/"/g,D=/^(?:script|style|textarea|title)$/i,B=e=>(t,...i)=>({_$litType$:e,strings:t,values:i}),Y=B(1),tt=B(2),et=B(3),m=Symbol.for("lit-noChange"),a=Symbol.for("lit-nothing"),V=new WeakMap,g=c.createTreeWalker(c,129);function k(e,t){if(!I(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return P!==void 0?P.createHTML(t):t}var z=(e,t)=>{let i=e.length-1,n=[],s,r=t===2?"<svg>":t===3?"<math>":"",h=H;for(let l=0;l<i;l++){let o=e[l],N,A,$=-1,_=0;for(;_<o.length&&(h.lastIndex=_,A=h.exec(o),A!==null);)_=h.lastIndex,h===H?A[1]==="!--"?h=L:A[1]!==void 0?h=O:A[2]!==void 0?(D.test(A[2])&&(s=RegExp("</"+A[2],"g")),h=u):A[3]!==void 0&&(h=u):h===u?A[0]===">"?(h=s??H,$=-1):A[1]===void 0?$=-2:($=h.lastIndex-A[2].length,N=A[1],h=A[3]===void 0?u:A[3]==='"'?j:W):h===j||h===W?h=u:h===L||h===O?h=H:(h=u,s=void 0);let p=h===u&&e[l+1].startsWith("/>")?" ":"";r+=h===H?o+X:$>=0?(n.push(N),o.slice(0,$)+w+o.slice($)+d+p):o+d+($===-2?l:p)}return[k(e,r+(e[i]||"<?>")+(t===2?"</svg>":t===3?"</math>":"")),n]},U=class K{constructor({strings:t,_$litType$:i},n){let s;this.parts=[];let r=0,h=0,l=t.length-1,o=this.parts,[N,A]=z(t,i);if(this.el=K.createElement(N,n),g.currentNode=this.el.content,i===2||i===3){let $=this.el.content.firstChild;$.replaceWith(...$.childNodes)}for(;(s=g.nextNode())!==null&&o.length<l;){if(s.nodeType===1){if(s.hasAttributes())for(let $ of s.getAttributeNames())if($.endsWith(w)){let _=A[h++],p=s.getAttribute($).split(d),T=/([.?@])?(.*)/.exec(_);o.push({type:1,index:r,name:T[2],strings:p,ctor:T[1]==="."?Z:T[1]==="?"?q:T[1]==="@"?G:x}),s.removeAttribute($)}else $.startsWith(d)&&(o.push({type:6,index:r}),s.removeAttribute($));if(D.test(s.tagName)){let $=s.textContent.split(d),_=$.length-1;if(_>0){s.textContent=b?b.emptyScript:"";for(let p=0;p<_;p++)s.append($[p],f()),g.nextNode(),o.push({type:2,index:++r});s.append($[_],f())}}}else if(s.nodeType===8)if(s.data===S)o.push({type:2,index:r});else{let $=-1;for(;($=s.data.indexOf(d,$+1))!==-1;)o.push({type:7,index:r}),$+=d.length-1}r++}}static createElement(t,i){let n=c.createElement("template");return n.innerHTML=t,n}};function v(e,t,i=e,n){if(t===m)return t;let s=n!==void 0?i._$Co?.[n]:i._$Cl,r=y(t)?void 0:t._$litDirective$;return s?.constructor!==r&&(s?._$AO?.(!1),r===void 0?s=void 0:(s=new r(e),s._$AT(e,i,n)),n!==void 0?(i._$Co??=[])[n]=s:i._$Cl=s),s!==void 0&&(t=v(e,s._$AS(e,t.values),s,n)),t}var F=class{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){let{el:{content:t},parts:i}=this._$AD,n=(e?.creationScope??c).importNode(t,!0);g.currentNode=n;let s=g.nextNode(),r=0,h=0,l=i[0];for(;l!==void 0;){if(r===l.index){let o;l.type===2?o=new C(s,s.nextSibling,this,e):l.type===1?o=new l.ctor(s,l.name,l.strings,this,e):l.type===6&&(o=new J(s,this,e)),this._$AV.push(o),l=i[++h]}r!==l?.index&&(s=g.nextNode(),r++)}return g.currentNode=c,n}p(e){let t=0;for(let i of this._$AV)i!==void 0&&(i.strings!==void 0?(i._$AI(e,i,t),t+=i.strings.length-2):i._$AI(e[t])),t++}},C=class Q{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,n,s){this.type=2,this._$AH=a,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=n,this.options=s,this._$Cv=s?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode,i=this._$AM;return i!==void 0&&t?.nodeType===11&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=v(this,t,i),y(t)?t===a||t==null||t===""?(this._$AH!==a&&this._$AR(),this._$AH=a):t!==this._$AH&&t!==m&&this._(t):t._$litType$!==void 0?this.$(t):t.nodeType!==void 0?this.T(t):R(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==a&&y(this._$AH)?this._$AA.nextSibling.data=t:this.T(c.createTextNode(t)),this._$AH=t}$(t){let{values:i,_$litType$:n}=t,s=typeof n=="number"?this._$AC(t):(n.el===void 0&&(n.el=U.createElement(k(n.h,n.h[0]),this.options)),n);if(this._$AH?._$AD===s)this._$AH.p(i);else{let r=new F(s,this),h=r.u(this.options);r.p(i),this.T(h),this._$AH=r}}_$AC(t){let i=V.get(t.strings);return i===void 0&&V.set(t.strings,i=new U(t)),i}k(t){I(this._$AH)||(this._$AH=[],this._$AR());let i=this._$AH,n,s=0;for(let r of t)s===i.length?i.push(n=new Q(this.O(f()),this.O(f()),this,this.options)):n=i[s],n._$AI(r),s++;s<i.length&&(this._$AR(n&&n._$AB.nextSibling,s),i.length=s)}_$AR(t=this._$AA.nextSibling,i){for(this._$AP?.(!1,!0,i);t!==this._$AB;){let n=t.nextSibling;t.remove(),t=n}}setConnected(t){this._$AM===void 0&&(this._$Cv=t,this._$AP?.(t))}},x=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,i,n,s){this.type=1,this._$AH=a,this._$AN=void 0,this.element=e,this.name=t,this._$AM=n,this.options=s,i.length>2||i[0]!==""||i[1]!==""?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=a}_$AI(e,t=this,i,n){let s=this.strings,r=!1;if(s===void 0)e=v(this,e,t,0),r=!y(e)||e!==this._$AH&&e!==m,r&&(this._$AH=e);else{let h=e,l,o;for(e=s[0],l=0;l<s.length-1;l++)o=v(this,h[i+l],t,l),o===m&&(o=this._$AH[l]),r||=!y(o)||o!==this._$AH[l],o===a?e=a:e!==a&&(e+=(o??"")+s[l+1]),this._$AH[l]=o}r&&!n&&this.j(e)}j(e){e===a?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}},Z=class extends x{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===a?void 0:e}},q=class extends x{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==a)}},G=class extends x{constructor(e,t,i,n,s){super(e,t,i,n,s),this.type=5}_$AI(e,t=this){if((e=v(this,e,t,0)??a)===m)return;let i=this._$AH,n=e===a&&i!==a||e.capture!==i.capture||e.once!==i.once||e.passive!==i.passive,s=e!==a&&(i===a||n);n&&this.element.removeEventListener(this.name,this,i),s&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){typeof this._$AH=="function"?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}},J=class{constructor(e,t,i){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(e){v(this,e)}},it={M:w,P:d,A:S,C:1,L:z,R:F,D:R,V:v,I:C,H:x,N:q,U:G,B:Z,F:J},st=M.litHtmlPolyfillSupport;st?.(U,C),(M.litHtmlVersions??=[]).push("3.3.1");var nt=(e,t,i)=>{let n=i?.renderBefore??t,s=n._$litPart$;if(s===void 0){let r=i?.renderBefore??null;n._$litPart$=s=new C(t.insertBefore(f(),r),r,void 0,i??{})}return s._$AI(e),s};export{it as _$LH,Y as html,et as mathml,m as noChange,a as nothing,nt as render,tt as svg};/*! Bundled license information:
@@ -30344,5 +31738,5 @@ lit-html/directives/unsafe-html.js:
    * SPDX-License-Identifier: BSD-3-Clause
    *)
 */
-`,mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%;--admin-header-height: 4rem;--sidebar-header-min-height: var(--admin-header-height);--sidebar-header-padding: 0 1rem;--navbar-height: var(--admin-header-height);--admin-header-border: 3px;--sidebar-header-border-width: var(--admin-header-border);--navbar-border-color: var(--color-border, #e5e7eb);--sidebar-header-background: var(--color-surface-dark, #f3f4f6);--navbar-background: var(--color-surface-dark, #f3f4f6)}.admin-main uix-navbar::part(container){border-bottom-width:var(--admin-header-border)}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;background:var(--card-background, inherit);&::part(body){display:flex;flex-direction:column;flex:1}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, transparent)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, transparent);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--breadcrumbs-font-size: .875rem;--breadcrumbs-font-weight: 700;--breadcrumbs-current-font-weight: 900;--breadcrumbs-text-transform: uppercase;--breadcrumbs-letter-spacing: .05em;--breadcrumbs-link-color: #6b7280;--breadcrumbs-link-hover-color: #1a1a1a;--breadcrumbs-current-color: #1a1a1a;--breadcrumbs-separator-color: #9ca3af;--breadcrumbs-gap: .5rem;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
+`,mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%;--admin-header-height: 4rem;--sidebar-header-min-height: var(--admin-header-height);--sidebar-header-padding: 0 1rem;--navbar-height: var(--admin-header-height);--admin-header-border: 3px;--sidebar-header-border-width: var(--admin-header-border);--navbar-border-color: var(--color-border, #e5e7eb);--sidebar-header-background: var(--color-surface-dark, #f3f4f6);--navbar-background: var(--color-surface-dark, #f3f4f6)}.admin-main uix-navbar::part(container){border-bottom-width:var(--admin-header-border)}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;background:var(--card-background, inherit);&::part(body){display:flex;flex-direction:column;flex:1}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, transparent)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, transparent);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--breadcrumbs-font-size: .875rem;--breadcrumbs-font-weight: 700;--breadcrumbs-current-font-weight: 900;--breadcrumbs-text-transform: uppercase;--breadcrumbs-letter-spacing: .05em;--breadcrumbs-link-color: #6b7280;--breadcrumbs-link-hover-color: #1a1a1a;--breadcrumbs-current-color: #1a1a1a;--breadcrumbs-separator-color: #9ca3af;--breadcrumbs-gap: .5rem;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
 `,mimeType:"text/css"}};self.addEventListener("install",e=>{console.log("SW: Installing new version...")}),self.addEventListener("activate",e=>{console.log("SW: Activated"),e.waitUntil(self.clients.claim())}),self.addEventListener("message",e=>{e.data?.type==="SKIP_WAITING"&&(console.log("SW: Skip waiting requested, activating..."),self.skipWaiting())}),self.addEventListener("fetch",e=>{let n=new URL(e.request.url).pathname;n.startsWith("/npm/")&&(n="/"+n.slice(5));const t=FILE_BUNDLE[n];t&&e.respondWith(new Response(t.content,{headers:{"Content-Type":t.mimeType||"application/javascript"}}))});
