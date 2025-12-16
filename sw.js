@@ -3556,7 +3556,4465 @@ export default {
     },
   },
 };
-`,mimeType:"text/javascript"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
+`,mimeType:"text/javascript"},"/$app/uix/docs/showcase.js":{content:`/**
+ * UIX Component Showcase
+ * Interactive component library viewer with lazy loading
+ */
+
+import Theme from "/$app/theme/index.js";
+import T from "/$app/types/index.js";
+import View from "/$app/view/index.js";
+import { html, nothing } from "/npm/lit-html";
+import { unsafeHTML } from "/npm/lit-html/directives/unsafe-html.js";
+import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
+import {
+  getComponentList,
+  getDefaultValues,
+  loadComponent,
+} from "../utils/component-registry.js";
+import "./showcase-sidebar.js";
+import "./showcase-property-editor.js";
+import "./showcase-code-viewer.js";
+import "./theme-generator.js";
+
+const ShowcaseDefinition = {
+  tag: "uix-showcase",
+  style: true,
+  properties: {
+    selectedCategory: T.string({ sync: "querystring" }),
+    selectedComponentName: T.string({ sync: "querystring" }),
+    selectedResourcePage: T.string({ sync: "querystring" }),
+    currentTheme: T.string("gruvbox-dark"),
+    componentList: T.object(),
+    selectedComponent: T.string(),
+    loading: T.boolean(),
+    error: T.string(),
+    liveProps: T.object(),
+  },
+  connected() {
+    this.componentList = getComponentList();
+    if (this.selectedComponentName)
+      this._handleComponentSelect({
+        detail: {
+          type: "component",
+          category: this.selectedCategory,
+          name: this.selectedComponentName,
+        },
+      });
+  },
+
+  async _handleComponentSelect({ detail }) {
+    const { type, category, name, page } = detail;
+
+    // Handle resource page selection
+    if (type === "resource") {
+      this.selectedResourcePage = page;
+      this.selectedCategory = null;
+      this.selectedComponentName = null;
+      this.selectedComponent = null;
+      return;
+    }
+
+    // Handle component selection
+    if (
+      this.selectedCategory === category &&
+      this.selectedComponentName === name &&
+      this.selectedComponent
+    ) {
+      return;
+    }
+
+    this.selectedResourcePage = null;
+    this.selectedCategory = category;
+    this.selectedComponentName = name;
+    this.selectedComponent = null;
+    this.loading = true;
+    this.error = null;
+
+    try {
+      // Lazy load the component
+      const metadata = await loadComponent(category, name);
+
+      this.selectedComponent = {
+        name,
+        category,
+        ...metadata,
+      };
+
+      // Initialize live props with defaults
+      this.liveProps = getDefaultValues(metadata.properties);
+    } catch (err) {
+      console.error("Failed to load component:", err);
+      this.error = err.message;
+    } finally {
+      this.loading = false;
+    }
+  },
+
+  _handlePropertyChange({ detail }) {
+    const { key, value } = detail;
+    this.liveProps = {
+      ...this.liveProps,
+      [key]: value,
+    };
+  },
+
+  _handleReset() {
+    if (this.selectedComponent) {
+      this.liveProps = getDefaultValues(this.selectedComponent.properties);
+    }
+  },
+
+  _handleThemeChange(themeName) {
+    Theme.loadTheme(themeName);
+  },
+
+  renderLiveComponent() {
+    if (!this.selectedComponent) return nothing;
+
+    const { tag } = this.selectedComponent;
+    const props = this.liveProps;
+
+    // Build attributes string
+    const attributes = Object.entries(props)
+      .map(([key, value]) => {
+        if (value === undefined || value === null) return "";
+        if (typeof value === "boolean") {
+          return value ? key : "";
+        }
+        if (typeof value === "string" || typeof value === "number") {
+          return \`\${key}="\${value}"\`;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(" ");
+
+    // Render component dynamically
+    try {
+      return staticHTML\`
+        <\${unsafeStatic(tag)} \${unsafeStatic(attributes)}>
+          \${this.renderComponentSlotContent(tag)}
+        </\${unsafeStatic(tag)}>
+      \`;
+    } catch (err) {
+      return html\`<div class="preview-error">Failed to render component</div>\`;
+    }
+  },
+
+  renderComponentSlotContent(tag) {
+    // Provide default slot content based on component type
+    if (tag.includes("button")) {
+      return "Click me";
+    }
+    if (tag.includes("input")) {
+      return nothing;
+    }
+    if (tag.includes("badge")) {
+      return "Badge";
+    }
+    if (tag.includes("modal")) {
+      return html\`
+        <div slot="header">Modal Header</div>
+        <p>Modal content goes here...</p>
+        <div slot="footer">
+          <uix-button>Cancel</uix-button>
+          <uix-button variant="primary">OK</uix-button>
+        </div>
+      \`;
+    }
+    return "Component content";
+  },
+
+  renderComponentInfo() {
+    if (!this.selectedComponent) return nothing;
+
+    const { hasShadow, parts = [], slots = [] } = this.selectedComponent;
+    const hasInfo =
+      hasShadow !== undefined || parts.length > 0 || slots.length > 0;
+
+    if (!hasInfo) return nothing;
+
+    return html\`
+      <uix-card variant="elevated" padding="lg">
+        <h3 slot="header">Component Information</h3>
+        <uix-grid cols="repeat(auto-fit,minmax(300px,1fr))" gap="md">
+          \${
+            hasShadow !== undefined
+              ? html\`
+            <uix-card variant="filled" padding="md">
+              <uix-flex direction="column" gap="sm">
+                <uix-text size="sm" weight="semibold">Shadow DOM</uix-text>
+                <div>
+                  \${
+                    hasShadow
+                      ? html\`<uix-badge variant="success" size="sm">Enabled</uix-badge>\`
+                      : html\`<uix-badge variant="default" size="sm">Disabled</uix-badge>\`
+                  }
+                </div>
+              </uix-flex>
+            </uix-card>
+          \`
+              : nothing
+          }
+
+          \${
+            slots.length > 0
+              ? html\`
+            <uix-card variant="filled" padding="md">
+              <uix-flex direction="column" gap="sm">
+                <uix-text size="sm" weight="semibold">Slots</uix-text>
+                <div>
+                  <uix-list variant="unstyled" spacing="sm">
+                    \${slots.map(
+                      (slot) => html\`
+                      <uix-list-item>
+                        <uix-flex align="baseline" gap="xs">
+                          <uix-text size="xs" weight="semibold" mono style="background: var(--color-surface-darker); padding: 2px 6px; border-radius: 3px;">\${slot.name}</uix-text>
+                          \${slot.description ? html\`<uix-text size="xs">- \${slot.description}</uix-text>\` : nothing}
+                        </uix-flex>
+                      </uix-list-item>
+                    \`,
+                    )}
+                  </uix-list>
+                </div>
+              </uix-flex>
+            </uix-card>
+          \`
+              : nothing
+          }
+
+          \${
+            parts.length > 0
+              ? html\`
+            <uix-card variant="filled" padding="md">
+              <uix-flex direction="column" gap="sm">
+                <uix-text size="sm" weight="semibold">CSS Parts</uix-text>
+                <div>
+                  <uix-list variant="unstyled" spacing="sm">
+                    \${parts.map(
+                      (part) => html\`
+                      <uix-list-item>
+                        <uix-flex align="baseline" gap="xs">
+                          <uix-text size="xs" weight="semibold" mono style="background: var(--color-surface-darker); padding: 2px 6px; border-radius: 3px;">\${part.name}</uix-text>
+                          \${part.description ? html\`<uix-text size="xs">- \${part.description}</uix-text>\` : nothing}
+                        </uix-flex>
+                      </uix-list-item>
+                    \`,
+                    )}
+                  </uix-list>
+                </div>
+              </uix-flex>
+            </uix-card>
+          \`
+              : nothing
+          }
+        </uix-grid>
+      </uix-card>
+    \`;
+  },
+
+  executeJavaScript(code) {
+    try {
+      // Create context with Lit imports
+      const context = { html, unsafeHTML, nothing };
+
+      // Execute code with controlled scope
+      const fn = new Function(...Object.keys(context), \`return (\${code})\`);
+      const result = fn(...Object.values(context));
+
+      return { success: true, result };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  renderExamples() {
+    if (!this.selectedComponent?.examples?.length) return nothing;
+
+    return html\`
+      <uix-card variant="outlined" padding="lg" style="margin-bottom: 24px;">
+        <uix-heading level="3" size="lg">Examples</uix-heading>
+        <uix-flex direction="column" gap="lg">
+          \${this.selectedComponent.examples.map(
+            (example, idx) => html\`
+            <uix-card variant="elevated" padding="lg">
+              <uix-heading level="4" size="base" slot="header">\${example.title}</uix-heading>
+              \${
+                example.description
+                  ? html\`
+                <uix-text size="sm" style="line-height: 1.6;">\${example.description}</uix-text>
+              \`
+                  : nothing
+              }
+              <uix-flex direction="column" gap="sm">
+                \${example.codeBlocks.map((block) => {
+                  const isJavaScript =
+                    block.language === "js" || block.language === "javascript";
+                  if (isJavaScript) {
+                    const execution = this.executeJavaScript(block.code);
+
+                    return html\`
+                      <uix-flex>
+                        <div flex-1 style="padding: 16px;">
+                          \${
+                            execution.success
+                              ? execution.result
+                              : html\`<uix-text text="danger">Error: \${execution.error}</uix-text>\`
+                          }
+                        </div>
+                        <uix-code style="max-height: 600px;" flex-1 language=\${block.language} .content=\${block.code} readonly></uix-code>
+                      </uix-flex>
+                    \`;
+                  }
+
+                  return html\`
+                    <uix-flex>
+                      <div flex-1 style="padding: 16px;">\${unsafeHTML(block.code)}</div>
+                      <uix-code style="max-height: 600px;" flex-1 language=\${block.language} .content=\${block.code} readonly></uix-code>
+                    </uix-flex>
+                  \`;
+                })}
+              </uix-flex>
+            </uix-card>
+          \`,
+          )}
+        </uix-flex>
+      </uix-card>
+    \`;
+  },
+
+  renderResourcePage() {
+    if (this.selectedResourcePage === "theme-generator")
+      return html\`<uix-theme-generator></uix-theme-generator>\`;
+
+    return html\`
+      <div style="max-width: 800px; margin: 0 auto;">
+        <uix-heading level="1" size="3xl" style="margin-bottom: 24px; text-transform: capitalize;">\${this.selectedResourcePage}</uix-heading>
+        <uix-card variant="filled" padding="lg">
+          <p>
+            Documentation for <strong>\${this.selectedResourcePage}</strong> coming soon...
+          </p>
+        </uix-card>
+      </div>
+    \`;
+  },
+
+  renderMainContent() {
+    // Resource page view
+    if (this.selectedResourcePage) {
+      return this.renderResourcePage();
+    }
+
+    // Empty state
+    if (!this.selectedCategory && !this.selectedComponentName) {
+      return html\`
+        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
+          <uix-icon name="package" style="width: 64px; height: 64px; opacity: 0.3;"></uix-icon>
+          <uix-heading level="2" size="2xl">Select a component</uix-heading>
+          <p>Choose a component from the sidebar to view its details and properties</p>
+        </uix-flex>
+      \`;
+    }
+
+    // Loading state
+    if (this.loading) {
+      return html\`
+        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
+          <uix-spinner size="lg"></uix-spinner>
+          <p>Loading \${this.selectedComponentName}...</p>
+        </uix-flex>
+      \`;
+    }
+
+    // Error state
+    if (this.error) {
+      return html\`
+        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
+          <uix-icon name="alert-circle" color="danger" style="width: 48px; height: 48px;"></uix-icon>
+          <uix-heading level="3" size="xl">Failed to load component</uix-heading>
+          <p>\${this.error}</p>
+        </uix-flex>
+      \`;
+    }
+
+    // Component loaded
+    if (!this.selectedComponent) return nothing;
+
+    const { tag, properties } = this.selectedComponent;
+
+    return html\`
+      <uix-flex direction="column" gap="lg" style="max-width: 1200px; margin: 0 auto; padding: 24px;">
+        <div>
+          <uix-flex align="center" gap="md">
+            <uix-heading level="1" size="2xl">&lt;\${tag}&gt;</uix-heading>
+            <uix-badge variant="info" size="sm">\${this.selectedCategory}</uix-badge>
+          </uix-flex>
+        </div>
+
+        \${this.renderComponentInfo()}
+
+        <uix-card variant="elevated" padding="lg">
+          <uix-showcase-property-editor
+            .properties=\${properties}
+            .values=\${this.liveProps}
+            @property-change=\${this._handlePropertyChange}
+            @reset=\${this._handleReset}
+          ></uix-showcase-property-editor>
+        </uix-card>
+
+        \${this.renderExamples()}
+
+        <uix-card variant="elevated" padding="lg">
+          <h3 slot="header">Generated Code</h3>
+          <uix-showcase-code-viewer
+            .tag=\${tag}
+            .props=\${this.liveProps}
+            .category=\${this.selectedCategory}
+            .name=\${this.selectedComponentName}
+          ></uix-showcase-code-viewer>
+        </uix-card>
+      </uix-flex>
+    \`;
+  },
+
+  render() {
+    const availableThemes = Theme.availableThemes || {};
+
+    return html\`
+      <uix-split-pane direction="vertical"  initialSize="50px" minSize="50px" style="height: 100vh;">
+        <uix-flex w-full slot="primary" justify="space-between" align="center" style="padding: 12px 16px;">
+          <uix-flex align="center" gap="sm">
+            <uix-icon name="package"></uix-icon>
+            <uix-heading level="1" size="xl">UIX Components</uix-heading>
+          </uix-flex>
+          <uix-flex align="center" gap="sm">
+            <uix-text size="sm">Theme</uix-text>
+            <uix-select
+              value=\${this.currentTheme}
+              .options=\${Object.keys(availableThemes)}
+              @change=\${(e) => !this._handleThemeChange(e.target.value)}
+            ></uix-select>
+          </uix-flex>
+        </uix-flex>
+        <uix-split-pane slot="secondary" initialSize="280px" minSize="280px">
+          <uix-showcase-sidebar slot="primary"
+            .componentList=\${this.componentList}
+            @select=\${this._handleComponentSelect}
+            flex-1
+          ></uix-showcase-sidebar>
+          <div slot="secondary" flex-1>
+            \${this.renderMainContent()}
+          </div>
+        </uix-split-pane>
+      </uix-split-pane>
+    \`;
+  },
+};
+
+View.define("uix-showcase", ShowcaseDefinition);
+
+export default ShowcaseDefinition;
+`,mimeType:"text/javascript"},"/$app/uix/utils/component-registry.js":{content:`/**
+ * UIX Component Registry
+ * Provides component list and lazy-loads component modules on-demand
+ */
+
+import UIX from "/$app/uix/index.js";
+import {
+  extractDescription,
+  extractExamplesFromComments,
+  extractMetadataTags,
+  extractParts,
+  extractSlots,
+} from "./example-parser.js";
+
+// Cache for loaded component modules
+const componentCache = new Map();
+
+/**
+ * Get lightweight component list from uix module
+ * Returns component names organized by category
+ */
+export function getComponentList() {
+  if (!UIX?.components) {
+    console.warn("UIX module not loaded or no components found");
+    return {};
+  }
+
+  return UIX.components;
+}
+
+/**
+ * Lazy load a specific component module
+ * @param {string} category - Component category (display, form, overlay, etc.)
+ * @param {string} name - Component name (button, input, modal, etc.)
+ * @returns {Promise<Object>} Component metadata
+ */
+export async function loadComponent(category, name) {
+  const cacheKey = \`\${category}:\${name}\`;
+
+  // Return cached component if already loaded
+  if (componentCache.has(cacheKey)) {
+    return componentCache.get(cacheKey);
+  }
+
+  try {
+    // Dynamically import the component module
+    const module = await import(
+      \`/$app/uix/\${category}/\${name}.js\`
+    );
+
+    // Fetch source code for parsing comments
+    const sourceUrl = \`/$app/uix/\${category}/\${name}.js\`;
+    const response = await fetch(sourceUrl);
+    const sourceCode = await response.text();
+
+    // Extract metadata from component definition
+    const metadata = extractMetadata(module.default, name);
+
+    // Parse examples and description from JSDoc comments
+    const examples = extractExamplesFromComments(sourceCode);
+    const description = extractDescription(sourceCode);
+    const docMetadata = extractMetadataTags(sourceCode);
+    const parts = extractParts(sourceCode);
+    const slots = extractSlots(sourceCode);
+
+    // Combine all metadata
+    const result = {
+      ...metadata,
+      examples,
+      description,
+      parts,
+      slots,
+      ...docMetadata,
+    };
+
+    // Cache the result
+    componentCache.set(cacheKey, result);
+
+    return result;
+  } catch (error) {
+    console.error(\`Failed to load component \${category}/\${name}:\`, error);
+    throw new Error(\`Component not found or failed to load: \${name}\`);
+  }
+}
+
+/**
+ * Extract metadata from component definition
+ * @param {Object} componentDef - Component definition object
+ * @param {string} name - Component name
+ * @returns {Object} Extracted metadata
+ */
+function extractMetadata(componentDef, name) {
+  if (!componentDef) {
+    throw new Error("Invalid component definition");
+  }
+
+  const properties = {};
+
+  // Extract property definitions
+  if (componentDef.properties) {
+    for (const [key, typeDef] of Object.entries(componentDef.properties)) {
+      properties[key] = extractPropertyMetadata(typeDef);
+    }
+  }
+
+  return {
+    tag: componentDef.tag || \`uix-\${name}\`,
+    properties,
+    hasStyle: componentDef.style === true,
+    hasShadow: componentDef.shadow === true,
+    i18n: componentDef.i18n || {},
+    module: componentDef,
+  };
+}
+
+/**
+ * Extract metadata from a property type definition
+ * @param {Object} typeDef - Type definition from T.*
+ * @returns {Object} Property metadata
+ */
+function extractPropertyMetadata(typeDef) {
+  // Handle simple default values (T.string("default"))
+  if (
+    typeof typeDef === "string" ||
+    typeof typeDef === "number" ||
+    typeof typeDef === "boolean"
+  ) {
+    return {
+      type: typeof typeDef,
+      defaultValue: typeDef,
+    };
+  }
+
+  // Handle object-based type definitions
+  if (typeDef && typeof typeDef === "object") {
+    return {
+      type: typeDef._type || "unknown",
+      defaultValue: typeDef._defaultValue ?? typeDef.defaultValue,
+      enum: typeDef._enum || typeDef.enum,
+      required: typeDef._required || typeDef.required || false,
+      attribute: typeDef._attribute ?? typeDef.attribute ?? true,
+    };
+  }
+
+  return {
+    type: "unknown",
+    defaultValue: undefined,
+  };
+}
+
+/**
+ * Get default values for all properties
+ * @param {Object} properties - Properties metadata
+ * @returns {Object} Default values
+ */
+export function getDefaultValues(properties) {
+  const defaults = {};
+
+  for (const [key, metadata] of Object.entries(properties)) {
+    if (metadata.defaultValue !== undefined) {
+      defaults[key] = metadata.defaultValue;
+    }
+  }
+
+  return defaults;
+}
+
+/**
+ * Clear the component cache
+ */
+export function clearCache() {
+  componentCache.clear();
+}
+`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-sidebar.js":{content:`/**
+ * UIX Showcase Sidebar
+ * Navigation for component categories and components using UIX components
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import View from "/$app/view/index.js";
+
+const resources = [
+  { id: "installation", label: "Installation", icon: "download" },
+  { id: "usage", label: "Usage", icon: "book-open" },
+  { id: "themes", label: "Themes", icon: "droplet" },
+  { id: "theme-generator", label: "Theme Generator", icon: "sliders-vertical" },
+];
+const categoryIcons = {
+  display: "eye",
+  form: "list-checks",
+  overlay: "layers",
+  layout: "layout-grid",
+  navigation: "compass",
+  feedback: "loader",
+  utility: "pen-tool",
+};
+
+const ShowcaseSidebarDefinition = {
+  tag: "uix-showcase-sidebar",
+  properties: {
+    componentList: T.object(), // Component categories and names
+    selectedCategory: T.string({ sync: "querystring" }), // Currently selected category
+    selectedComponent: T.string({ sync: "querystring" }), // Currently selected component
+    selectedResourcePage: T.string({ sync: "querystring" }), // Currently selected resource page
+    searchQuery: T.string(""), // Search filter
+  },
+  selectComponent(category, name) {
+    this.emit("select", { type: "component", category, name });
+  },
+  selectResource(page) {
+    this.emit("select", { type: "resource", page });
+  },
+  filterComponents(components, query) {
+    if (!query) return components;
+    const lowerQuery = query.toLowerCase();
+    return components.filter((name) => name.toLowerCase().includes(lowerQuery));
+  },
+  getCategoryIcon(category) {
+    return categoryIcons[category] || "package";
+  },
+  render() {
+    if (!this.componentList || Object.keys(this.componentList).length === 0) {
+      return html\`
+        <div part="container" class="sidebar-container">
+          <div class="empty-state">
+            <p>No components found</p>
+          </div>
+        </div>
+      \`;
+    }
+
+    return html\`
+      <div part="container" class="sidebar-container">
+        <!-- Search Input -->
+        <uix-container part="search" padding="md">
+            <uix-input
+              w-full
+              type="search"
+              placeholder="Search components..."
+              class="search-input"
+              .value=\${this.searchQuery}
+              @input=\${(e) => {
+                this.searchQuery = e.target.value;
+              }}
+            >
+            <uix-icon name="search"></uix-icon>
+          </uix-input>
+        </uix-container>
+
+        <uix-accordion>
+          <uix-nav-item
+            prevent-collapse
+            open
+            icon="book"
+            label="Resources"
+          >
+          </uix-nav-item>
+          <uix-menu>
+            \${resources.map(
+              (resource) => html\`
+                <uix-nav-item
+                  icon=\${resource.icon}
+                  label=\${resource.label}
+                  size="sm"
+                  ?active=\${this.selectedResourcePage === resource.id}
+                  ?activeBg=\${this.selectedResourcePage === resource.id}
+                  @nav-item-click=\${() => this.selectResource(resource.id)}
+                ></uix-nav-item>
+              \`,
+            )}
+          </uix-menu>
+
+          <!-- Component Categories -->
+          \${Object.entries(this.componentList).map(([category, components]) => {
+            const filteredComponents = this.filterComponents(
+              components,
+              this.searchQuery,
+            );
+            const componentCount = filteredComponents.length;
+
+            // Hide category if no matches after filtering
+            if (componentCount === 0 && this.searchQuery) return null;
+
+            const hasSelection = this.selectedCategory === category;
+
+            return html\`
+              <uix-nav-item
+                ?open=\${hasSelection}
+                icon=\${this.getCategoryIcon(category)}
+                label=\${category}
+                badge=\${componentCount}
+                header
+              >
+              </uix-nav-item>
+              <uix-menu>
+                \${filteredComponents.map((name) => {
+                  const isSelected =
+                    this.selectedCategory === category &&
+                    this.selectedComponent === name;
+
+                  return html\`
+                    <uix-nav-item
+                      label=\${name}
+                      size="sm"
+                      ?active=\${isSelected}
+                      ?activeBg=\${isSelected}
+                      @nav-item-click=\${() =>
+                        this.selectComponent(category, name)}
+                    ></uix-nav-item>
+                  \`;
+                })}
+              </uix-menu>
+            \`;
+          })}
+        </uix-accordion>
+      </div>
+    \`;
+  },
+};
+
+View.define("uix-showcase-sidebar", ShowcaseSidebarDefinition);
+
+export default ShowcaseSidebarDefinition;
+`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-property-editor.js":{content:`/**
+ * UIX Showcase Property Editor
+ * Interactive controls to modify component properties in real-time
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import View from "/$app/view/index.js";
+
+const ShowcasePropertyEditorDefinition = {
+  tag: "uix-showcase-property-editor",
+  properties: {
+    properties: T.object(), // Component property metadata
+    values: T.object(), // Current property values
+  },
+
+  handleChange(key, value) {
+    // Emit change event to parent
+    this.emit("property-change", { key, value });
+  },
+
+  renderPropertyControl(key, metadata) {
+    const currentValue = this.values?.[key] ?? metadata.defaultValue;
+    const { type, enum: enumValues, defaultValue } = metadata;
+
+    // Helper for default value text
+    const renderDefault = () =>
+      defaultValue !== undefined
+        ? html\`<uix-text size="xs" muted style="font-style: italic">default: \${defaultValue}</uix-text>\`
+        : null;
+
+    // Boolean: Toggle switch
+    if (type === "boolean") {
+      return html\`
+        <uix-card variant="filled" padding="sm">
+          <uix-grid cols="200px 1fr auto" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>boolean</uix-text>
+            </uix-flex>
+            <uix-switch
+              .checked=\${currentValue}
+              @change=\${(e) => this.handleChange(key, e.detail.checked)}
+            ></uix-switch>
+            \${renderDefault()}
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // String with enum: Dropdown
+    if (type === "string" && enumValues && enumValues.length > 0) {
+      return html\`
+        <uix-card variant="filled" padding="sm">
+          <uix-grid cols="200px 1fr auto" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>enum</uix-text>
+            </uix-flex>
+            <uix-select
+              .value=\${currentValue}
+              .options=\${enumValues}
+              @change=\${(e) => this.handleChange(key, e.detail.value)}
+            ></uix-select>
+            \${renderDefault()}
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // Number: Number input
+    if (type === "number") {
+      return html\`
+        <uix-card variant="filled" padding="sm">
+          <uix-grid cols="200px 1fr auto" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>number</uix-text>
+            </uix-flex>
+            <uix-input
+              type="number"
+              size="sm"
+              .value=\${currentValue}
+              @input=\${(e) => this.handleChange(key, parseFloat(e.target.value) || 0)}
+            ></uix-input>
+            \${renderDefault()}
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // String (no enum): Text input
+    if (type === "string") {
+      return html\`
+        <uix-card variant="filled" padding="sm">
+          <uix-grid cols="200px 1fr auto" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>string</uix-text>
+            </uix-flex>
+            <uix-input
+              type="text"
+              size="sm"
+              .value=\${currentValue || ""}
+              @input=\${(e) => this.handleChange(key, e.target.value)}
+            ></uix-input>
+            \${renderDefault()}
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // Array or Object: JSON editor
+    if (type === "array" || type === "object") {
+      const jsonValue = JSON.stringify(currentValue, null, 2);
+      return html\`
+        <uix-card variant="filled" padding="sm">
+          <uix-grid cols="200px 1fr" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>\${type}</uix-text>
+            </uix-flex>
+            <uix-textarea
+              size="sm"
+              .value=\${jsonValue}
+              style="min-height: 80px; font-family: monospace"
+              @input=\${(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  this.handleChange(key, parsed);
+                  e.target.removeAttribute("error");
+                } catch (err) {
+                  // Visual feedback for invalid JSON
+                  e.target.setAttribute("error", "");
+                }
+              }}
+            ></uix-textarea>
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // Function: Display only
+    if (type === "function") {
+      return html\`
+        <uix-card variant="filled" padding="sm" style="opacity: 0.6">
+          <uix-grid cols="200px 1fr" gap="md">
+            <uix-flex direction="column" gap="xs">
+              <uix-text size="sm" weight="semibold">\${key}</uix-text>
+              <uix-text size="xs" muted mono>function</uix-text>
+            </uix-flex>
+            <uix-text size="sm" muted style="font-style: italic">Event handler (immutable)</uix-text>
+          </uix-grid>
+        </uix-card>
+      \`;
+    }
+
+    // Unknown type
+    return html\`
+      <uix-card variant="filled" padding="sm" style="opacity: 0.6">
+        <uix-grid cols="200px 1fr" gap="md">
+          <uix-flex direction="column" gap="xs">
+            <uix-text size="sm" weight="semibold">\${key}</uix-text>
+            <uix-text size="xs" muted mono>\${type || "unknown"}</uix-text>
+          </uix-flex>
+          <uix-text size="sm" muted>Not editable</uix-text>
+        </uix-grid>
+      </uix-card>
+    \`;
+  },
+
+  render() {
+    if (!this.properties || Object.keys(this.properties).length === 0) {
+      return html\`
+        <uix-card variant="filled" padding="md" style="text-align: center">
+          <uix-text muted>No configurable properties</uix-text>
+        </uix-card>
+      \`;
+    }
+
+    return html\`
+      <uix-flex direction="column" gap="md" style="font-family: var(--font-sans)">
+        <uix-flex justify="space-between" align="center">
+          <uix-heading level="3" size="lg">Properties</uix-heading>
+          <uix-button
+            outline
+            size="xs"
+            @click=\${() => this.emit("reset")}
+            title="Reset to defaults"
+          >
+          <uix-icon name="rotate-ccw"></uix-icon>    
+          Reset
+          </uix-button>
+        </uix-flex>
+        <uix-flex direction="column" gap="sm">
+          \${Object.entries(this.properties).map(([key, metadata]) =>
+            this.renderPropertyControl(key, metadata),
+          )}
+        </uix-flex>
+      </uix-flex>
+    \`;
+  },
+};
+
+View.define("uix-showcase-property-editor", ShowcasePropertyEditorDefinition);
+
+export default ShowcasePropertyEditorDefinition;
+`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-code-viewer.js":{content:`/**
+ * UIX Showcase Code Viewer
+ * Displays code examples with syntax highlighting
+ */
+
+import T from "/$app/types/index.js";
+import View from "/$app/view/index.js";
+import { html } from "/npm/lit-html";
+
+const ShowcaseCodeViewerDefinition = {
+  tag: "uix-showcase-code-viewer",
+  properties: {
+    componentTag: T.string(), // Component tag name
+    props: T.object(), // Current property values
+    category: T.string(), // Component category
+    name: T.string(), // Component file name
+    copiedBasic: T.boolean(),
+    copiedImport: T.boolean(),
+  },
+  generateBasicExample() {
+    if (!this.componentTag) return "";
+
+    const { tag, props } = this;
+    const attributes = [];
+
+    // Generate attributes from props
+    for (const [key, value] of Object.entries(props || {})) {
+      if (value === undefined || value === null) continue;
+
+      if (typeof value === "boolean") {
+        if (value) attributes.push(key);
+      } else if (typeof value === "string") {
+        attributes.push(\`\${key}="\${value}"\`);
+      } else if (typeof value === "number") {
+        attributes.push(\`\${key}="\${value}"\`);
+      }
+    }
+
+    const attrsString = attributes.length > 0 ? " " + attributes.join(" ") : "";
+
+    return \`<\${tag}\${attrsString}>
+  <!-- Component Content -->
+</\${tag}>\`;
+  },
+
+  generateImportCode() {
+    if (!this.category || !this.name) return "";
+
+    return \`import "/$app/uix/app.js";
+
+// Component auto-loaded from:
+// /$app/uix/\${this.category}/\${this.name}.js\`;
+  },
+
+  async copyToClipboard(text, type) {
+    const triggerSuccess = () => {
+      this[\`copied\${type}\`] = true;
+      setTimeout(() => {
+        this[\`copied\${type}\`] = false;
+      }, 2000);
+    };
+
+    try {
+      // 1. Try Modern API
+      await navigator.clipboard.writeText(text);
+      triggerSuccess();
+    } catch (err) {
+      // 2. Fallback (iframe/legacy)
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+
+        // Ensure it's not visible but part of DOM
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (successful) triggerSuccess();
+      } catch (fallbackErr) {
+        console.error("Failed to copy:", fallbackErr);
+      }
+    }
+  },
+
+  render() {
+    if (!this.componentTag) {
+      return html\`
+        <uix-card variant="outlined" padding="md">
+          <uix-text size="sm" align="center" muted>No code example available</uix-text>
+        </uix-card>
+      \`;
+    }
+
+    const basicExample = this.generateBasicExample();
+    const importCode = this.generateImportCode();
+
+    return html\`
+      <uix-flex direction="column" gap="md">
+        <!-- Import Section -->
+        <uix-flex direction="column" gap="sm" style="position: relative;">
+          <uix-flex justify="space-between" align="center">
+            <uix-text size="sm" weight="semibold" text="inverse" style="text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;">Import</uix-text>
+            <uix-button
+              size="xs"
+              ghost
+              primary
+              @click=\${() => this.copyToClipboard(importCode, "Import")}
+              title="Copy import path"
+            >
+              <uix-icon name=\${this.copiedImport ? "check" : "copy"} size="14"></uix-icon>
+              \${this.copiedImport ? "Copied" : "Copy"}
+            </uix-button>
+          </uix-flex>
+          <uix-card variant="outlined" overflow="hidden">
+            <uix-code language="javascript" .content=\${importCode} ?lineNumber=\${false} readonly></uix-code>
+          </uix-card>
+        </uix-flex>
+
+        <!-- Basic Usage Section -->
+        <uix-flex direction="column" gap="sm" style="position: relative;">
+          <uix-flex justify="space-between" align="center">
+            <uix-text size="sm" weight="semibold" text="inverse" style="text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;">Usage</uix-text>
+            <uix-button
+              size="xs"
+              ghost
+              primary
+              @click=\${() => this.copyToClipboard(basicExample, "Basic")}
+              title="Copy code example"
+            >
+              <uix-icon name=\${this.copiedBasic ? "check" : "copy"} size="14"></uix-icon>
+              \${this.copiedBasic ? "Copied" : "Copy"}
+            </uix-button>
+          </uix-flex>
+          <uix-card variant="outlined" overflow="hidden">
+            <uix-code language="html" .content=\${basicExample} readonly></uix-code>
+          </uix-card>
+        </uix-flex>
+      </uix-flex>
+    \`;
+  },
+};
+
+View.define("uix-showcase-code-viewer", ShowcaseCodeViewerDefinition);
+
+export default ShowcaseCodeViewerDefinition;
+`,mimeType:"text/javascript"},"/$app/uix/docs/theme-generator.js":{content:`/**
+ * UIX Theme Generator
+ * Interactive tool for creating custom themes
+ * Uses the new semantic shade format (lighter, light, DEFAULT, dark, darker)
+ */
+import Theme from "/$app/theme/index.js";
+import T from "/$app/types/index.js";
+import { html, nothing } from "/npm/lit-html";
+
+// Color categories with their default values (Gruvbox-inspired)
+const DEFAULT_COLORS = {
+  primary: {
+    DEFAULT: "#fabd2f",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  secondary: {
+    DEFAULT: "#83a598",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  success: {
+    DEFAULT: "#b8bb26",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  danger: {
+    DEFAULT: "#fb4934",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  warning: {
+    DEFAULT: "#fe8019",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  info: {
+    DEFAULT: "#83a598",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  surface: {
+    DEFAULT: "#504945",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+  inverse: {
+    DEFAULT: "#282828",
+    lighter: null,
+    light: null,
+    dark: null,
+    darker: null,
+  },
+};
+
+export default {
+  properties: {
+    themeName: T.string("custom-theme"),
+    sectionTab: T.number(0),
+    // Color palette - new semantic format
+    colors: T.object({ defaultValue: structuredClone(DEFAULT_COLORS) }),
+    // Track which colors have expanded shade editors
+    expandedColors: T.object({ defaultValue: {} }),
+    // Text color
+    textColor: T.string("default"),
+    // Spacing scale
+    spacing: T.object({
+      defaultValue: {
+        xs: "0.25rem",
+        sm: "0.5rem",
+        md: "0.75rem",
+        lg: "1rem",
+        xl: "1.5rem",
+        "2xl": "2rem",
+        "3xl": "3rem",
+      },
+    }),
+    // Border radius
+    radius: T.object({
+      defaultValue: {
+        none: "0",
+        sm: "0.25rem",
+        md: "0.375rem",
+        lg: "0.5rem",
+        xl: "0.75rem",
+        full: "9999px",
+      },
+    }),
+    // Typography
+    typography: T.object({
+      defaultValue: {
+        fontSize: {
+          xs: "0.75rem",
+          sm: "0.875rem",
+          base: "1rem",
+          lg: "1.125rem",
+          xl: "1.25rem",
+          "2xl": "1.5rem",
+          "3xl": "1.875rem",
+        },
+        fontWeight: {
+          normal: "400",
+          medium: "500",
+          semibold: "600",
+          bold: "700",
+        },
+        lineHeight: {
+          tight: "1.2",
+          normal: "1.5",
+          relaxed: "1.75",
+        },
+      },
+    }),
+  },
+
+  _updateColor(category, shade, value) {
+    this.colors = {
+      ...this.colors,
+      [category]: {
+        ...this.colors[category],
+        [shade]: value,
+      },
+    };
+    this._applyPreview();
+  },
+
+  _applyPreview() {
+    const theme = this.generateThemeObject();
+    Theme.applyTheme(theme);
+  },
+
+  _toggleExpanded(category) {
+    this.expandedColors = {
+      ...this.expandedColors,
+      [category]: !this.expandedColors[category],
+    };
+  },
+
+  _toggleAutoShade(category, shade) {
+    const currentValue = this.colors[category][shade];
+    if (currentValue === null) {
+      // Set to a default value (copy from DEFAULT)
+      this._updateColor(category, shade, this.colors[category].DEFAULT);
+    } else {
+      // Set back to auto
+      this._updateColor(category, shade, null);
+    }
+  },
+
+  generateThemeObject() {
+    // Generate theme object matching gruvbox-dark.js format
+    const colorOutput = {};
+
+    for (const [category, shades] of Object.entries(this.colors)) {
+      // Check if any shades are customized (non-null)
+      const hasCustomShades = Object.entries(shades).some(
+        ([key, val]) => key !== "DEFAULT" && val !== null,
+      );
+
+      if (hasCustomShades) {
+        // Output as object with only non-null values
+        const colorObj = { DEFAULT: shades.DEFAULT };
+        for (const [shade, value] of Object.entries(shades)) {
+          if (shade !== "DEFAULT" && value !== null) {
+            colorObj[shade] = value;
+          }
+        }
+        colorOutput[category] = colorObj;
+      } else {
+        // Output as simple string
+        colorOutput[category] = shades.DEFAULT;
+      }
+    }
+
+    return {
+      name: this.themeName,
+      link: { color: "var(--color-primary)" },
+      text: { color: this.textColor },
+      color: colorOutput,
+      spacing: this.spacing,
+      typography: this.typography,
+      radius: this.radius,
+    };
+  },
+
+  exportTheme() {
+    const theme = this.generateThemeObject();
+    const themeCode = \`/**
+ * \${theme.name} Theme
+ * Generated with UIX Theme Generator
+ */
+
+export default \${JSON.stringify(theme, null, 2)};
+\`;
+
+    const blob = new Blob([themeCode], { type: "application/javascript" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = \`\${this.themeName}.js\`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  renderColorPaletteSection() {
+    const categories = Object.keys(this.colors);
+    const shadeNames = ["lighter", "light", "dark", "darker"];
+
+    return html\`
+      <uix-container padding="md">
+        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-md)">Color Palette</uix-heading>
+
+        <!-- Text Color -->
+        <uix-container variant="filled" padding="sm" style="margin-bottom: var(--spacing-lg)">
+          <uix-flex direction="row" align="center" justify="space-between" style="margin-bottom: var(--spacing-xs)">
+            <uix-text size="sm" weight="medium">Text Color</uix-text>
+            <uix-input
+              type="text"
+              .value=\${this.textColor}
+              @input=\${(e) => {
+                this.textColor = e.target.value;
+                this._applyPreview();
+              }}
+              size="xs"
+              mono
+              style="width: 6rem"
+            ></uix-input>
+          </uix-flex>
+          <input
+            type="color"
+            .value=\${this.textColor}
+            @input=\${(e) => {
+              this.textColor = e.target.value;
+              this._applyPreview();
+            }}
+            w-full
+            cursor-pointer
+          />
+        </uix-container>
+
+        <!-- Color Categories -->
+        <uix-flex direction="column" gap="md">
+          \${categories.map((category) => {
+            const colorData = this.colors[category];
+            const isExpanded = this.expandedColors[category];
+
+            return html\`
+              <uix-container variant="filled" padding="sm">
+                <!-- Main color row -->
+                <uix-flex direction="row" align="center" gap="sm" style="margin-bottom: var(--spacing-xs)">
+                  <input
+                    type="color"
+                    .value=\${colorData.DEFAULT}
+                    @input=\${(e) => this._updateColor(category, "DEFAULT", e.target.value)}
+                    style="width: 3rem; height: 3rem; flex-shrink: 0; border-radius: var(--radius-md); cursor: pointer"
+                  />
+                  <uix-flex direction="column" gap="xs" style="flex: 1">
+                    <uix-text size="sm" weight="medium" transform="capitalize">\${category}</uix-text>
+                    <uix-input
+                      type="text"
+                      .value=\${colorData.DEFAULT}
+                      @input=\${(e) => this._updateColor(category, "DEFAULT", e.target.value)}
+                      size="xs"
+                      mono
+                      w-full
+                    ></uix-input>
+                  </uix-flex>
+                  <uix-button
+                    @click=\${() => this._toggleExpanded(category)}
+                    ghost
+                    size="sm"
+                    title="Customize shades"
+                  >
+                    <uix-icon name=\${isExpanded ? "chevron-up" : "chevron-down"} size="sm"></uix-icon>
+                  </uix-button>
+                </uix-flex>
+
+                <!-- Expanded shade editors -->
+                \${
+                  isExpanded
+                    ? html\`
+                  <uix-grid cols="2" gap="sm" style="margin-top: var(--spacing-sm); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-surface)">
+                    \${shadeNames.map((shade) => {
+                      const shadeValue = colorData[shade];
+                      const isAuto = shadeValue === null;
+
+                      return html\`
+                        <uix-flex direction="row" align="center" gap="sm">
+                          <input
+                            type="color"
+                            .value=\${isAuto ? colorData.DEFAULT : shadeValue}
+                            ?disabled=\${isAuto}
+                            @input=\${(e) => this._updateColor(category, shade, e.target.value)}
+                            style="width: 2rem; height: 2rem; border-radius: var(--radius-md); cursor: pointer"
+                            class="\${isAuto ? "opacity-50" : ""}"
+                          />
+                          <uix-flex direction="column" style="flex: 1; min-width: 0">
+                            <uix-flex direction="row" align="center" gap="xs">
+                              <uix-text size="xs" weight="medium" transform="capitalize">\${shade}</uix-text>
+                              <label style="margin-left: auto; display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; opacity: 0.7">
+                                <input
+                                  type="checkbox"
+                                  ?checked=\${isAuto}
+                                  @change=\${() => this._toggleAutoShade(category, shade)}
+                                  style="width: 0.75rem; height: 0.75rem"
+                                />
+                                Auto
+                              </label>
+                            </uix-flex>
+                          </uix-flex>
+                        </uix-flex>
+                      \`;
+                    })}
+                  </uix-grid>
+                \`
+                    : nothing
+                }
+              </uix-container>
+            \`;
+          })}
+        </uix-flex>
+      </uix-container>
+    \`;
+  },
+
+  renderSpacingSection() {
+    return html\`
+      <uix-container padding="md">
+        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Spacing</uix-heading>
+        <uix-grid cols="2" gap="sm">
+          \${Object.entries(this.spacing).map(
+            ([key, value]) => html\`
+              <uix-flex direction="column">
+                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
+                <uix-input
+                  type="text"
+                  .value=\${value}
+                  @input=\${(e) => {
+                    this.spacing = { ...this.spacing, [key]: e.target.value };
+                  }}
+                  size="sm"
+                  mono
+                  w-full
+                ></uix-input>
+              </uix-flex>
+            \`,
+          )}
+        </uix-grid>
+      </uix-container>
+    \`;
+  },
+
+  renderEdgesSection() {
+    return html\`
+      <uix-container padding="md">
+        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Border Radius</uix-heading>
+        <uix-grid cols="2" gap="sm">
+          \${Object.entries(this.radius).map(
+            ([key, value]) => html\`
+              <uix-flex direction="column">
+                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
+                <uix-input
+                  type="text"
+                  .value=\${value}
+                  @input=\${(e) => {
+                    this.radius = { ...this.radius, [key]: e.target.value };
+                  }}
+                  size="sm"
+                  mono
+                  w-full
+                ></uix-input>
+              </uix-flex>
+            \`,
+          )}
+        </uix-grid>
+      </uix-container>
+    \`;
+  },
+
+  renderTypographySection() {
+    return html\`
+      <uix-container padding="md">
+        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Typography</uix-heading>
+
+        <uix-heading level="4" size="sm" style="margin-bottom: var(--spacing-xs)">Font Sizes</uix-heading>
+        <uix-grid cols="2" gap="sm" style="margin-bottom: var(--spacing-md)">
+          \${Object.entries(this.typography.fontSize).map(
+            ([key, value]) => html\`
+              <uix-flex direction="column">
+                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
+                <uix-input
+                  type="text"
+                  .value=\${value}
+                  @input=\${(e) => {
+                    this.typography = {
+                      ...this.typography,
+                      fontSize: {
+                        ...this.typography.fontSize,
+                        [key]: e.target.value,
+                      },
+                    };
+                  }}
+                  size="sm"
+                  mono
+                  w-full
+                ></uix-input>
+              </uix-flex>
+            \`,
+          )}
+        </uix-grid>
+
+        <uix-heading level="4" size="sm" style="margin-bottom: var(--spacing-xs)">Font Weights</uix-heading>
+        <uix-grid cols="2" gap="sm">
+          \${Object.entries(this.typography.fontWeight).map(
+            ([key, value]) => html\`
+              <uix-flex direction="column">
+                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
+                <uix-input
+                  type="text"
+                  .value=\${value}
+                  @input=\${(e) => {
+                    this.typography = {
+                      ...this.typography,
+                      fontWeight: {
+                        ...this.typography.fontWeight,
+                        [key]: e.target.value,
+                      },
+                    };
+                  }}
+                  size="sm"
+                  mono
+                  w-full
+                ></uix-input>
+              </uix-flex>
+            \`,
+          )}
+        </uix-grid>
+      </uix-container>
+    \`;
+  },
+
+  renderControlsPanel() {
+    const sections = [
+      {
+        id: "colors",
+        label: "Colors",
+        render: this.renderColorPaletteSection.bind(this),
+      },
+      {
+        id: "spacing",
+        label: "Spacing",
+        render: this.renderSpacingSection.bind(this),
+      },
+      {
+        id: "edges",
+        label: "Edges",
+        render: this.renderEdgesSection.bind(this),
+      },
+      {
+        id: "typography",
+        label: "Type",
+        render: this.renderTypographySection.bind(this),
+      },
+    ];
+
+    return html\`
+      <uix-flex direction="column" style="height: 100%;overflow-x: hidden;">
+        <uix-tabs @tab-change=\${(e) => (this.sectionTab = e.detail)} style="flex: 1; display: flex; flex-direction: column; min-height: 0">
+          \${sections.map((section) => html\`<button slot="tab">\${section.label}</button>\`)}
+          <div slot="panel" style="flex: 1">
+            \${sections[this.sectionTab] ? sections[this.sectionTab].render() : nothing}
+          </div>
+        </uix-tabs>
+
+        <uix-container padding="md" style="border-top: 1px solid var(--color-surface)">
+          <uix-input
+            type="text"
+            .value=\${this.themeName}
+            @input=\${(e) => {
+              this.themeName = e.target.value;
+            }}
+            placeholder="Theme name..."
+            size="sm"
+            w-full
+            style="margin-bottom: var(--spacing-sm)"
+          ></uix-input>
+          <uix-button variant="primary" w-full @click=\${() => this.exportTheme()}>
+            <uix-icon name="download"></uix-icon>
+            Export Theme
+          </uix-button>
+        </uix-container>
+      </uix-flex>
+    \`;
+  },
+
+  renderPreviewPanel() {
+    return html\`
+      <uix-flex direction="column" style="flex: 1; overflow-y: auto; padding: var(--spacing-lg); background: var(--color-surface)">
+        <uix-heading level="2" size="2xl" style="margin-bottom: var(--spacing-lg)">Preview</uix-heading>
+
+        <uix-flex direction="column" gap="xl" style="max-width: 800px">
+          <!-- Buttons -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Buttons</uix-heading>
+            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap">
+              <uix-button>Default</uix-button>
+              <uix-button variant="primary">Primary</uix-button>
+              <uix-button variant="secondary">Secondary</uix-button>
+              <uix-button variant="success">Success</uix-button>
+              <uix-button variant="danger">Danger</uix-button>
+              <uix-button variant="warning">Warning</uix-button>
+            </uix-flex>
+            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap; margin-top: var(--spacing-sm)">
+              <uix-button ghost>Ghost</uix-button>
+              <uix-button ghost variant="primary">Ghost Primary</uix-button>
+              <uix-button outline variant="primary">Outline</uix-button>
+              <uix-button bordered variant="primary">Bordered</uix-button>
+            </uix-flex>
+          </section>
+
+          <!-- Stats -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Stats</uix-heading>
+            <uix-join>
+              <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
+              <uix-stat title="New Users" value="4,200" variant="success">+400 (22%)</uix-stat>
+              <uix-stat title="Errors" value="12" variant="danger">-5 (14%)</uix-stat>
+            </uix-join>
+          </section>
+
+          <!-- Badges -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Badges</uix-heading>
+            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap">
+              <uix-badge>Default</uix-badge>
+              <uix-badge variant="success">Success</uix-badge>
+              <uix-badge variant="danger">Danger</uix-badge>
+              <uix-badge variant="warning">Warning</uix-badge>
+              <uix-badge variant="info">Info</uix-badge>
+            </uix-flex>
+          </section>
+
+          <!-- Form Controls -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Form Controls</uix-heading>
+            <uix-flex direction="column" gap="md">
+              <uix-grid cols="2" gap="sm">
+                <uix-input placeholder="Text input"></uix-input>
+                <uix-input type="email" placeholder="Email input"></uix-input>
+              </uix-grid>
+              <uix-flex direction="row" gap="md" style="flex-wrap: wrap">
+                <uix-checkbox checked>Checkbox</uix-checkbox>
+                <uix-switch checked>Switch</uix-switch>
+              </uix-flex>
+              <uix-slider min="0" max="100" value="50"></uix-slider>
+            </uix-flex>
+          </section>
+
+          <!-- Navigation -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Navigation</uix-heading>
+            <uix-tabs>
+              <button slot="tab">Tab 1</button>
+              <button slot="tab">Tab 2</button>
+              <button slot="tab">Tab 3</button>
+              <div slot="panel">Tab 1 content</div>
+              <div slot="panel">Tab 2 content</div>
+              <div slot="panel">Tab 3 content</div>
+            </uix-tabs>
+          </section>
+
+          <!-- Feedback -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Feedback</uix-heading>
+            <uix-flex direction="column" gap="sm">
+              <uix-progress-bar value="65" max="100"></uix-progress-bar>
+              <uix-progress-bar value="30" max="100" variant="success"></uix-progress-bar>
+              <uix-flex direction="row" gap="sm" align="center">
+                <uix-spinner size="sm"></uix-spinner>
+                <uix-spinner size="md"></uix-spinner>
+                <uix-spinner size="lg"></uix-spinner>
+              </uix-flex>
+            </uix-flex>
+          </section>
+
+          <!-- Card -->
+          <section>
+            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Card</uix-heading>
+            <uix-card variant="elevated" padding="lg">
+              <h4 slot="header">Card Header</h4>
+              <p>Card content with theme colors applied.</p>
+              <div slot="footer">
+                <uix-button size="sm">Action</uix-button>
+              </div>
+            </uix-card>
+          </section>
+        </uix-flex>
+      </uix-flex>
+    \`;
+  },
+
+  render() {
+    return html\`
+      <uix-flex direction="row" style="height: 100%; min-height: 0">
+        \${this.renderPreviewPanel()}
+        <div style="width: 400px; flex-shrink: 0; height: 100%; min-height: 0">
+          \${this.renderControlsPanel()}
+        </div>
+      </uix-flex>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/utils/example-parser.js":{content:`export function extractExamplesFromComments(sourceCode) {
+  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
+  if (!matches || matches.length === 0) return [];
+
+  const lastComment = matches[matches.length - 1];
+  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
+  const examples = [];
+  const exampleRegex = /@example\\s+([^\\n]*)\\n([\\s\\S]*?)(?=\\n\\s*\\*\\s*@(?:example|component|category|tag|param|returns|prop|slot|part|event)\\b|$)/g;
+  let match;
+
+  while ((match = exampleRegex.exec(docstring)) !== null) {
+    const title = match[1].replace(/^\\s*\\*\\s?/, '').trim();
+    const content = match[2]
+      .split("\\n")
+      .map((line) => line.replace(/^\\s*\\*\\s?/, ""))
+      .join("\\n")
+      .trim();
+
+    const codeBlocks = [];
+    const codeRegex = /\`\`\`(\\w+)?\\n([\\s\\S]*?)\`\`\`/g;
+    let codeMatch;
+
+    while ((codeMatch = codeRegex.exec(content)) !== null) {
+      codeBlocks.push({
+        language: codeMatch[1] || "html",
+        code: codeMatch[2].trim(),
+      });
+    }
+
+    const description = content.split("\`\`\`")[0].trim();
+
+    if (codeBlocks.length > 0) {
+      examples.push({
+        title: title || \`Example \${examples.length + 1}\`,
+        description: description || null,
+        codeBlocks,
+      });
+    }
+  }
+
+  return examples;
+}
+
+export function extractDescription(sourceCode) {
+  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
+  if (!matches || matches.length === 0) return "";
+
+  const lastComment = matches[matches.length - 1];
+  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
+
+  const lines = docstring.split("\\n");
+  const descLines = [];
+
+  for (const line of lines) {
+    const cleaned = line.replace(/^\\s*\\*\\s?/, "").trim();
+
+    if (cleaned.startsWith("@")) break;
+
+    if (descLines.length === 0 && !cleaned) continue;
+
+    descLines.push(cleaned);
+  }
+
+  return descLines.join("\\n").trim();
+}
+
+export function extractMetadataTags(sourceCode) {
+  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
+  if (!matches || matches.length === 0) return {};
+
+  const lastComment = matches[matches.length - 1];
+  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
+  const metadata = {};
+
+  const tagMatch = docstring.match(/@tag\\s+(\\S+)/);
+  if (tagMatch) metadata.tag = tagMatch[1];
+
+  const categoryMatch = docstring.match(/@category\\s+(\\S+)/);
+  if (categoryMatch) metadata.category = categoryMatch[1];
+
+  metadata.isComponent = /@component/.test(docstring);
+
+  return metadata;
+}
+
+export function extractParts(sourceCode) {
+  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
+  if (!matches || matches.length === 0) return [];
+
+  const lastComment = matches[matches.length - 1];
+  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
+  const parts = [];
+  const partRegex = /@part\\s+(\\S+)\\s+-\\s+(.+?)(?=\\n\\s*[@*]|$)/gm;
+  let match;
+
+  while ((match = partRegex.exec(docstring)) !== null) {
+    parts.push({
+      name: match[1].trim(),
+      description: match[2].trim(),
+    });
+  }
+
+  return parts;
+}
+
+export function extractSlots(sourceCode) {
+  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
+  if (!matches || matches.length === 0) return [];
+
+  const lastComment = matches[matches.length - 1];
+  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
+  const slots = [];
+  const slotRegex = /@slot\\s+([^\\s-]*)\\s*-?\\s*(.*)$/gm;
+  let match;
+
+  while ((match = slotRegex.exec(docstring)) !== null) {
+    const name = match[1].trim();
+    const description = match[2].trim();
+
+    slots.push({
+      name: name || "default",
+      description: description || "Default slot",
+    });
+  }
+
+  return slots;
+}
+`,mimeType:"text/javascript"},"/$app/uix/display/heading.js":{content:`/**
+ * UIX Heading Component
+ * Semantic headings (h1-h6) with consistent styling
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  properties: {
+    level: T.number({ defaultValue: 2, min: 1, max: 6 }),
+    size: T.string({
+      enum: ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl"],
+    }), // Optional size override
+  },
+
+  render() {
+    const HeadingTag = \`h\${this.level}\`;
+    return html\`<\${HeadingTag}><slot></slot></\${HeadingTag}>\`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/layout/split-pane.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+let throttleTimeout = null;
+let lastEvent = null;
+
+export default {
+  tag: "uix-split-pane",
+  i18n: {},
+  properties: {
+    direction: T.string("horizontal"),
+    initialSize: T.string("50%"), // Supports "200px" or "30%"
+    minSize: T.string(), // Minimum size constraint e.g., "200px" or "10%"
+    maxSize: T.string(), // Maximum size constraint e.g., "500px" or "90%"
+    primarySize: T.string(), // Current size (with units)
+    dividerSize: T.number(2),
+    storageKey: T.string(),
+    resizable: T.boolean(false), // Whether divider can be dragged
+  },
+  extends: "uix-flex",
+  style: true,
+  shadow: true,
+  connected() {
+    this.isDragging = false;
+    this.loadSize();
+    this.boundHandlePointerMove = this._handlePointerMove.bind(this);
+    this.boundHandlePointerUp = this._handlePointerUp.bind(this);
+  },
+  firstUpdated() {
+    this.primaryPanel = this.shadowRoot.querySelector('[part="primary"]');
+    this.secondaryPanel = this.shadowRoot.querySelector('[part="secondary"]');
+  },
+
+  // Parse size string to { value, unit }
+  _parseSize(size) {
+    if (!size) return null;
+    const match = String(size).match(/^([\\d.]+)(px|%)?$/);
+    if (!match) return null;
+    return {
+      value: parseFloat(match[1]),
+      unit: match[2] || "%",
+    };
+  },
+
+  // Convert size to pixels based on container
+  _toPixels(size, containerSize) {
+    const parsed = this._parseSize(size);
+    if (!parsed) return null;
+    if (parsed.unit === "px") return parsed.value;
+    return (parsed.value / 100) * containerSize;
+  },
+
+  loadSize() {
+    if (this.storageKey) {
+      const saved = localStorage.getItem(\`uix-split-pane:\${this.storageKey}\`);
+      if (saved) {
+        this.primarySize = saved;
+        return;
+      }
+    }
+    this.primarySize = this.initialSize;
+  },
+
+  saveSize() {
+    if (this.storageKey && this.primarySize) {
+      localStorage.setItem(
+        \`uix-split-pane:\${this.storageKey}\`,
+        this.primarySize,
+      );
+    }
+  },
+
+  _handleDividerPointerDown(e) {
+    if (!this.resizable) return;
+    e.preventDefault();
+    this.isDragging = true;
+    this.startPos = this.direction === "horizontal" ? e.clientX : e.clientY;
+
+    const rect = this.getBoundingClientRect();
+    this.containerSize =
+      this.direction === "horizontal" ? rect.width : rect.height;
+    this.startPrimaryPx = this._toPixels(this.primarySize, this.containerSize);
+
+    this.shadowRoot.addEventListener(
+      "pointermove",
+      this.boundHandlePointerMove,
+    );
+    this.setAttribute("dragging", "");
+  },
+
+  _handlePointerMove(e) {
+    if (!this.isDragging) return;
+    lastEvent = e;
+    if (throttleTimeout) return;
+    throttleTimeout = setTimeout(() => {
+      throttleTimeout = null;
+      this._calculateNewSize(lastEvent);
+    }, 15);
+  },
+
+  _calculateNewSize(e) {
+    const currentPos = this.direction === "horizontal" ? e.clientX : e.clientY;
+    const delta = currentPos - this.startPos;
+    let newPrimaryPx = this.startPrimaryPx + delta;
+
+    // Apply min/max constraints
+    const minPx = this._toPixels(this.minSize, this.containerSize);
+    const maxPx = this._toPixels(this.maxSize, this.containerSize);
+
+    if (minPx !== null) newPrimaryPx = Math.max(minPx, newPrimaryPx);
+    if (maxPx !== null) newPrimaryPx = Math.min(maxPx, newPrimaryPx);
+
+    // Ensure secondary panel has space
+    const minSecondary = 50; // minimum 50px for secondary
+    newPrimaryPx = Math.min(newPrimaryPx, this.containerSize - minSecondary);
+
+    if (this.primaryPanel && this.secondaryPanel) {
+      this.primaryPanel.style.flexBasis = \`\${newPrimaryPx}px\`;
+      this.secondaryPanel.style.flexBasis = \`\${this.containerSize - newPrimaryPx}px\`;
+    }
+    this.primarySize = \`\${newPrimaryPx}px\`;
+  },
+
+  _handlePointerUp() {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this.removeAttribute("dragging");
+    this.shadowRoot.removeEventListener(
+      "pointermove",
+      this.boundHandlePointerMove,
+    );
+    this.saveSize();
+  },
+
+  render() {
+    const parsed = this._parseSize(this.primarySize);
+    const primaryStyle = parsed
+      ? \`flex-basis: \${parsed.value}\${parsed.unit}\`
+      : "flex-basis: 50%";
+
+    return html\`<slot name="primary" part="primary" style="\${primaryStyle}"></slot>
+      <div
+        part="divider"
+        @pointerdown=\${this._handleDividerPointerDown.bind(this)}
+        @pointerup=\${this._handlePointerUp.bind(this)}
+        style="--divider-size: \${this.dividerSize}px"
+      ></div>
+      <slot part="secondary" name="secondary"></slot>\`;
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * Split Pane Component
+ *
+ * @component
+ * @category layout
+ * @tag uix-split-pane
+ *
+ * A split pane layout for dividing space between two panels.
+ * By default, the divider is non-resizable (just a visual separator).
+ * Add the \`resizable\` attribute to enable drag-to-resize functionality.
+ * Supports both pixel and percentage-based sizing.
+ *
+ * @slot primary - Primary (left/top) panel content
+ * @slot secondary - Secondary (right/bottom) panel content
+ * @part primary - Primary panel container
+ * @part divider - Divider between panels
+ * @part secondary - Secondary panel container
+ *
+ * @example Fixed Sidebar (Non-resizable)
+ * \`\`\`html
+ * <uix-split-pane initialSize="200px" minSize="200px">
+ *   <div slot="primary">Fixed 200px sidebar</div>
+ *   <div slot="secondary">Main content</div>
+ * </uix-split-pane>
+ * \`\`\`
+ *
+ * @example Resizable Split
+ * \`\`\`html
+ * <uix-split-pane initialSize="30%" resizable>
+ *   <div slot="primary">Resizable panel</div>
+ *   <div slot="secondary">Main content</div>
+ * </uix-split-pane>
+ * \`\`\`
+ *
+ * @example With Constraints
+ * \`\`\`html
+ * <uix-split-pane
+ *   initialSize="250px"
+ *   minSize="150px"
+ *   maxSize="400px"
+ *   resizable
+ *   storageKey="editor-sidebar"
+ * >
+ *   <div slot="primary">Sidebar</div>
+ *   <div slot="secondary">Editor</div>
+ * </uix-split-pane>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/display/text.js":{content:`/**
+ * UIX Text Component
+ * Styled text with size, weight, and variant options
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  style: true,
+  properties: {
+    size: T.string({
+      defaultValue: "base",
+      enum: ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"],
+    }),
+    weight: T.string({
+      defaultValue: "normal",
+      enum: ["normal", "medium", "semibold", "bold"],
+    }),
+    color: T.string({
+      enum: [
+        "primary",
+        "secondary",
+        "success",
+        "danger",
+        "warning",
+        "info",
+        "muted",
+        "inverse",
+      ],
+    }),
+    muted: T.boolean(false),
+    mono: T.boolean(false),
+    align: T.string({
+      defaultValue: "left",
+      enum: ["left", "center", "right"],
+    }),
+    transform: T.string({
+      enum: ["capitalize", "uppercase", "lowercase", "none"],
+    }),
+    as: T.string({ defaultValue: "span", enum: ["span", "p", "div"] }),
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/layout/flex.js":{content:`/**
+ * UIX Flex Component
+ * Flexible container for flexbox layouts
+ * No shadow DOM - host element is the flex container
+ */
+
+import T from "/$app/types/index.js";
+
+export default {
+  style: true,
+  properties: {
+    direction: T.string({
+      defaultValue: "row",
+      enum: ["row", "column", "row-reverse", "column-reverse"],
+    }),
+    gap: T.string({
+      enum: ["none", "xs", "sm", "md", "lg", "xl", "2xl", "3xl"],
+    }),
+    align: T.string({
+      defaultValue: "stretch",
+      enum: ["start", "center", "end", "stretch", "baseline"],
+    }),
+    justify: T.string({
+      defaultValue: "start",
+      enum: [
+        "start",
+        "center",
+        "end",
+        "space-between",
+        "space-around",
+        "space-evenly",
+      ],
+    }),
+    wrap: T.string({
+      defaultValue: "nowrap",
+      enum: ["wrap", "nowrap", "wrap-reverse"],
+    }),
+  },
+};
+
+/**
+ * UIX Flex Component
+ *
+ * @component
+ * @category layout
+ * @tag uix-flex
+ *
+ * A flexible container component for creating flexbox layouts.
+ * No shadow DOM - the host element itself becomes the flex container.
+ *
+ * ## Flex Item Attributes
+ *
+ * Direct children can use these attributes for individual flex behavior:
+ * - \`flex-1\` - Grow and shrink equally (flex: 1 1 0%)
+ * - \`flex-auto\` - Grow and shrink with auto basis (flex: 1 1 auto)
+ * - \`flex-initial\` - Don't grow, can shrink (flex: 0 1 auto)
+ * - \`flex-none\` - Don't grow or shrink (flex: none)
+ * - \`flex-grow\` - Allow growing (flex-grow: 1)
+ * - \`flex-shrink="0"\` - Prevent shrinking
+ * - \`align-self="center|start|end|stretch"\` - Individual alignment
+ *
+ * @example
+ * // Basic row layout
+ * \`\`\`html
+ * <uix-flex gap="md">
+ *   <div>Item 1</div>
+ *   <div>Item 2</div>
+ *   <div>Item 3</div>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Column layout with gap
+ * \`\`\`html
+ * <uix-flex direction="column" gap="lg">
+ *   <div>Top</div>
+ *   <div>Middle</div>
+ *   <div>Bottom</div>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Centered content
+ * \`\`\`html
+ * <uix-flex align="center" justify="center" style="min-height: 200px;">
+ *   <div>Centered Content</div>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Sidebar layout with flex-1
+ * \`\`\`html
+ * <uix-flex gap="md">
+ *   <aside style="width: 250px;">
+ *     Sidebar (fixed width)
+ *   </aside>
+ *   <main flex-1>
+ *     Main content (takes remaining space)
+ *   </main>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Toolbar with flexible search
+ * \`\`\`html
+ * <uix-flex align="center" gap="sm">
+ *   <uix-button flex-none>New</uix-button>
+ *   <uix-button flex-none>Save</uix-button>
+ *   <uix-input flex-1 placeholder="Search..."></uix-input>
+ *   <uix-button flex-none variant="primary">Submit</uix-button>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Card with flexible body
+ * \`\`\`html
+ * <uix-flex direction="column" gap="none" style="height: 400px;">
+ *   <div flex-none style="padding: 1rem; border-bottom: 1px solid #ddd;">
+ *     Header
+ *   </div>
+ *   <div flex-1 style="padding: 1rem; overflow-y: auto;">
+ *     Body content that grows to fill available space
+ *   </div>
+ *   <div flex-none style="padding: 1rem; border-top: 1px solid #ddd;">
+ *     Footer
+ *   </div>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Space between items
+ * \`\`\`html
+ * <uix-flex justify="space-between" align="center">
+ *   <h2>Page Title</h2>
+ *   <uix-button variant="primary">Action</uix-button>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Individual item alignment
+ * \`\`\`html
+ * <uix-flex gap="md" style="height: 150px;">
+ *   <div align-self="start">Aligned to start</div>
+ *   <div align-self="center">Centered</div>
+ *   <div align-self="end">Aligned to end</div>
+ *   <div align-self="stretch">Stretched</div>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Wrap items
+ * \`\`\`html
+ * <uix-flex wrap="wrap" gap="sm">
+ *   <uix-badge>Tag 1</uix-badge>
+ *   <uix-badge>Tag 2</uix-badge>
+ *   <uix-badge>Tag 3</uix-badge>
+ *   <uix-badge>Tag 4</uix-badge>
+ *   <uix-badge>Tag 5</uix-badge>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Dashboard layout
+ * \`\`\`html
+ * <uix-flex direction="column" gap="lg" style="height: 100vh;">
+ *   <header flex-none>
+ *     <uix-navbar>Navigation</uix-navbar>
+ *   </header>
+ *
+ *   <uix-flex flex-1 gap="md">
+ *     <aside flex-none style="width: 300px;">
+ *       <uix-sidebar>Sidebar</uix-sidebar>
+ *     </aside>
+ *
+ *     <main flex-1>
+ *       <div style="padding: 2rem;">
+ *         Main content area
+ *       </div>
+ *     </main>
+ *   </uix-flex>
+ *
+ *   <footer flex-none>
+ *     Footer content
+ *   </footer>
+ * </uix-flex>
+ * \`\`\`
+ *
+ * @example
+ * // Form row with labels
+ * \`\`\`html
+ * <uix-flex direction="column" gap="md">
+ *   <uix-flex align="center" gap="sm">
+ *     <label flex-none style="width: 120px;">Name:</label>
+ *     <uix-input flex-1></uix-input>
+ *   </uix-flex>
+ *
+ *   <uix-flex align="center" gap="sm">
+ *     <label flex-none style="width: 120px;">Email:</label>
+ *     <uix-input flex-1 type="email"></uix-input>
+ *   </uix-flex>
+ * </uix-flex>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/navigation/accordion.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-accordion",
+  properties: {
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "bordered", "filled", "flush", "separated"],
+    }),
+    single: T.boolean(false),
+    rounded: T.boolean(true),
+    openItems: T.array([]),
+  },
+  style: true,
+  shadow: true,
+  connected() {
+    this.openItems = [];
+  },
+  firstUpdated() {
+    const slot = this.shadowRoot.querySelector("slot");
+    if (slot) {
+      slot.addEventListener("slotchange", () => {
+        this.initializeItems();
+      });
+      this.initializeItems();
+    }
+  },
+  initializeItems() {
+    const slot = this.shadowRoot.querySelector("slot");
+    if (!slot) return;
+    const items = slot.assignedElements();
+    items.forEach((item, index) => {
+      if (
+        index % 2 === 0 &&
+        (item.hasAttribute("open") || item.hasAttribute("prevent-collapse"))
+      ) {
+        const panelIndex = Math.floor(index / 2);
+        if (!this.openItems.includes(panelIndex)) {
+          this.openItems.push(panelIndex);
+        }
+      }
+    });
+
+    this.updatePanels();
+  },
+
+  updatePanels() {
+    const slot = this.shadowRoot.querySelector("slot");
+    if (!slot) return;
+
+    const items = slot.assignedElements();
+
+    items.forEach((item, index) => {
+      const isHeader = index % 2 === 0;
+      const panelIndex = Math.floor(index / 2);
+
+      if (isHeader) {
+        // Header element (even index)
+        if (this.openItems.includes(panelIndex)) {
+          item.setAttribute("active", "");
+        } else {
+          item.removeAttribute("active");
+        }
+      } else {
+        // Panel element (odd index)
+        if (this.openItems.includes(panelIndex)) {
+          item.removeAttribute("hide");
+        } else {
+          item.setAttribute("hide", "");
+        }
+      }
+    });
+  },
+  handleClick(e) {
+    // Find the closest element with the 'header' attribute
+    const headerElement = e.target.closest("[header]");
+
+    if (!headerElement) return;
+    if (headerElement.hasAttribute("prevent-collapse")) return;
+
+    // Get all direct children of the accordion element
+    const items = Array.from(this.children);
+    const clickedIndex = items.indexOf(headerElement);
+
+    // Calculate which panel was clicked (every header+content pair)
+    const panelIndex = Math.floor(clickedIndex / 2);
+
+    if (this.single) {
+      // Single mode: only one item open at a time
+      if (this.openItems.includes(panelIndex)) {
+        this.openItems = [];
+      } else {
+        this.openItems = [panelIndex];
+      }
+    } else {
+      // Multiple mode: toggle individual items
+      if (this.openItems.includes(panelIndex)) {
+        this.openItems = this.openItems.filter((i) => i !== panelIndex);
+      } else {
+        this.openItems = [...this.openItems, panelIndex];
+      }
+    }
+
+    this.updatePanels();
+    this.emit("accordion-toggle", {
+      index: panelIndex,
+      open: this.openItems.includes(panelIndex),
+    });
+  },
+  render() {
+    return html\`
+      <div part="container" class="accordion-container">
+        <slot @click=\${this.handleClick.bind(this)}></slot>
+      </div>
+    \`;
+  },
+};
+
+/**
+ * Accordion Component
+ *
+ * @component
+ * @category layout
+ * @tag uix-accordion
+ *
+ * Collapsible container with alternating header/content pairs. Click even-indexed elements to toggle odd-indexed elements.
+ *
+ * @example
+ * // Basic accordion - alternating headers and content
+ * \`\`\`html
+ * <uix-accordion>
+ *   <button>Section 1</button>
+ *   <div>Content for section 1</div>
+ *   <button>Section 2</button>
+ *   <div>Content for section 2</div>
+ *   <button>Section 3</button>
+ *   <div>Content for section 3</div>
+ * </uix-accordion>
+ * \`\`\`
+ *
+ * @example
+ * // FAQ style accordion
+ * \`\`\`html
+ * <uix-accordion variant="bordered">
+ *   <div>What is UIX?</div>
+ *   <div><p>UIX is a component library built with Lit and web components.</p></div>
+ *   <div>How do I install it?</div>
+ *   <div><p>Follow the installation guide in the documentation.</p></div>
+ *   <div>Is it free?</div>
+ *   <div><p>Yes, UIX is completely free and open source.</p></div>
+ * </uix-accordion>
+ * \`\`\`
+ *
+ * @example
+ * // Single mode - only one item open at a time
+ * \`\`\`html
+ * <uix-accordion single>
+ *   <button>Profile</button>
+ *   <div>Profile settings content...</div>
+ *   <button>Settings</button>
+ *   <div>General settings content...</div>
+ *   <button>Privacy</button>
+ *   <div>Privacy settings content...</div>
+ * </uix-accordion>
+ * \`\`\`
+ *
+ * @example
+ * // With initial open state
+ * \`\`\`html
+ * <uix-accordion>
+ *   <button open>Already Open</button>
+ *   <div>This panel starts open</div>
+ *   <button>Closed</button>
+ *   <div>This panel starts closed</div>
+ *   <button open>Also Open</button>
+ *   <div>This panel starts open too</div>
+ * </uix-accordion>
+ * \`\`\`
+ *
+ * @example
+ * // With variants
+ * \`\`\`html
+ * <uix-accordion variant="filled">
+ *   <div>Header 1</div>
+ *   <div>Panel 1 content</div>
+ *   <div>Header 2</div>
+ *   <div>Panel 2 content</div>
+ * </uix-accordion>
+ * \`\`\`
+ *
+ * @example
+ * // With event handler
+ * \`\`\`js
+ * html\`<uix-accordion
+ *   @accordion-toggle=\${(e) => console.log('Item', e.detail.index, 'is now', e.detail.open ? 'open' : 'closed')}
+ * >
+ *   <button>Item 1</button>
+ *   <div>Content 1</div>
+ *   <button>Item 2</button>
+ *   <div>Content 2</div>
+ * </uix-accordion>\`
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/navigation/nav-item.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+/**
+ * @component uix-nav-item
+ * @description A navigation item component with icon, label, badge, and active state support
+ *
+ * @property {string} icon - Icon name (uses uix-icon)
+ * @property {string} label - Label text for the navigation item
+ * @property {string} badge - Optional badge text/number to display
+ * @property {boolean} active - Whether the item is currently active/selected
+ * @property {string} href - Optional link URL (renders as anchor)
+ * @property {boolean} disabled - Whether the item is disabled
+ * @property {string} size - Size variant (sm, md, lg)
+ *
+ * @event nav-item-click - Emitted when the item is clicked {href?, active, disabled}
+ *
+ *
+ * @part container - The main container element (button or anchor)
+ * @part icon - The icon wrapper
+ * @part label - The label wrapper
+ * @part badge - The badge wrapper
+ *
+ * @example
+ * <uix-nav-item icon="house" label="Home" active></uix-nav-item>
+ * <uix-nav-item icon="settings" label="Settings" badge="3"></uix-nav-item>
+ * <uix-nav-item href="/docs" label="Documentation"></uix-nav-item>
+ */
+export default {
+  tag: "uix-nav-item",
+  properties: {
+    icon: T.string({ defaultValue: "" }),
+    label: T.string({ defaultValue: "" }),
+    badge: T.string({ defaultValue: "" }),
+    active: T.boolean(false),
+    href: T.string({ defaultValue: "" }),
+    disabled: T.boolean(false),
+    activeBg: T.boolean(),
+    iconOnly: T.boolean(false),
+    indicatorPosition: T.string({
+      defaultValue: "none",
+      enum: ["none", "left", "right", "top", "bottom"],
+    }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["sm", "md", "lg"],
+    }),
+  },
+  style: true,
+  _handleClick(e) {
+    if (this.disabled) {
+      e.preventDefault();
+      return;
+    }
+
+    this.emit("nav-item-click", {
+      href: this.href,
+      active: this.active,
+      disabled: this.disabled,
+    });
+  },
+
+  render() {
+    const content = this.iconOnly
+      ? html\`
+          \${
+            this.icon
+              ? html\`
+                <span part="icon" class="nav-item-icon">
+                  <uix-icon name=\${this.icon} size=\${this.size}></uix-icon>
+                </span>
+              \`
+              : null
+          }
+        \`
+      : html\`
+          <span part="label" class="nav-item-label label">
+          \${
+            this.icon
+              ? html\`
+                <span part="icon" class="nav-item-icon">
+                  <uix-icon name=\${this.icon} size=\${this.size}></uix-icon>
+                </span>
+              \`
+              : null
+          }
+            \${this.label}
+          </span>
+          \${
+            this.badge
+              ? html\`
+                <span part="badge" class="nav-item-badge badge">\${this.badge}</span>
+              \`
+              : null
+          }
+        \`;
+
+    const title = this.iconOnly ? this.label : "";
+
+    if (this.href && !this.disabled) {
+      return html\`
+        <a
+          part="container"
+          class="nav-item"
+          href=\${this.href}
+          title=\${title}
+          @click=\${this._handleClick.bind(this)}
+        >
+          \${content}
+        </a>
+      \`;
+    }
+
+    return html\`
+      <button
+        part="container"
+        class="nav-item"
+        title=\${title}
+        ?disabled=\${this.disabled}
+        @click=\${this._handleClick.bind(this)}
+      >
+        \${content}
+      </button>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/docs/showcase.css":{content:`:where(.uix-showcase){display:flex;width:100%}
+`,mimeType:"text/css"},"/$app/uix/display/text.css":{content:`:where(.uix-text,uix-text){span,p,div{margin:0;color:var(--text-color);font-family:inherit}&[size=xs]{span,p,div{font-size:var(--text-xs, .75rem)}}&[size=sm]{span,p,div{font-size:var(--text-sm, .875rem)}}&[size=base]{span,p,div{font-size:var(--text-base, 1rem)}}&[size=lg]{span,p,div{font-size:var(--text-lg, 1.125rem)}}&[size=xl]{span,p,div{font-size:var(--text-xl, 1.25rem)}}&[size="2xl"]{span,p,div{font-size:var(--text-2xl, 1.5rem)}}&[size="3xl"]{span,p,div{font-size:var(--text-3xl, 1.875rem)}}&[weight=normal]{span,p,div{font-weight:var(--font-normal, 400)}}&[weight=medium]{span,p,div{font-weight:var(--font-medium, 500)}}&[weight=semibold]{span,p,div{font-weight:var(--font-semibold, 600)}}&[weight=bold]{span,p,div{font-weight:var(--font-bold, 700)}}&[muted]{span,p,div{opacity:.6}}&[mono]{span,p,div{font-family:monospace}}&[align=left]{span,p,div{text-align:left}}&[align=center]{span,p,div{text-align:center}}&[align=right]{span,p,div{text-align:right}}&[color=primary]{span,p,div{color:var(--color-primary)}}&[color=secondary]{span,p,div{color:var(--color-secondary)}}&[color=success]{span,p,div{color:var(--color-success)}}&[color=danger]{span,p,div{color:var(--color-danger)}}&[color=warning]{span,p,div{color:var(--color-warning)}}&[color=info]{span,p,div{color:var(--color-info)}}&[color=muted]{span,p,div{opacity:.6}}&[color=inverse]{span,p,div{color:var(--color-inverse)}}&[transform=capitalize]{span,p,div{text-transform:capitalize}}&[transform=uppercase]{span,p,div{text-transform:uppercase}}&[transform=lowercase]{span,p,div{text-transform:lowercase}}&[transform=none]{span,p,div{text-transform:none}}}
+`,mimeType:"text/css"},"/$app/uix/layout/flex.css":{content:`:where(.uix-flex,uix-flex){display:flex;flex-direction:var(--flex-direction, row);gap:var(--flex-gap);align-items:var(--flex-align, stretch);justify-content:var(--flex-justify, flex-start);flex-wrap:var(--flex-wrap, nowrap);box-sizing:border-box;&[direction=row]{--flex-direction: row}&[direction=column]{--flex-direction: column}&[direction=row-reverse]{--flex-direction: row-reverse}&[direction=column-reverse]{--flex-direction: column-reverse}&[gap=none]{--flex-gap: 0}&[gap=xs]{--flex-gap: var(--spacing-xs, .25rem)}&[gap=sm]{--flex-gap: var(--spacing-sm, .5rem)}&[gap=md]{--flex-gap: var(--spacing-md, .75rem)}&[gap=lg]{--flex-gap: var(--spacing-lg, 1rem)}&[gap=xl]{--flex-gap: var(--spacing-xl, 1.5rem)}&[gap="2xl"]{--flex-gap: var(--spacing-2xl, 2rem)}&[gap="3xl"]{--flex-gap: var(--spacing-3xl, 3rem)}&[align=start]{--flex-align: flex-start}&[align=center]{--flex-align: center}&[align=end]{--flex-align: flex-end}&[align=stretch]{--flex-align: stretch}&[align=baseline]{--flex-align: baseline}&[justify=start]{--flex-justify: flex-start}&[justify=center]{--flex-justify: center}&[justify=end]{--flex-justify: flex-end}&[justify=space-between]{--flex-justify: space-between}&[justify=space-around]{--flex-justify: space-around}&[justify=space-evenly]{--flex-justify: space-evenly}&[wrap=wrap]{--flex-wrap: wrap}&[wrap=nowrap]{--flex-wrap: nowrap}&[wrap=wrap-reverse]{--flex-wrap: wrap-reverse}>[flex-1]{flex:1 1 0%}>[flex-auto]{flex:1 1 auto}>[flex-initial]{flex:0 1 auto}>[flex-none]{flex:none}>[flex-grow]{flex-grow:1}>[flex-grow="0"]{flex-grow:0}>[flex-shrink]{flex-shrink:1}>[flex-shrink="0"]{flex-shrink:0}>[flex-basis=auto]{flex-basis:auto}>[flex-basis="0"]{flex-basis:0}>[align-self=start]{align-self:flex-start}>[align-self=center]{align-self:center}>[align-self=end]{align-self:flex-end}>[align-self=stretch]{align-self:stretch}>[w-full]{width:100%}}
+`,mimeType:"text/css"},"/$app/uix/navigation/accordion.css":{content:`:where(.uix-accordion,uix-accordion){display:flex;width:100%;--accordion-border-radius: var(--radius-md, .375rem);--accordion-padding: .25rem .5rem;--accordion-gap: 0;--accordion-background: transparent;--accordion-border-color: transparent;--accordion-header-background: transparent;--accordion-header-color: var(--color-surface-lighter);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-color-hover: var(--color-inverse);--accordion-header-background-active: var(--color-surface-darker);--accordion-header-color-active: var(--color-inverse);--accordion-panel-background: transparent;--accordion-panel-color: var(--color-surface-lighter);--accordion-transition: background-color .2s ease, color .2s ease, border-color .2s ease;&::part(container){display:flex;flex-direction:column;width:100%;gap:var(--accordion-gap);background:var(--accordion-background);border:1px solid var(--accordion-border-color);border-radius:var(--accordion-border-radius);overflow:hidden}>*:nth-child(odd){display:flex;width:100%;text-align:left;cursor:pointer;user-select:none;padding:var(--accordion-padding);font-size:var(--text-base, 1rem);font-weight:var(--font-medium, 500);background:var(--accordion-header-background);border:none;border-top:1px solid var(--header-border-top);transition:var(--accordion-transition);&:hover{background:var(--accordion-header-background-hover)}&[active][activeBg]{background:var(--accordion-header-background-active)}}>*:nth-child(1){border-top:none}>*:nth-child(2n){background:var(--accordion-panel-background);color:var(--accordion-panel-color);font-size:var(--text-sm, .875rem);line-height:var(--leading-relaxed, 1.6);transition:var(--accordion-transition);>*{padding-left:40px;padding-block:.5rem}&[hide]{display:none}}&[variant=bordered]{--accordion-border-color: var(--color-surface-dark);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-background-active: var(--color-surface-darker);&::part(container){border-width:2px}>*:nth-child(odd){border-top-width:1px}}&[variant=filled]{--accordion-background: var(--color-surface-lighter);--accordion-border-color: transparent;--header-border-top: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: var(--color-surface);--accordion-header-background-hover: var(--color-surface);>*:nth-child(odd)[active]{box-shadow:0 1px 2px #0003}}&[variant=flush]{--accordion-background: transparent;--accordion-border-color: transparent;--accordion-padding: 0;--header-border-top: transparent;--accordion-header-background: transparent;--accordion-header-background-hover: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: transparent;&::part(container){border:none;padding:0}>*:nth-child(odd){border-top:none}}&[variant=separated]{--accordion-gap: var(--spacing-sm, .5rem);--accordion-border-color: transparent;--header-border-top: transparent;&::part(container){border:none;padding:var(--spacing-sm, .5rem)}>*:nth-child(odd){border:1px solid var(--color-surface-dark);border-radius:var(--accordion-border-radius)}>*:nth-child(2n){border:1px solid var(--color-surface-dark);border-top:none;border-radius:0 0 var(--accordion-border-radius) var(--accordion-border-radius)}}&:not([rounded]){--accordion-border-radius: 0;&::part(container){border-radius:0}}}
+`,mimeType:"text/css"},"/$app/uix/navigation/nav-item.css":{content:`:where(.uix-nav-item,uix-nav-item){--nav-item-padding-y: .5rem;--nav-item-padding-x: .75rem;--nav-item-gap: .75rem;--nav-item-font-size: var(--text-sm, .875rem);--nav-item-line-height: var(--leading-tight, 1.25rem);--nav-item-border-radius: 0;--nav-item-color: var(--text-color, inherit);--nav-item-background: transparent;--nav-item-hover-background: var(--color-surface-dark, rgba(0, 0, 0, .05));--nav-item-hover-color: var(--text-color, inherit);--nav-item-active-background: var(--color-primary, rgba(0, 0, 0, .1));--nav-item-active-color: var(--color-surface-darker, inherit);--nav-item-disabled-opacity: .5;--nav-item-indicator-width: 2px;--nav-item-indicator-color: var(--color-primary, currentColor);--nav-item-indicator-length: 50%;--nav-item-badge-background: var(--color-surface-darker);--nav-item-badge-color: var(--text-color, #fff);--nav-item-badge-padding: .2rem .4rem;--nav-item-badge-font-size: var(--text-xs, .6rem);--nav-item-badge-border-radius: var(--radius-md);all:unset;display:flex;align-items:center;gap:var(--nav-item-gap);padding:var(--nav-item-padding-y) var(--nav-item-padding-x);font-size:var(--nav-item-font-size);line-height:var(--nav-item-line-height);color:var(--nav-item-color);background-color:var(--nav-item-background);border-radius:var(--nav-item-border-radius);cursor:pointer;transition:background-color .15s ease-in-out;width:100%;text-decoration:none;box-sizing:border-box;button{display:flex;justify-content:space-between;width:100%}&[rounded]{--nav-item-border-radius: var(--radius-md, .375rem)}&:not([prevent-collapse]){&:hover:not(:disabled){background-color:var(--nav-item-hover-background)}button{cursor:pointer}}&[size=sm]{--nav-item-padding-y: .375rem;--nav-item-padding-x: .5rem;--nav-item-gap: .5rem;--nav-item-font-size: var(--text-sm, .8125rem);--nav-item-line-height: var(--leading-tight, 1.125rem)}&[size=lg]{--nav-item-padding-y: .625rem;--nav-item-padding-x: 1rem;--nav-item-gap: 1rem;--nav-item-font-size: var(--text-base, 1rem);--nav-item-line-height: var(--leading-normal, 1.5rem)}&[active][activeBg]{background-color:var(--nav-item-active-background);color:var(--nav-item-active-color);font-weight:var(--font-semibold, 600)}&[active]:not([activeBg]){background-color:transparent;color:var(--link-active-color);font-weight:var(--font-semibold, 600)}&:disabled{opacity:var(--nav-item-disabled-opacity);cursor:not-allowed}.uix-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0}.label{flex:1;display:flex;flex-direction:row;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:inline-flex;align-items:center;justify-content:center;padding:var(--nav-item-badge-padding);font-size:var(--nav-item-badge-font-size);font-weight:var(--font-semibold, 600);line-height:1;color:var(--nav-item-badge-color);background-color:var(--nav-item-badge-background);border-radius:var(--nav-item-badge-border-radius);flex-shrink:0}&[header] button{position:relative;&:before{content:"";display:inline-block;width:.5em;height:.5em;margin-top:5px;margin-left:.5rem;margin-right:1rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s ease;flex-shrink:0;vertical-align:middle}}&[header][active] button:before{transform:rotate(45deg);margin-top:3px}&[iconOnly]{justify-content:center;padding:var(--nav-item-padding-y);.nav-item-icon{margin:0}}&[indicatorPosition]:not([indicatorPosition=none])[active]{background-color:transparent}&[indicatorPosition=left]{position:relative;&[active]:before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 var(--radius-md, 4px) var(--radius-md, 4px) 0}}&[indicatorPosition=right]{position:relative;&[active]:before{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) 0 0 var(--radius-md, 4px)}}&[indicatorPosition=top]{position:relative;&[active]:before{content:"";position:absolute;top:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 0 var(--radius-md, 4px) var(--radius-md, 4px)}}&[indicatorPosition=bottom]{position:relative;&[active]:before{content:"";position:absolute;bottom:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) var(--radius-md, 4px) 0 0}}&:not([prevent-collapse]):hover:not(:disabled):not([active]){color:var(--nav-item-hover-color)}}
+`,mimeType:"text/css"},"/$app/uix/layout/split-pane.css":{content:`:where(.uix-split-pane,uix-split-pane){display:flex;width:100%;height:100%;overflow:hidden;>[slot]{width:100%}&::part(primary),&::part(secondary){width:100%;display:flex;overflow:auto;background:var( --split-pane-panel-bg, var(--color-surface-darker, #282828) );flex-shrink:0;flex-grow:0}&::part(primary){min-width:0;min-height:0}&::part(secondary){flex:1;min-width:0;min-height:0}&::part(divider){display:flex;align-items:center;justify-content:center;background:var( --split-pane-divider-bg, var(--color-surface, #504945) );flex-shrink:0;position:relative;z-index:10;transition:background .15s ease}&[direction=horizontal],&:not([direction]){flex-direction:row;&::part(divider){width:var(--divider-size, 4px);cursor:default;&:before{width:var(--divider-size, 4px);height:48px}}}&[direction=vertical]{flex-direction:column;&::part(divider){height:var(--divider-size, 4px);cursor:default;&:before{width:48px;height:var(--divider-size, 4px)}}}&[resizable]{&::part(divider):hover{background:var( --split-pane-divider-hover-bg, var(--color-primary, #fabd2f) )}&::part(divider):active{background:var( --split-pane-divider-active-bg, var(--color-primary, #fabd2f) )}&::part(divider):before{content:"";position:absolute;background:var(--color-surface-light, #3c3836);border-radius:var(--radius-full, 9999px);opacity:0;transition:opacity .2s ease}&::part(divider):hover:before{opacity:1}&[direction=horizontal]::part(divider),&:not([direction])::part(divider){cursor:col-resize}&[direction=vertical]::part(divider){cursor:row-resize}}&[dragging]{user-select:none;&[direction=horizontal],&:not([direction]){cursor:col-resize;*{cursor:col-resize!important}}&[direction=vertical]{cursor:row-resize;*{cursor:row-resize!important}}}}@media (pointer: coarse){:where(.uix-split-pane,uix-split-pane){&[direction=horizontal]::part(divider),&:not([direction])::part(divider){width:calc(var(--divider-size, 4px) * 2);margin-left:calc(var(--divider-size, 4px) * -.5);margin-right:calc(var(--divider-size, 4px) * -.5)}&[direction=vertical]::part(divider){height:calc(var(--divider-size, 4px) * 2);margin-top:calc(var(--divider-size, 4px) * -.5);margin-bottom:calc(var(--divider-size, 4px) * -.5)}}}
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/book-open.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/book.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/download.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5l5-5m-5 5V3"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sliders-vertical.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M2 14h4m4-6h4m4 8h4"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/droplet.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/compass.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16.24 7.76l-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/eye.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layers.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83ZM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65m20-5l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-grid.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/loader.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4m4.2 1.8l2.9-2.9M18 12h4m-5.8 4.2l2.9 2.9M12 18v4m-7.1-2.9l2.9-2.9M2 12h4M4.9 4.9l2.9 2.9"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/pen-tool.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/><path d="m18 13l-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18M2.3 2.3l7.286 7.286"/><circle cx="11" cy="11" r="2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list-checks.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m3 17l2 2l4-4M3 7l2 2l4-4m4 1h8m-8 6h8m-8 6h8"/></svg>',mimeType:"image/svg+xml"},"/$app/admin/views/dashboard.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { getModelNames, capitalize } from "../utils/model-utils.js";
+
+export default {
+  tag: "admin-dashboard",
+  style: true,
+  properties: {
+    modelStats: T.object({ defaultValue: {} }),
+    loading: T.boolean({ defaultValue: true }),
+  },
+
+  async connected() {
+    await this.loadStats();
+  },
+
+  async loadStats() {
+    this.loading = true;
+    const stats = {};
+    const models = getModelNames();
+
+    for (const model of models) {
+      try {
+        const records = await $APP.Model[model].getAll();
+        stats[model] = Array.isArray(records) ? records.length : 0;
+      } catch (error) {
+        console.error(\`Error loading stats for \${model}:\`, error);
+        stats[model] = 0;
+      }
+    }
+
+    this.modelStats = stats;
+    this.loading = false;
+  },
+
+  navigate(path) {
+    $APP.Router.go(path);
+  },
+
+  render() {
+    if (this.loading) {
+      return html\`
+        <div class="admin-dashboard-loading">
+          <uix-spinner size="lg"></uix-spinner>
+        </div>
+      \`;
+    }
+
+    const models = Object.entries(this.modelStats);
+    const totalRecords = Object.values(this.modelStats).reduce((a, b) => a + b, 0);
+
+    return html\`
+      <div class="admin-dashboard">
+        <!-- Header -->
+        <div class="admin-dashboard-header">
+          <h1 class="admin-dashboard-title">Dashboard</h1>
+          <p class="admin-dashboard-subtitle">Manage your application data and settings</p>
+        </div>
+
+        <!-- Summary Card -->
+        <uix-card class="admin-dashboard-summary">
+          <div class="admin-dashboard-summary-content">
+            <div>
+              <p class="admin-dashboard-stat-label">Total Records</p>
+              <p class="admin-dashboard-stat-value">\${totalRecords}</p>
+            </div>
+            <div class="admin-dashboard-stat-right">
+              <p class="admin-dashboard-stat-label">Models</p>
+              <p class="admin-dashboard-stat-value">\${models.length}</p>
+            </div>
+          </div>
+        </uix-card>
+
+        <!-- Model Stats Grid -->
+        <section class="admin-dashboard-section">
+          <h2 class="admin-dashboard-section-title">Models</h2>
+          <div class="admin-dashboard-grid">
+            \${models.map(
+              ([model, count]) => html\`
+                <uix-card
+                  hover
+                  class="admin-dashboard-model-card"
+                  @click=\${() => this.navigate(\`/admin/models/\${model}\`)}
+                >
+                  <div class="admin-dashboard-model-header">
+                    <uix-icon name="database" size="24"></uix-icon>
+                    <span class="admin-dashboard-model-count">\${count}</span>
+                  </div>
+                  <p class="admin-dashboard-model-name">\${model}</p>
+                  <p class="admin-dashboard-model-label">
+                    \${count === 1 ? "record" : "records"}
+                  </p>
+                </uix-card>
+              \`,
+            )}
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="admin-dashboard-section">
+          <h2 class="admin-dashboard-section-title">Quick Actions</h2>
+          <div class="admin-dashboard-actions">
+            <uix-button
+              class="admin-action-deploy"
+              @click=\${() => this.navigate("/admin/deploy")}
+            >
+              <uix-icon name="rocket" size="24"></uix-icon>
+              Deploy
+            </uix-button>
+
+            <uix-button
+              class="admin-action-theme"
+              @click=\${() => this.navigate("/admin/theme")}
+            >
+              <uix-icon name="palette" size="24"></uix-icon>
+              Theme
+            </uix-button>
+
+            <uix-button
+              class="admin-action-refresh"
+              @click=\${() => this.loadStats()}
+            >
+              <uix-icon name="refresh-cw" size="24"></uix-icon>
+              Refresh
+            </uix-button>
+          </div>
+        </section>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/admin/views/dashboard.css":{content:`.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}
+`,mimeType:"text/css"},"/$app/admin/views/model-list.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
+import { keyed } from "/npm/lit-html/directives/keyed.js";
+import {
+  capitalize,
+  getDisplayColumns,
+  getModelSchema,
+  getSingularName,
+} from "../utils/model-utils.js";
+import { getModelActions, getPluginModals } from "../plugins.js";
+
+export default {
+  tag: "admin-model-list",
+  style: true,
+  dataQuery: true,
+  properties: {
+    rows: T.array(),
+    model: T.string(),
+    selectedRow: T.object(),
+    selectedColumns: T.array({ sync: "local", scope: "model" }),
+    viewMode: T.string({ defaultValue: "list", enum: ["list", "board"] }),
+    groupByField: T.string({ sync: "local", scope: "model", defaultValue: "" }),
+    modalOpen: T.boolean({ defaultValue: false }),
+    confirmDelete: T.boolean({ defaultValue: false }),
+    searchQuery: T.string({ defaultValue: "" }),
+    pluginModal: T.string({ defaultValue: "" }),
+  },
+
+  connected() {
+    if (!this.selectedColumns || this.selectedColumns.length === 0) {
+      this.selectedColumns = getDisplayColumns(this.model);
+    }
+  },
+
+  getColumns() {
+    const schema = getModelSchema(this.model);
+    return this.selectedColumns
+      .map((colName) => {
+        const field = schema.find((f) => f.name === colName);
+        return {
+          name: colName,
+          label: field?.label || capitalize(colName),
+          type: field?.type || "string",
+          sortable: true,
+        };
+      })
+      .filter(Boolean);
+  },
+
+  getGroupableFields() {
+    const schema = getModelSchema(this.model);
+    const groupable = schema.filter((f) => {
+      const type = f.type?.toLowerCase() || "";
+      return (
+        f.enum ||
+        type === "enum" ||
+        type === "belongs" ||
+        type === "string" ||
+        type === "boolean"
+      );
+    });
+    return groupable.sort((a, b) => {
+      const aScore = a.enum ? 0 : a.type === "belongs" ? 1 : 2;
+      const bScore = b.enum ? 0 : b.type === "belongs" ? 1 : 2;
+      return aScore - bScore;
+    });
+  },
+
+  openCreateForm() {
+    this.selectedRow = {};
+    this.modalOpen = true;
+  },
+
+  openEditForm(row) {
+    this.selectedRow = { ...row };
+    this.modalOpen = true;
+  },
+
+  closeModal() {
+    this.modalOpen = false;
+    this.selectedRow = null;
+    this.confirmDelete = false;
+  },
+
+  openPluginModal(name) {
+    this.pluginModal = name;
+  },
+
+  closePluginModal() {
+    this.pluginModal = "";
+  },
+
+  handlePluginAction(action) {
+    const context = {
+      model: this.model,
+      rows: this.rows,
+      openModal: (name) => this.openPluginModal(name),
+      refresh: () => this.dispatchEvent(new CustomEvent("refresh")),
+    };
+    action.handler(context);
+  },
+
+  async handleFormSubmit(e) {
+    const data = e.detail;
+
+    try {
+      let error, result;
+      if (data.id) {
+        [error, result] = await $APP.Model[this.model].edit(data);
+      } else {
+        [error, result] = await $APP.Model[this.model].add(data);
+      }
+
+      if (error) {
+        // Pass errors to form for display
+        const form = this.querySelector("admin-model-form uix-form");
+        form?.setErrors(error);
+        return;
+      }
+
+      this.closeModal();
+      this.dispatchEvent(new CustomEvent("refresh"));
+    } catch (error) {
+      console.error("Error saving:", error);
+      alert(\`Error: \${error.message}\`);
+    }
+  },
+
+  async handleDelete() {
+    if (!this.selectedRow?.id) return;
+
+    try {
+      await $APP.Model[this.model].remove(this.selectedRow.id);
+      this.closeModal();
+      this.dispatchEvent(new CustomEvent("refresh"));
+    } catch (error) {
+      console.error("Error deleting:", error);
+      alert(\`Error: \${error.message}\`);
+    }
+  },
+
+  toggleColumn(column) {
+    if (column === "id") return;
+    const current = [...(this.selectedColumns || [])];
+    const index = current.indexOf(column);
+    if (index === -1) {
+      current.push(column);
+    } else {
+      current.splice(index, 1);
+    }
+    this.selectedColumns = current;
+  },
+
+  filterRows(rows) {
+    if (!this.searchQuery) return rows;
+    const query = this.searchQuery.toLowerCase();
+    return rows.filter((row) =>
+      Object.values(row).some((val) =>
+        String(val).toLowerCase().includes(query),
+      ),
+    );
+  },
+
+  render() {
+    const { rows, model, selectedRow, modalOpen, confirmDelete } = this;
+    const modelName = getSingularName(model);
+    const schema = getModelSchema(model);
+    const columns = this.getColumns();
+    const filteredRows = this.filterRows(rows || []);
+
+    return html\`
+      <div class="admin-model-list">
+        <!-- Header -->
+        <div class="admin-model-list-header">
+          <div>
+            <h1 class="admin-model-list-title">\${capitalize(model)}</h1>
+            <p class="admin-model-list-count">\${filteredRows.length} records</p>
+          </div>
+
+          <div class="admin-model-list-actions">
+            <!-- Column Selector -->
+            <uix-dropdown>
+              <uix-button slot="trigger" ghost>
+                <uix-icon name="columns-3" size="18"></uix-icon>
+                Columns
+              </uix-button>
+              <div class="admin-dropdown-content">
+                \${schema.map(
+                  (field) => html\`
+                    <label class="admin-dropdown-item">
+                      <uix-checkbox
+                        ?checked=\${this.selectedColumns?.includes(field.name)}
+                        ?disabled=\${field.name === "id"}
+                        @change=\${() => this.toggleColumn(field.name)}
+                      ></uix-checkbox>
+                      <span>\${field.label || field.name}</span>
+                    </label>
+                  \`,
+                )}
+              </div>
+            </uix-dropdown>
+
+            <!-- Group By Field Selector (Board Mode) -->
+            \${
+              this.viewMode === "board"
+                ? html\`
+                  <uix-dropdown>
+                    <uix-button slot="trigger" ghost>
+                      <uix-icon name="layers" size="18"></uix-icon>
+                      \${
+                        this.groupByField
+                          ? capitalize(this.groupByField)
+                          : "No Grouping"
+                      }
+                    </uix-button>
+                    <div class="admin-dropdown-content">
+                      <button
+                        class="admin-dropdown-item \${!this.groupByField ? "active" : ""}"
+                        @click=\${() => (this.groupByField = "")}
+                      >
+                        <uix-icon name="layout-grid" size="16"></uix-icon>
+                        No Grouping
+                      </button>
+                      \${this.getGroupableFields().map(
+                        (field) => html\`
+                          <button
+                            class="admin-dropdown-item \${this.groupByField === field.name ? "active" : ""}"
+                            @click=\${() => (this.groupByField = field.name)}
+                          >
+                            <uix-icon
+                              name=\${field.enum ? "list-filter" : field.type === "belongs" ? "link" : "type"}
+                              size="16"
+                            ></uix-icon>
+                            \${field.label || capitalize(field.name)}
+                          </button>
+                        \`,
+                      )}
+                    </div>
+                  </uix-dropdown>
+                \`
+                : ""
+            }
+
+            <!-- View Mode Toggle -->
+            <div class="admin-view-toggle">
+              <uix-button
+                ghost
+                size="sm"
+                ?primary=\${this.viewMode === "list"}
+                @click=\${() => (this.viewMode = "list")}
+              >
+                <uix-icon name="list" size="18"></uix-icon>
+              </uix-button>
+              <uix-button
+                ghost
+                size="sm"
+                ?primary=\${this.viewMode === "board"}
+                @click=\${() => (this.viewMode = "board")}
+              >
+                <uix-icon name="kanban" size="18"></uix-icon>
+              </uix-button>
+            </div>
+
+            <!-- Import/Export -->
+            <admin-import .model=\${model}></admin-import>
+            <admin-export .model=\${model} .rows=\${rows}></admin-export>
+
+            <!-- Plugin Actions -->
+            \${getModelActions(model).map(
+              (action) => html\`
+                <uix-button ghost @click=\${() => this.handlePluginAction(action)}>
+                  <uix-icon name=\${action.icon || "plug"} size="18"></uix-icon>
+                  \${action.label}
+                </uix-button>
+              \`,
+            )}
+
+            <!-- New Button -->
+            <uix-button primary @click=\${this.openCreateForm}>
+              <uix-icon name="plus" size="20"></uix-icon>
+              New \${capitalize(modelName)}
+            </uix-button>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="admin-model-list-search">
+          <uix-input
+            w-full
+            type="search"
+            placeholder="Search..."
+            icon="search"
+            .value=\${this.searchQuery}
+            @input=\${(e) => (this.searchQuery = e.target.value)}
+          ></uix-input>
+        </div>
+
+        <!-- Content Area -->
+        \${
+          this.viewMode === "board"
+            ? html\`
+              <admin-board
+                .model=\${model}
+                .rows=\${filteredRows}
+                .groupByField=\${this.groupByField}
+                @select-item=\${(e) => this.openEditForm(e.detail)}
+                @new-item=\${(e) => {
+                  this.selectedRow = e.detail || {};
+                  this.modalOpen = true;
+                }}
+              ></admin-board>
+            \`
+            : html\`
+                <uix-data-table
+                  .data-query=\${{ model, key: "rows" }}
+                  .columns=\${columns}
+                  .selectRow=\${(row) => this.openEditForm(row)}
+                ></uix-data-table>
+            \`
+        }
+ 
+        <!-- Edit/Create Modal -->
+        <uix-modal
+          ?open=\${modalOpen}
+          @modal-close=\${this.closeModal}
+        >
+          <div slot="header">
+            \${
+              selectedRow?.id
+                ? html\`Edit \${capitalize(modelName)} <span class="admin-modal-id">#\${selectedRow.id}</span>\`
+                : html\`New \${capitalize(modelName)}\`
+            }
+          </div>
+          \${
+            modalOpen
+              ? keyed(
+                  selectedRow,
+                  html\`
+                  <admin-model-form
+                    .model=\${model}
+                    .row=\${selectedRow}
+                    @form-submit=\${this.handleFormSubmit}
+                  ></admin-model-form>
+                \`,
+                )
+              : ""
+          }
+          <div slot="footer">
+            <uix-button ghost @click=\${this.closeModal}>
+              Cancel
+            </uix-button>
+            \${
+              selectedRow?.id
+                ? html\`
+                <uix-button danger ghost @click=\${() => (this.confirmDelete = true)}>
+                  <uix-icon name="trash" size="18"></uix-icon>
+                  Delete
+                </uix-button>
+              \`
+                : ""
+            }
+            <uix-button primary @click=\${() => this.querySelector("admin-model-form")?.submit()}>
+              <uix-icon name=\${selectedRow?.id ? "save" : "plus"} size="18"></uix-icon>
+              \${selectedRow?.id ? "Save" : "Create"}
+            </uix-button>
+          </div>
+        </uix-modal>
+
+        <!-- Delete Confirmation Modal -->
+        <uix-modal
+          ?open=\${confirmDelete}
+          @modal-close=\${() => (this.confirmDelete = false)}
+          size="sm"
+        >
+          <div slot="header">Delete \${capitalize(modelName)}?</div>
+          <div class="admin-delete-confirm">
+            <div class="admin-delete-icon">
+              <uix-icon name="alert-triangle" size="24"></uix-icon>
+            </div>
+            <div>
+              <p class="admin-delete-text">This action cannot be undone.</p>
+            </div>
+          </div>
+          <div slot="footer">
+            <uix-button ghost @click=\${() => (this.confirmDelete = false)}>
+              Cancel
+            </uix-button>
+            <uix-button danger @click=\${this.handleDelete}>
+              <uix-icon name="trash" size="18"></uix-icon>
+              Delete
+            </uix-button>
+          </div>
+        </uix-modal>
+
+        <!-- Plugin Modals -->
+        \${Object.entries(getPluginModals()).map(
+          ([name, config]) => html\`
+            <uix-modal
+              ?open=\${this.pluginModal === name}
+              @modal-close=\${() => this.closePluginModal()}
+              @close-modal=\${() => this.closePluginModal()}
+              @refresh=\${() => {
+                this.closePluginModal();
+                this.dispatchEvent(new CustomEvent("refresh"));
+              }}
+              size="lg"
+            >
+              <div slot="header">\${config.title || capitalize(name.replace(/-/g, " "))}</div>
+              \${this.pluginModal === name ? config.component({ model, context: this }) : ""}
+            </uix-modal>
+          \`,
+        )}
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/admin/views/model-list.css":{content:`.admin-model-list{padding:var(--admin-list-padding, 2rem)}.admin-model-list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--admin-list-header-margin, 1.5rem)}.admin-model-list-title{font-size:var(--admin-list-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0}.admin-model-list-count{color:var(--admin-list-count-color, #6b7280);margin:0}.admin-model-list-actions{display:flex;align-items:center;gap:var(--admin-list-actions-gap, 1rem)}.admin-view-toggle{display:flex;border:2px solid var(--admin-toggle-border, #000);border-radius:var(--admin-toggle-radius, .5rem);overflow:hidden}.admin-view-toggle uix-button{border-radius:0}.admin-dropdown-content{padding:var(--admin-dropdown-padding, .5rem);max-height:var(--admin-dropdown-max-height, 16rem);overflow-y:auto}.admin-dropdown-item{display:flex;align-items:center;gap:.5rem;width:100%;padding:var(--admin-dropdown-item-padding, .5rem .75rem);border:none;background:none;border-radius:var(--admin-dropdown-item-radius, .5rem);cursor:pointer;text-align:left;font-size:.875rem;transition:background-color .15s ease}.admin-dropdown-item:hover{background:var(--admin-dropdown-item-hover, #f3f4f6)}.admin-dropdown-item.active{background:var(--admin-dropdown-item-active, #f3f4f6);font-weight:700}.admin-model-list-search{margin-bottom:var(--admin-list-search-margin, 1.5rem);max-width:var(--admin-list-search-width, 28rem)}.admin-table-card{overflow:hidden}.admin-table-scroll{overflow-x:auto}.admin-table{width:100%;border-collapse:collapse}.admin-table thead{background:var(--admin-table-header-bg, #f3f4f6);border-bottom:3px solid var(--admin-table-border, #000)}.admin-table th{padding:var(--admin-table-cell-padding, .75rem 1rem);text-align:left;font-size:.875rem;font-weight:900;text-transform:uppercase;letter-spacing:.025em}.admin-table tbody tr{cursor:pointer;transition:background-color .15s ease;border-bottom:1px solid var(--admin-table-row-border, #e5e7eb)}.admin-table tbody tr:hover{background:var(--admin-table-row-hover, #f9fafb)}.admin-table td{padding:var(--admin-table-cell-padding, .75rem 1rem);font-size:.875rem}.admin-table-actions-col{text-align:right;width:1%;white-space:nowrap}.admin-table-empty{padding:var(--admin-table-empty-padding, 3rem);text-align:center;color:var(--admin-table-empty-color, #6b7280)}.admin-table-empty uix-icon{margin:0 auto 1rem;opacity:.5}.admin-table-empty-title{font-size:1.125rem;font-weight:500;margin:0 0 .25rem}.admin-table-empty-text{font-size:.875rem;margin:0}.admin-delete-confirm{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}.admin-delete-icon{padding:.75rem;background:var(--admin-delete-icon-bg, #fee2e2);border-radius:9999px;color:var(--admin-delete-icon-color, #dc2626)}.admin-delete-title{font-weight:900;font-size:1.125rem;margin:0}.admin-delete-text{color:var(--admin-delete-text-color, #6b7280);font-size:.875rem;margin:0}.admin-modal-id{font-weight:400;color:var(--text-muted, #6b7280);font-size:.875em}.admin-modal-footer{display:flex;gap:1rem}.admin-modal-footer uix-button{flex:1}
+`,mimeType:"text/css"},"/$app/uix/overlay/dropdown.js":{content:`import T from "/$app/types/index.js";
+
+export default {
+  style: true,
+  extends: "uix-popover-controller",
+  tag: "uix-dropdown",
+  properties: {
+    autoClose: T.boolean(true),
+  },
+
+  connected() {
+    this.setAttribute("role", "menu");
+    this.addEventListener("click", this._handleMenuClick);
+  },
+
+  disconnected() {
+    this.removeEventListener("click", this._handleMenuClick);
+  },
+
+  _handleMenuClick(e) {
+    if (!this.autoClose) return;
+
+    // Close dropdown when a menu item (link or button) is clicked
+    const target = e.target;
+    const link = target.closest("a, button");
+
+    // Don't close if it's a button that triggers another popover
+    if (link && !link.closest("[popovertarget]")) {
+      this._close();
+    }
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * UIX Dropdown Component
+ * Shows dropdown menu using custom popover system.
+ * Extends uix-popover-controller for positioning and state management.
+ *
+ * @extends uix-popover-controller
+ * @slot - Default slot for dropdown menu items
+ *
+ * @property {string} position - Positioning relative to trigger (inherited from popover-controller)
+ * @property {boolean} autoClose - Auto-close when menu item is clicked (default true)
+ *
+ * @example Basic Dropdown
+ * \`\`\`html
+ * <uix-button popovertarget="menu5">Toggle Menu</uix-button>
+<uix-dropdown id="menu5">
+    <div class="dropdown-header">Settings</div>
+    <a href="/profile">Profile</a>
+    <a href="/preferences">Preferences</a>
+    <hr>
+    <div class="dropdown-header">Account</div>
+    <a href="/logout">Logout</a>
+  </uix-dropdown>
+
+ * \`\`\`
+ *
+ * @example Different Positions
+ * \`\`\`html
+ * <uix-button popovertarget="dropdown1">Bottom Menu</uix-button>
+ * <uix-dropdown id="dropdown1" position="bottom">
+
+ *     <uix-nav-item
+ *        href="/item1"
+ *        label="Item 1"></uix-nav-item>
+ *     <uix-nav-item
+ *        href="/item2"
+ *        label="Item 2"></uix-nav-item>
+ * </uix-dropdown>
+ *
+ * <uix-button popovertarget="dropdown2">Top Menu</uix-button>
+ * <uix-dropdown id="dropdown2" position="top">
+ *     <uix-nav-item
+ *        href="/item1"
+ *        label="Item 1"></uix-nav-item>
+ *     <uix-nav-item
+ *        href="/item2"
+ *        label="Item 2"></uix-nav-item>
+ * </uix-dropdown>
+ *
+ * <uix-button popovertarget="dropdown3">Right-Aligned Menu</uix-button>
+ * <uix-dropdown id="dropdown3" position="right">
+ *     <uix-nav-item
+ *        href="/item1"
+ *        label="Item 1"></uix-nav-item>
+ *     <uix-nav-item
+ *        href="/item2"
+ *        label="Item 2"></uix-nav-item>
+ * </uix-dropdown>
+ * \`\`\`
+ *
+ * @example With Custom Content
+ * \`\`\`html
+ * <uix-button popovertarget="products-menu">
+ *   Products <uix-icon name="chevron-down"></uix-icon>
+ * </uix-button>
+ * <uix-dropdown id="products-menu" position="bottom-left">
+ *   <a href="/product1">Product 1</a>
+ *   <a href="/product2">Product 2</a>
+ *   <hr>
+ *   <a href="/all-products">View All</a>
+ * </uix-dropdown>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/admin/views/export.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+
+const convertToCSV = (data) => {
+  if (!data || data.length === 0) return "";
+
+  const headers = Object.keys(data[0]);
+  const rows = data.map((obj) =>
+    headers
+      .map((header) => {
+        const value = obj[header];
+        if (value === null || value === undefined) return '""';
+        if (typeof value === "object") return \`"\${JSON.stringify(value).replace(/"/g, '""')}"\`;
+        const str = String(value);
+        if (str.includes(",") || str.includes("\\n") || str.includes('"')) {
+          return \`"\${str.replace(/"/g, '""')}"\`;
+        }
+        return str;
+      })
+      .join(","),
+  );
+
+  return [headers.join(","), ...rows].join("\\n");
+};
+
+const downloadFile = (content, fileName, mimeType) => {
+  const blob = new Blob([content], { type: mimeType });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
+export default {
+  tag: "admin-export",
+  style: true,
+  properties: {
+    model: T.string(),
+    rows: T.array(),
+    exporting: T.boolean({ defaultValue: false }),
+  },
+
+  async exportData(format) {
+    this.exporting = true;
+
+    try {
+      let data = this.rows;
+      if (!data || data.length === 0) {
+        data = await $APP.Model[this.model].getAll();
+      }
+
+      if (!data || data.length === 0) {
+        alert("No data to export");
+        this.exporting = false;
+        return;
+      }
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      const fileName = \`\${this.model}-\${timestamp}\`;
+
+      if (format === "CSV") {
+        const csvContent = convertToCSV(data);
+        downloadFile(csvContent, \`\${fileName}.csv\`, "text/csv;charset=utf-8");
+      } else if (format === "JSON") {
+        const jsonContent = JSON.stringify(data, null, 2);
+        downloadFile(jsonContent, \`\${fileName}.json\`, "application/json");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert(\`Export failed: \${error.message}\`);
+    }
+
+    this.exporting = false;
+  },
+
+  render() {
+    return html\`
+      <uix-button popovertarget="export-\${this.model}" ghost ?disabled=\${this.exporting}>
+        <uix-icon name="download" size="18"></uix-icon>
+        \${this.exporting ? "Exporting..." : "Export"}
+      </uix-button>
+      <uix-dropdown id="export-\${this.model}">
+        <div class="admin-export-options">
+          \${["CSV", "JSON"].map(
+            (format) => html\`
+              <button
+                class="admin-export-option"
+                @click=\${() => this.exportData(format)}
+              >
+                \${format}
+              </button>
+            \`,
+          )}
+        </div>
+      </uix-dropdown>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/display/data-table.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-data-table",
+  style: true,
+  properties: {
+    "data-query": T.object(),
+    columns: T.array(),
+    rows: T.array(),
+    selectRow: T.function(),
+    emptyMessage: T.string({ defaultValue: "No data" }),
+    // Pagination state
+    page: T.number({ defaultValue: 1 }),
+    limit: T.number({ defaultValue: 10 }),
+    total: T.number({ defaultValue: 0 }),
+    showPagination: T.boolean({ defaultValue: true }),
+    // Sorting
+    sortBy: T.string(),
+    sortDir: T.string({ defaultValue: "asc" }),
+  },
+
+  handleDataLoaded(e) {
+    const { total, limit, offset } = e.detail;
+    this.total = total;
+    this.limit = limit;
+    this.offset = offset;
+    this.totalPages = Math.ceil(this.total / this.limit) || 1;
+  },
+
+  handlePageChange(e) {
+    const newPage = e.detail.page;
+    this.page = newPage;
+    // Update data-query to trigger re-fetch via uix-table
+    this["data-query"] = {
+      ...this["data-query"],
+      limit: this.limit,
+      offset: (newPage - 1) * this.limit,
+    };
+  },
+  render() {
+    return html\`
+      <uix-table
+        .data-query=\${{ ...this["data-query"], limit: this.limit }}
+        .columns=\${this.columns}
+        .selectRow=\${this.selectRow}
+        @dataLoaded=\${this.handleDataLoaded}
+      ></uix-table>
+      \${
+        this.showPagination && this.totalPages > 1
+          ? html\`
+            <uix-pagination
+              .current=\${this.page}
+              .total=\${this.totalPages}
+              @change=\${this.handlePageChange}
+            ></uix-pagination>
+          \`
+          : ""
+      }
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/admin/views/import.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+import { getModelSchema } from "../utils/model-utils.js";
+
+const readFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => resolve(event.target.result);
+    reader.onerror = (error) => reject(error);
+    reader.readAsText(file);
+  });
+};
+
+const parseCSV = (csvData) => {
+  const rows = csvData.trim().split("\\n");
+  if (rows.length === 0) return [];
+
+  const headers = rows[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+
+  return rows
+    .slice(1)
+    .map((row) => {
+      const values = [];
+      let current = "";
+      let inQuotes = false;
+
+      for (const char of row) {
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+          values.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+
+      return headers.reduce((object, header, index) => {
+        let value = values[index] || "";
+        value = value.replace(/^"|"$/g, "");
+        object[header] = value;
+        return object;
+      }, {});
+    })
+    .filter((row) => Object.values(row).some((value) => value));
+};
+
+export default {
+  tag: "admin-import",
+  style: true,
+  properties: {
+    model: T.string(),
+    modalOpen: T.boolean({ defaultValue: false }),
+    fileType: T.string({ defaultValue: "" }),
+    parsedData: T.array({ defaultValue: [] }),
+    importing: T.boolean({ defaultValue: false }),
+    csvFields: T.array({ defaultValue: [] }),
+    fieldMapping: T.object({ defaultValue: {} }),
+  },
+
+  async handleFileSelect(e, fileType) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const content = await readFile(file);
+      let data = [];
+
+      if (fileType === "CSV") {
+        data = parseCSV(content);
+        if (data.length > 0) {
+          this.csvFields = Object.keys(data[0]);
+          const schema = getModelSchema(this.model);
+          const mapping = {};
+          schema.forEach((field) => {
+            const match = this.csvFields.find(
+              (csvField) => csvField.toLowerCase() === field.name.toLowerCase(),
+            );
+            if (match) {
+              mapping[field.name] = match;
+            }
+          });
+          this.fieldMapping = mapping;
+        }
+      } else if (fileType === "JSON") {
+        data = JSON.parse(content);
+        if (!Array.isArray(data)) {
+          data = [data];
+        }
+      }
+
+      this.parsedData = data;
+      this.fileType = fileType;
+      this.modalOpen = true;
+    } catch (error) {
+      console.error("Error parsing file:", error);
+      alert(\`Error parsing file: \${error.message}\`);
+    }
+
+    e.target.value = "";
+  },
+
+  updateMapping(modelField, csvField) {
+    this.fieldMapping = { ...this.fieldMapping, [modelField]: csvField };
+  },
+
+  async handleImport() {
+    this.importing = true;
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      const data =
+        this.fileType === "CSV"
+          ? this.parsedData.map((row) => this.mapCsvRow(row))
+          : this.parsedData;
+
+      for (const item of data) {
+        try {
+          await $APP.Model[this.model].add(item);
+          successCount++;
+        } catch (error) {
+          console.error("Error importing row:", error);
+          errorCount++;
+        }
+      }
+
+      alert(
+        \`Import complete! \${successCount} records imported\${errorCount > 0 ? \`, \${errorCount} failed\` : ""}.\`,
+      );
+      this.closeModal();
+    } catch (error) {
+      console.error("Import error:", error);
+      alert(\`Import failed: \${error.message}\`);
+    }
+
+    this.importing = false;
+  },
+
+  mapCsvRow(row) {
+    const result = {};
+    Object.entries(this.fieldMapping).forEach(([modelField, csvField]) => {
+      if (csvField && row[csvField] !== undefined) {
+        result[modelField] = row[csvField];
+      }
+    });
+    return result;
+  },
+
+  closeModal() {
+    this.modalOpen = false;
+    this.parsedData = [];
+    this.csvFields = [];
+    this.fieldMapping = {};
+    this.fileType = "";
+  },
+
+  render() {
+    const schema = getModelSchema(this.model);
+
+    return html\`
+      <!-- Import Dropdown -->
+      <uix-button popovertarget="import-\${this.model}" ghost>
+        <uix-icon name="upload" size="18"></uix-icon>
+        Import
+      </uix-button>
+      <uix-dropdown id="import-\${this.model}">
+        <div class="admin-import-options">
+          \${["CSV", "JSON"].map(
+            (type) => html\`
+              <label class="admin-import-option">
+                \${type}
+                <input
+                  type="file"
+                  accept=".\${type.toLowerCase()}"
+                  @change=\${(e) => this.handleFileSelect(e, type)}
+                  class="admin-import-file-input"
+                />
+              </label>
+            \`,
+          )}
+        </div>
+      </uix-dropdown>
+
+      <!-- Import Modal -->
+      <uix-modal
+        ?open=\${this.modalOpen}
+        @close=\${this.closeModal}
+        title="Import \${this.fileType} - \${this.parsedData.length} records"
+      >
+        \${this.modalOpen
+          ? html\`
+              <div class="admin-import-content">
+                \${this.fileType === "CSV" && this.csvFields.length > 0
+                  ? html\`
+                      <div class="admin-import-mapping">
+                        <h3 class="admin-import-mapping-title">Map CSV columns to model fields:</h3>
+                        <div class="admin-import-mapping-list">
+                          \${schema
+                            .filter((f) => f.name !== "id")
+                            .map(
+                              (field) => html\`
+                                <div class="admin-import-mapping-row">
+                                  <span class="admin-import-field-name">\${field.label || field.name}</span>
+                                  <span class="admin-import-arrow">\u2192</span>
+                                  <uix-select
+                                    .value=\${this.fieldMapping[field.name] || ""}
+                                    placeholder="-- Skip --"
+                                    .options=\${this.csvFields.map((csvField) => ({
+                                      value: csvField,
+                                      label: csvField,
+                                    }))}
+                                    @change=\${(e) =>
+                                      this.updateMapping(field.name, e.target.value)}
+                                  ></uix-select>
+                                </div>
+                              \`,
+                            )}
+                        </div>
+                      </div>
+                    \`
+                  : html\`
+                      <div class="admin-import-preview">
+                        <h3 class="admin-import-preview-title">Preview:</h3>
+                        <pre class="admin-import-preview-code">\${JSON.stringify(this.parsedData.slice(0, 3), null, 2)}</pre>
+                        \${this.parsedData.length > 3
+                          ? html\`<p class="admin-import-preview-more">
+                              ... and \${this.parsedData.length - 3} more records
+                            </p>\`
+                          : ""}
+                      </div>
+                    \`}
+              </div>
+
+              <div slot="footer" class="admin-import-footer">
+                <uix-button ghost @click=\${this.closeModal}>
+                  Cancel
+                </uix-button>
+                <uix-button
+                  primary
+                  @click=\${this.handleImport}
+                  ?disabled=\${this.importing}
+                >
+                  \${this.importing ? "Importing..." : \`Import \${this.parsedData.length} records\`}
+                </uix-button>
+              </div>
+            \`
+          : ""}
+      </uix-modal>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/overlay/modal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-modal",
+  properties: {
+    open: T.boolean(false),
+    closeOnEscape: T.boolean(true),
+    closeOnBackdropClick: T.boolean(true),
+    size: T.string({ defaultValue: "md", enum: ["sm", "md", "lg", "xl"] }),
+  },
+  style: true,
+  shadow: true,
+  firstUpdated() {
+    this.dialog = this.shadowRoot.querySelector("dialog");
+    this.dialog.addEventListener("close", () => {
+      this.open = false;
+      this.emit("modal-close", { returnValue: this.dialog.returnValue });
+    });
+    this.dialog.addEventListener("cancel", (e) => {
+      if (!this.closeOnEscape) {
+        e.preventDefault();
+      } else {
+        this.emit("modal-cancel");
+      }
+    });
+    this.dialog.addEventListener("click", (e) => {
+      if (this.closeOnBackdropClick && e.target === this.dialog) {
+        const rect = this.dialog.getBoundingClientRect();
+        const isInDialog =
+          rect.top <= e.clientY &&
+          e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX &&
+          e.clientX <= rect.left + rect.width;
+
+        if (!isInDialog) this.close();
+      }
+    });
+
+    const closeLinks = this.querySelectorAll("[data-close]");
+    closeLinks.forEach((link) => {
+      link.addEventListener("click", this.close.bind(this));
+    });
+  },
+  updated({ changedProps }) {
+    if (changedProps.has("open") && this.dialog) {
+      if (this.open && !this.dialog.open) {
+        this.showModal();
+      } else if (!this.open && this.dialog.open) {
+        this.dialog.close();
+      }
+    }
+  },
+  showModal() {
+    if (this.dialog && !this.dialog.open) {
+      this.dialog.showModal();
+      this.open = true;
+      this.emit("modal-open");
+    }
+  },
+  show() {
+    if (this.dialog && !this.dialog.open) {
+      this.dialog.show();
+      this.open = true;
+      this.emit("modal-open");
+    }
+  },
+  close(returnValue) {
+    if (this.dialog?.open) {
+      this.dialog.close(returnValue);
+      this.open = false;
+    }
+  },
+  render() {
+    return html\`
+      <slot name="trigger" @click=\${this.showModal.bind(this)}></slot>
+      <dialog part="dialog">
+        <div part="header" class="modal-header">
+          <slot name="header"></slot>
+          <button
+            part="close-button"
+            class="modal-close-button"
+            @click=\${() => this.close()}
+            aria-label="Close"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div part="body" class="modal-body">
+          <slot></slot>
+        </div>
+        <slot part="footer" class="modal-footer" name="footer"></slot>
+      </dialog>
+    \`;
+  },
+};
+
+/**
+ * Modal Component
+ *
+ * @component
+ * @category overlay
+ * @tag uix-modal
+ *
+ * Modal dialog using native HTML dialog API with flexible trigger options
+ *
+ * @example
+ * // Pattern 1: Modal with trigger button in slot
+ * \`\`\`html
+ * <uix-modal>
+ *   <button slot="trigger">Open Modal</button>
+ *   <h2 slot="header">Modal Title</h2>
+ *   <p>Modal content goes here...</p>
+ *   <div slot="footer">
+ *     <uix-button data-close>Cancel</uix-button>
+ *     <uix-button variant="primary">Confirm</uix-button>
+ *   </div>
+ * </uix-modal>
+ * \`\`\`
+ *
+ * @example
+ * // Pattern 2: Modal opened from external button
+ * \`\`\`js
+ * html\`<button @click=\${() => document.querySelector('#myModal').showModal()}>
+ *   Open Modal
+ * </button>
+ *
+ * <uix-modal id="myModal">
+ *   <h2 slot="header">Delete Item</h2>
+ *   <p>Are you sure you want to delete this item?</p>
+ *   <div slot="footer">
+ *     <uix-button @click=\${(e) => e.target.closest('uix-modal').close()}>
+ *       Cancel
+ *     </uix-button>
+ *     <uix-button variant="danger" @click=\${this.handleDelete}>
+ *       Delete
+ *     </uix-button>
+ *   </div>
+ * </uix-modal>\`
+ * \`\`\`
+ *
+ * @example
+ *  Pattern 3: Controlled modal with open property
+ * \`\`\`js
+ * html\`<uix-modal
+ *   .open=\${this.isModalOpen}
+ *   @modal-close=\${() => this.isModalOpen = false}
+ * >
+ *   <h2 slot="header">Settings</h2>
+ *   <p>Modal content...</p>
+ *   <div slot="footer">
+ *     <uix-button @click=\${() => this.isModalOpen = false}>Close</uix-button>
+ *   </div>
+ * </uix-modal>\`
+ * \`\`\`
+ *
+ * @example
+ * // With options
+ * \`\`\`js
+ * html\`<uix-modal
+ *   .closeOnEscape=\${false}
+ *   .closeOnBackdropClick=\${false}
+ *   @modal-close=\${this.handleClose}
+ * >
+ *   <h2 slot="header">Important Notice</h2>
+ *   <p>This modal cannot be closed by clicking outside or pressing Escape.</p>
+ *   <div slot="footer">
+ *     <uix-button @click=\${(e) => e.target.closest('uix-modal').close('confirmed')}>
+ *       I Understand
+ *     </uix-button>
+ *   </div>
+ * </uix-modal>\`
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/columns-3.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18m6-18v18"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/kanban.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5v11m6-11v6m6-6v14"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/instagram.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8A4 4 0 0 1 16 11.37m1.5-4.87h.01"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/trash.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/plus.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/overlay/popover-controller.js":{content:`import T from "/$app/types/index.js";
+
+export default {
+  tag: "uix-popover-controller",
+  i18n: {},
+  properties: {
+    position: T.string("bottom-left"),
+    open: T.boolean(false),
+    offset: T.number(4),
+  },
+  style: true,
+
+  connected() {
+    this._triggerElement = null;
+    this._boundDocumentClick = this._handleDocumentClick.bind(this);
+
+    // Set initial state
+    if (!this.open) {
+      this.style.display = "none";
+    }
+  },
+
+  disconnected() {
+    this._removeDocumentListener();
+    this._stopPositionTracking();
+  },
+
+  _calculatePosition(triggerElement) {
+    if (!triggerElement) return { top: 0, left: 0 };
+
+    const triggerRect = triggerElement.getBoundingClientRect();
+    const popoverRect = this.getBoundingClientRect();
+    const offset = this.offset || 4;
+
+    let top = 0;
+    let left = 0;
+
+    const position = this.position || "bottom-left";
+
+    // Vertical positioning
+    if (position.includes("bottom")) {
+      top = triggerRect.bottom + offset;
+    } else if (position.includes("top")) {
+      top = triggerRect.top - popoverRect.height - offset;
+    } else {
+      // Default to bottom
+      top = triggerRect.bottom + offset;
+    }
+
+    // Horizontal positioning
+    if (
+      position.includes("left") ||
+      position === "bottom" ||
+      position === "top"
+    ) {
+      left = triggerRect.left;
+    } else if (position.includes("right")) {
+      left = triggerRect.right - popoverRect.width;
+    } else if (position === "left") {
+      left = triggerRect.left - popoverRect.width - offset;
+    } else if (position === "right") {
+      left = triggerRect.right + offset;
+    } else {
+      left = triggerRect.left;
+    }
+
+    // Keep within viewport
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    if (left + popoverRect.width > viewportWidth) {
+      left = viewportWidth - popoverRect.width - 8;
+    }
+    if (left < 8) {
+      left = 8;
+    }
+    if (top + popoverRect.height > viewportHeight) {
+      top = viewportHeight - popoverRect.height - 8;
+    }
+    if (top < 8) {
+      top = 8;
+    }
+
+    return { top, left };
+  },
+
+  _updatePosition() {
+    if (!this._triggerElement) return;
+
+    const pos = this._calculatePosition(this._triggerElement);
+    this.style.top = \`\${pos.top}px\`;
+    this.style.left = \`\${pos.left}px\`;
+  },
+
+  _open(triggerElement) {
+    if (this.open) return;
+
+    this._triggerElement = triggerElement;
+    this.open = true;
+    this.style.display = "";
+    this.setAttribute("data-open", "");
+
+    // Start position tracking loop
+    this._startPositionTracking();
+
+    this._addDocumentListener();
+
+    this.dispatchEvent(new CustomEvent("popover-open", { bubbles: true }));
+  },
+
+  _close() {
+    if (!this.open) return;
+
+    this.open = false;
+    this.style.display = "none";
+    this.removeAttribute("data-open");
+    this._removeDocumentListener();
+    this._stopPositionTracking();
+    this._triggerElement = null;
+
+    this.dispatchEvent(new CustomEvent("popover-close", { bubbles: true }));
+  },
+
+  toggle(triggerElement) {
+    if (this.open) {
+      this._close();
+    } else {
+      this._open(triggerElement);
+    }
+  },
+
+  _addDocumentListener() {
+    // Use capture phase to handle clicks before they bubble
+    document.addEventListener("click", this._boundDocumentClick, true);
+  },
+
+  _removeDocumentListener() {
+    document.removeEventListener("click", this._boundDocumentClick, true);
+  },
+
+  _startPositionTracking() {
+    // Use requestAnimationFrame to continuously update position
+    this._trackingFrame = null;
+
+    const track = () => {
+      if (this.open && this._triggerElement) {
+        this._updatePosition();
+        this._trackingFrame = requestAnimationFrame(track);
+      }
+    };
+
+    // Start tracking
+    this._trackingFrame = requestAnimationFrame(track);
+  },
+
+  _stopPositionTracking() {
+    if (this._trackingFrame) {
+      cancelAnimationFrame(this._trackingFrame);
+      this._trackingFrame = null;
+    }
+  },
+
+  _handleDocumentClick(e) {
+    // Don't close if clicking inside the popover
+    if (this.contains(e.target)) {
+      return;
+    }
+
+    // Don't close if clicking the trigger element or its shadow host
+    if (this._triggerElement) {
+      // Check if click is on the trigger element itself
+      if (this._triggerElement.contains(e.target)) {
+        return;
+      }
+
+      // Check if click is on the shadow host (uix-button/uix-link)
+      const shadowHost = this._triggerElement.getRootNode()?.host;
+      if (
+        shadowHost &&
+        (shadowHost === e.target || shadowHost.contains(e.target))
+      ) {
+        return;
+      }
+    }
+
+    // Close popover
+    this._close();
+  },
+};
+
+/**
+ * Copyright (c) Alan Carlos Meira Leal
+ *
+ * UIX Popover Controller
+ * Base component for popover-style overlays (dropdown, tooltip, etc.)
+ * Handles positioning, open/close state, and click-outside behavior.
+ *
+ * @slot - Default slot for popover content
+ *
+ * @property {string} position - Positioning relative to trigger (top, bottom, left, right, top-left, top-right, bottom-left, bottom-right)
+ * @property {boolean} open - Current open state
+ * @property {number} offset - Distance in pixels from trigger (default 4)
+ *
+ * @fires popover-open - Fired when popover opens
+ * @fires popover-close - Fired when popover closes
+ *
+ * @example Extending this component
+ * \`\`\`javascript
+ * export default {
+ *   extends: "uix-popover-controller",
+ *   // Add your custom behavior
+ * }
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/admin/views/export.css":{content:`.admin-export-options{padding:var(--admin-export-options-padding, .25rem)}.admin-export-option{display:block;width:100%;padding:var(--admin-export-option-padding, .5rem 1rem);border:none;background:none;text-align:left;cursor:pointer;transition:background-color .15s ease}.admin-export-option:hover{background:var(--admin-export-option-hover, #f3f4f6)}.admin-export-option:first-child{border-radius:.5rem .5rem 0 0}.admin-export-option:last-child{border-radius:0 0 .5rem .5rem}
+`,mimeType:"text/css"},"/$app/uix/display/data-table.css":{content:`:where(.uix-data-table,uix-data-table){display:block;width:var(--data-table-width, 100%);uix-pagination{margin-top:var(--data-table-pagination-margin, 1rem);justify-content:var(--data-table-pagination-justify, flex-end)}}.uix-data-table__empty{padding:var(--data-table-empty-padding, 2rem);text-align:center;color:var(--data-table-empty-color, #6b7280)}
+`,mimeType:"text/css"},"/$app/admin/views/import.css":{content:`.admin-import-options{padding:var(--admin-import-options-padding, .25rem)}.admin-import-option{display:block;padding:var(--admin-import-option-padding, .5rem 1rem);cursor:pointer;transition:background-color .15s ease}.admin-import-option:hover{background:var(--admin-import-option-hover, #f3f4f6)}.admin-import-option:first-child{border-radius:.5rem .5rem 0 0}.admin-import-option:last-child{border-radius:0 0 .5rem .5rem}.admin-import-file-input{display:none}.admin-import-content{margin-bottom:var(--admin-import-content-margin, 1rem)}.admin-import-mapping{margin-bottom:var(--admin-import-mapping-margin, 1.5rem)}.admin-import-mapping-title{font-weight:700;margin:0 0 1rem}.admin-import-mapping-list{display:flex;flex-direction:column;gap:var(--admin-import-mapping-gap, 1rem)}.admin-import-mapping-row{display:flex;align-items:center;gap:var(--admin-import-mapping-row-gap, 1rem)}.admin-import-field-name{width:var(--admin-import-field-name-width, 8rem);font-weight:500}.admin-import-arrow{color:var(--admin-import-arrow-color, #9ca3af)}.admin-import-mapping-row uix-select{flex:1}.admin-import-preview{margin-bottom:var(--admin-import-preview-margin, 1.5rem)}.admin-import-preview-title{font-weight:700;margin:0 0 .5rem}.admin-import-preview-code{padding:var(--admin-import-preview-code-padding, 1rem);background:var(--admin-import-preview-code-bg, #f3f4f6);border-radius:var(--admin-import-preview-code-radius, .75rem);font-size:.875rem;overflow-x:auto;max-height:var(--admin-import-preview-max-height, 16rem);margin:0}.admin-import-preview-more{font-size:.875rem;color:var(--admin-import-preview-more-color, #6b7280);margin:.5rem 0 0}.admin-import-footer{display:flex;justify-content:flex-end;gap:var(--admin-import-footer-gap, 1rem)}
+`,mimeType:"text/css"},"/$app/uix/overlay/modal.css":{content:`:where(.uix-modal,uix-modal){display:inline-block;&::part(dialog){background:var(--modal-background, #ffffff);border:var(--modal-border-width, 1px) solid var(--modal-border-color, #e5e7eb);border-radius:var(--modal-border-radius, .75rem);box-shadow:var(--modal-shadow, 0 25px 50px -12px rgb(0 0 0 / .25));padding:0;width:var(--modal-width, 90vw);max-width:var(--modal-max-width, 600px);color:var(--modal-color, #1a1a1a);&::backdrop{background:var(--modal-overlay, rgba(0, 0, 0, .5));backdrop-filter:blur(2px)}}&[size=sm]{--modal-max-width: 400px}&[size=md]{--modal-max-width: 600px}&[size=lg]{--modal-max-width: 800px}&[size=xl]{--modal-max-width: 1000px}@media (max-width: 639px){&::part(dialog){width:100%;max-width:100%;height:100%;max-height:100%;margin:0;border-radius:0;border:none;box-shadow:none}&::part(body){max-height:none;flex:1;overflow-y:auto}}&::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--modal-header-padding, 1.25rem 1.5rem);border-bottom:var(--modal-header-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-header-background, transparent);font-size:var(--modal-header-font-size, 1.125rem);font-weight:var(--modal-header-font-weight, 700);color:var(--modal-header-color, #1a1a1a);&:empty{display:none}}&::part(close-button){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:transparent;color:var(--modal-close-color, #6b7280);cursor:pointer;border-radius:.375rem;transition:background-color .15s,color .15s;flex-shrink:0;&:hover{background:var(--modal-close-hover-bg, #f3f4f6);color:var(--modal-close-hover-color, #1a1a1a)}}&::part(body){padding:var(--modal-body-padding, 1.5rem);color:var(--modal-body-color, #4b5563);font-size:var(--text-base, 1rem);line-height:1.5;overflow-y:auto;max-height:60vh}&::part(footer),[slot=footer]{padding:var(--modal-footer-padding, 1rem 1.5rem);border-top:var(--modal-footer-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-footer-background, #f9fafb);&:empty{display:none}}[slot=trigger]{cursor:pointer}[slot=footer]{display:flex;gap:.75rem;justify-content:flex-end;align-items:center}}
+`,mimeType:"text/css"},"/$app/uix/display/table.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const TypesRenderers = {
+  [String]: (content) => content,
+  [Boolean]: (content) =>
+    content ? html\`<uix-icon name="check"></uix-icon>\` : null,
+};
+
+export default {
+  tag: "uix-table",
+  style: true,
+  dataQuery: true,
+  properties: {
+    columns: T.array({ defaultValue: [] }),
+    rows: T.array({ defaultValue: [] }),
+    selectRow: T.function(),
+  },
+  render() {
+    return html\`
+      <table>
+        <thead>
+          <tr>
+            \${this.columns.map(
+              (column) => html\`
+                <th>\${column.name || column.label || column}</th>
+              \`,
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          \${this.rows?.map(
+            (row) => html\`
+              <tr
+                class=\${this.selectRow ? "clickable" : ""}
+                @click=\${this.selectRow ? (e) => this.selectRow(row, e) : null}
+              >
+                \${this.columns.map((column) => {
+                  const name = typeof column === "string" ? column : column.name;
+                  const columnType =
+                    typeof column === "string" ? "string" : column.type;
+                  return html\`
+                    <td>
+                      \${TypesRenderers[columnType]?.call(null, row[name]) ??
+                      row[name]}
+                    </td>
+                  \`;
+                })}
+              </tr>
+            \`,
+          )}
+        </tbody>
+      </table>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/upload.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m14-7l-5-5l-5 5m5-5v12"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/overlay/popover-controller.css":{content:`:where(.uix-popover-controller,uix-popover-controller){position:fixed;z-index:10000;display:none;&[data-open]{display:flex;flex-direction:column}}
+`,mimeType:"text/css"},"/$app/uix/overlay/dropdown.css":{content:`:where(.uix-dropdown,uix-dropdown){&[data-open]{display:flex;flex-direction:column;min-width:var(--dropdown-min-width, 200px);max-width:var(--dropdown-max-width, 400px);background:var(--color-surface-darker, #282828);color:var(--text-color, default);padding:var(--spacing-xs, .25rem);gap:2px}&[variant=elevated][data-open]{background:var(--color-surface-light, #3c3836)}&[variant=primary][data-open]{background:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&[variant=card][data-open]{background:var(--color-surface-dark, #32302f)}&[rounded][data-open]{border-radius:var(--radius-md, .375rem)}&[bordered][data-open]{border:1px solid var(--color-surface, #504945)}&[shadow][data-open]{box-shadow:0 8px 16px #0000004d,0 2px 4px #0003}>*{padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);color:inherit;text-decoration:none;display:block;border-radius:var(--radius-sm, .25rem);transition:background-color .15s ease,color .15s ease;cursor:pointer;white-space:nowrap;font-size:var(--text-sm, .875rem);line-height:1.5;&:hover{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) )}&:focus{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) );outline:2px solid var(--color-primary, #fabd2f);outline-offset:-2px}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&:disabled,&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}uix-icon{margin-right:var(--spacing-xs, .25rem);vertical-align:middle}>*{pointer-events:none}}>hr{border:none;border-top:1px solid var(--color-surface-dark, rgba(80, 73, 69, .5));margin:var(--spacing-xs, .25rem) 0;padding:0}>.dropdown-header,>[role=heading]{padding:var(--spacing-xs, .25rem) var(--spacing-md, .75rem);font-size:var(--text-xs, .75rem);font-weight:600;color:var(--text-muted, #a89984);text-transform:uppercase;letter-spacing:.05em;cursor:default;&:hover{background-color:transparent}}}
+`,mimeType:"text/css"},"/$app/uix/display/table.css":{content:`:where(.uix-table,uix-table){display:block;width:100%;table{width:100%;border-collapse:separate;border-spacing:0;border:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb);border-radius:var(--table-border-radius, .5rem);box-shadow:var(--table-shadow, none);overflow:hidden}thead{background-color:var(--table-header-background, #f9fafb)}th{padding:var(--table-cell-padding, 1rem);text-align:left;font-weight:var(--table-header-font-weight, 600);font-size:var(--table-header-font-size, .75rem);text-transform:var(--table-header-text-transform, uppercase);color:var(--table-header-color, #374151);letter-spacing:.05em;border-bottom:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb)}tbody tr{background-color:var(--table-row-background, #ffffff);transition:background-color .15s ease}tbody tr:hover{background-color:var(--table-row-hover-background, #f3f4f6)}tbody tr.clickable{cursor:pointer}td{padding:var(--table-cell-padding, 1rem);font-size:var(--table-cell-font-size, .875rem);color:var(--table-cell-color, #4b5563);border-bottom:1px solid var(--table-border-color, #e5e7eb)}tbody tr:last-child td{border-bottom:none}}
+`,mimeType:"text/css"},"/$app/uix/navigation/pagination.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-pagination",
+  properties: {
+    current: T.number({ defaultValue: 1 }),
+    total: T.number({ defaultValue: 1 }),
+    siblings: T.number({ defaultValue: 1 }), // Number of pages to show on each side of current
+    showFirst: T.boolean(true),
+    showLast: T.boolean(true),
+    showPrevNext: T.boolean(true),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["sm", "md", "lg"],
+    }),
+  },
+  style: true,
+  shadow: false,
+
+  goToPage(page) {
+    if (page < 1 || page > this.total || page === this.current) return;
+    this.current = page;
+    this.emit("change", { page: this.current });
+  },
+
+  next() {
+    this.goToPage(this.current + 1);
+  },
+
+  prev() {
+    this.goToPage(this.current - 1);
+  },
+
+  _getPageNumbers() {
+    const pages = [];
+    const leftSibling = Math.max(1, this.current - this.siblings);
+    const rightSibling = Math.min(this.total, this.current + this.siblings);
+
+    // Show first page
+    if (this.showFirst && leftSibling > 1) {
+      pages.push(1);
+      if (leftSibling > 2) {
+        pages.push("...");
+      }
+    }
+
+    // Show sibling pages
+    for (let i = leftSibling; i <= rightSibling; i++) {
+      pages.push(i);
+    }
+
+    // Show last page
+    if (this.showLast && rightSibling < this.total) {
+      if (rightSibling < this.total - 1) {
+        pages.push("...");
+      }
+      pages.push(this.total);
+    }
+
+    return pages;
+  },
+
+  render() {
+    const pages = this._getPageNumbers();
+    const hasPrev = this.current > 1;
+    const hasNext = this.current < this.total;
+
+    return html\`
+      <nav class="pagination" role="navigation" aria-label="Pagination">
+        <ul class="pagination-list">
+          \${
+            this.showPrevNext
+              ? html\`
+                <li>
+                  <button
+                    class="pagination-button prev"
+                    ?disabled=\${!hasPrev}
+                    @click=\${this.prev}
+                    aria-label="Previous page"
+                  >
+                    <uix-icon name="chevron-left"></uix-icon>
+                  </button>
+                </li>
+              \`
+              : ""
+          }
+
+          \${pages.map((page) =>
+            page === "..."
+              ? html\`<li><span class="pagination-ellipsis">\u2026</span></li>\`
+              : html\`
+                  <li>
+                    <button
+                      class="pagination-button \${page === this.current ? "active" : ""}"
+                      @click=\${() => this.goToPage(page)}
+                      aria-label="Page \${page}"
+                      aria-current=\${page === this.current ? "page" : "false"}
+                    >
+                      \${page}
+                    </button>
+                  </li>
+                \`,
+          )}
+
+          \${
+            this.showPrevNext
+              ? html\`
+                <li>
+                  <button
+                    class="pagination-button next"
+                    ?disabled=\${!hasNext}
+                    @click=\${this.next}
+                    aria-label="Next page"
+                  >
+                    <uix-icon name="chevron-right"></uix-icon>
+                  </button>
+                </li>
+              \`
+              : ""
+          }
+        </ul>
+      </nav>
+    \`;
+  },
+};
+
+/**
+ * Pagination Component
+ *
+ * @component
+ * @category navigation
+ * @tag uix-pagination
+ *
+ * Pagination controls for navigating through pages of content.
+ *
+ * @example
+ * // Basic pagination
+ * \`\`\`html
+ * <uix-pagination current="1" total="10"></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // Current page in middle
+ * \`\`\`html
+ * <uix-pagination current="5" total="10"></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // Many pages with ellipsis
+ * \`\`\`html
+ * <uix-pagination current="15" total="50"></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // More siblings (show more pages around current)
+ * \`\`\`html
+ * <uix-pagination current="10" total="20" siblings="2"></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // Without first/last
+ * \`\`\`html
+ * <uix-pagination
+ *   current="5"
+ *   total="10"
+ *   show-first="false"
+ *   show-last="false"
+ * ></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // Without prev/next arrows
+ * \`\`\`html
+ * <uix-pagination
+ *   current="5"
+ *   total="10"
+ *   show-prev-next="false"
+ * ></uix-pagination>
+ * \`\`\`
+ *
+ * @example
+ * // Size variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 1rem;">
+ *   <uix-pagination size="sm" current="3" total="7"></uix-pagination>
+ *   <uix-pagination size="md" current="3" total="7"></uix-pagination>
+ *   <uix-pagination size="lg" current="3" total="7"></uix-pagination>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With event handling
+ * \`\`\`js
+ * html\`<uix-pagination
+ *   current="1"
+ *   total="20"
+ *   @change=\${(e) => this.loadPage(e.detail.page)}
+ * ></uix-pagination>\`
+ * \`\`\`
+ *
+ * @example
+ * // Complete pagination example with data
+ * \`\`\`js
+ * html\`
+ *   <div>
+ *     <div class="data-grid">
+ *       \${this.currentPageData.map(item => html\`<div>\${item.name}</div>\`)}
+ *     </div>
+ *
+ *     <uix-pagination
+ *       .current=\${this.currentPage}
+ *       .total=\${Math.ceil(this.totalItems / this.itemsPerPage)}
+ *       @change=\${(e) => {
+ *         this.currentPage = e.detail.page;
+ *         this.loadData();
+ *       }}
+ *     ></uix-pagination>
+ *
+ *     <p>
+ *       Showing \${(this.currentPage - 1) * this.itemsPerPage + 1} to
+ *       \${Math.min(this.currentPage * this.itemsPerPage, this.totalItems)} of
+ *       \${this.totalItems} items
+ *     </p>
+ *   </div>
+ * \`
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/navigation/pagination.css":{content:`:where(.uix-pagination,uix-pagination){display:block;.pagination{display:flex;justify-content:center;padding:var(--pagination-padding, .75rem 0)}.pagination-list{display:flex;align-items:center;gap:var(--pagination-gap, .25rem);list-style:none;margin:0;padding:0}.pagination-button{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);padding:var(--pagination-button-padding, .5rem);border:var(--pagination-border-width, 1px) solid var(--pagination-border-color, var(--color-primary, #fabd2f));border-radius:var(--pagination-border-radius, .5rem);background-color:var(--pagination-background, #ffffff);color:var(--pagination-color, var(--color-primary, #1a1a1a));font-size:var(--pagination-font-size, .875rem);font-weight:var(--pagination-font-weight, 500);box-shadow:var(--pagination-shadow, none);cursor:pointer;transition:all .15s ease;&:hover:not(:disabled):not(.active){background-color:var(--pagination-hover-background, #f5f5f5);border-color:var(--pagination-hover-border-color, var(--color-primary, #fabd2f));box-shadow:var(--pagination-hover-shadow, none);transform:var(--pagination-hover-transform, none)}&.active{background-color:var(--pagination-active-background, var(--color-primary, #fabd2f));border-color:var(--pagination-active-border-color, #000000);color:var(--pagination-active-color, #000000);box-shadow:var(--pagination-active-shadow, none)}&:disabled{opacity:.5;cursor:not-allowed}&.prev,&.next{font-weight:var(--pagination-nav-font-weight, 700)}}.pagination-ellipsis{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);color:var(--pagination-ellipsis-color, #6b7280);font-size:var(--pagination-font-size, .875rem)}&[size=sm]{--pagination-button-size: 2rem;--pagination-font-size: .75rem;--pagination-button-padding: .375rem;--pagination-gap: .125rem}&[size=lg]{--pagination-button-size: 3rem;--pagination-font-size: 1rem;--pagination-button-padding: .625rem;--pagination-gap: .375rem}}
+`,mimeType:"text/css"},"/$app/base/bootstrapp.js":{content:`import config from "/$app/base/config.js";
 import $APP from "/$app.js";
 
 try {
@@ -5460,6 +9918,62 @@ export default Router;
 `,mimeType:"text/javascript"},"/$app/base/app/index.js":{content:`import $APP from "/$app.js";
 
 $APP.addModule({ name: "app", path: "/$app/base/app" });
+`,mimeType:"text/javascript"},"/frontend.js":{content:`import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import "/models/schema.js";
+import "/$app/i18n/index.js";
+import Theme from "/$app/theme/index.js";
+import "/$app/tailwind/index.js";
+import "/$app/uix/app.js";
+import "/$app/icon-lucide/app.js";
+import "/controllers/index.js";
+import "/$app/admin/index.js";
+import "/$app/maps/app.js";
+
+// Admin integration plugins (moved from local admin/ folder)
+import "/$app/admin/integrations/instagram/plugin.js";
+import "/$app/admin/integrations/instagram/import.js";
+import "/$app/admin/integrations/gmaps/plugin.js";
+import { initAuthFrontend } from "/$app/auth/frontend.js";
+
+initAuthFrontend($APP);
+
+$APP.i18n.registerLocale("en", () => import("/locales/en.js"));
+$APP.i18n.registerLocale("pt", () => import("/locales/pt.js"));
+
+// Handle guest to registered user migration
+$APP.events.on("AUTH:GUEST_CONVERTED", async ({ guestId, newUserId }) => {
+  await Interactions.migrateGuestData(guestId, newUserId);
+});
+
+$APP.events.on("APP:INIT", async () => {
+  // Restore auth session before rendering
+  if ($APP.Auth) {
+    const restored = await $APP.Auth.restore();
+    console.log(
+      restored
+        ? \`Auth restored for: \${$APP.Auth.user?.name}\`
+        : "No auth session - guest mode",
+    );
+  }
+
+  Theme.loadTheme("nbs");
+
+  $APP.define("app-container", {
+    extends: "router-ui",
+    properties: { userId: T.number({ sync: "local" }) },
+    async connected() {
+      this.currentLang = $APP.i18n.getLanguage();
+      $APP.events.on("i18n:language-changed", ({ locale }) => {
+        this.currentLang = locale;
+      });
+      this.addEventListener("item-click", (e) => {
+        this.modalItem = e.detail.item;
+        this.modalOpen = true;
+      });
+    },
+  });
+});
 `,mimeType:"text/javascript"},"/$app/controller/adapters/storage.js":{content:`const serialize = (value) => {
   if ((typeof value === "object" && value !== null) || Array.isArray(value)) {
     return JSON.stringify(value);
@@ -5529,62 +10043,6 @@ const ram = {
 const local = createStorageAdapter(window.localStorage);
 const session = createStorageAdapter(window.sessionStorage);
 export default { local, ram, session };
-`,mimeType:"text/javascript"},"/frontend.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import "/models/schema.js";
-import "/$app/i18n/index.js";
-import Theme from "/$app/theme/index.js";
-import "/$app/tailwind/index.js";
-import "/$app/uix/app.js";
-import "/$app/icon-lucide/app.js";
-import "/controllers/index.js";
-import "/$app/admin/index.js";
-import "/$app/maps/app.js";
-
-// Admin integration plugins (moved from local admin/ folder)
-import "/$app/admin/integrations/instagram/plugin.js";
-import "/$app/admin/integrations/instagram/import.js";
-import "/$app/admin/integrations/gmaps/plugin.js";
-import { initAuthFrontend } from "/$app/auth/frontend.js";
-
-initAuthFrontend($APP);
-
-$APP.i18n.registerLocale("en", () => import("/locales/en.js"));
-$APP.i18n.registerLocale("pt", () => import("/locales/pt.js"));
-
-// Handle guest to registered user migration
-$APP.events.on("AUTH:GUEST_CONVERTED", async ({ guestId, newUserId }) => {
-  await Interactions.migrateGuestData(guestId, newUserId);
-});
-
-$APP.events.on("APP:INIT", async () => {
-  // Restore auth session before rendering
-  if ($APP.Auth) {
-    const restored = await $APP.Auth.restore();
-    console.log(
-      restored
-        ? \`Auth restored for: \${$APP.Auth.user?.name}\`
-        : "No auth session - guest mode",
-    );
-  }
-
-  Theme.loadTheme("nbs");
-
-  $APP.define("app-container", {
-    extends: "router-ui",
-    properties: { userId: T.number({ sync: "local" }) },
-    async connected() {
-      this.currentLang = $APP.i18n.getLanguage();
-      $APP.events.on("i18n:language-changed", ({ locale }) => {
-        this.currentLang = locale;
-      });
-      this.addEventListener("item-click", (e) => {
-        this.modalItem = e.detail.item;
-        this.modalOpen = true;
-      });
-    },
-  });
-});
 `,mimeType:"text/javascript"},"/$app/controller/adapters/url.js":{content:`const getHashParams = () => {
   const hash = window.location.hash.substring(1);
   return new URLSearchParams(hash);
@@ -6077,6 +10535,197 @@ export const createSync = (instance, adapterName, syncableProps = null) => {
     },
   };
 };
+`,mimeType:"text/javascript"},"/$app/router/adapters.js":{content:`/**
+ * @bootstrapp/router - Platform Adapters
+ * Abstracts browser and memory-based platform operations
+ */
+
+/**
+ * Browser Platform Adapter
+ * Uses window.location, window.history, and document APIs
+ */
+export const createBrowserAdapter = () => ({
+  type: "browser",
+
+  // Get current location information
+  getLocation() {
+    return {
+      href: window.location.href,
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+    };
+  },
+
+  // Check if current URL matches path
+  isSamePath(path) {
+    return window.location.href === path;
+  },
+
+  // Navigate to new path (SSG support)
+  hardNavigate(path) {
+    window.location.href = path;
+  },
+
+  // Push state to history
+  pushState(state, path) {
+    const url = new URL(path, window.location.origin);
+    if (url.href !== window.location.href) {
+      window.history.pushState(state, "", path);
+    }
+  },
+
+  // Replace current state
+  replaceState(state, path) {
+    window.history.replaceState(state, "", path);
+  },
+
+  // Navigate back in history
+  back() {
+    window.history.back();
+  },
+
+  // Navigate forward in history
+  forward() {
+    window.history.forward();
+  },
+
+  // Set document title
+  setTitle(title) {
+    document.title = title;
+  },
+});
+
+/**
+ * Memory Platform Adapter
+ * Maintains location and history state in memory
+ */
+export const createMemoryAdapter = (initialPath = "/") => {
+  // Parse initial path
+  const initialUrl = new URL(initialPath, "http://memory");
+
+  // Internal state
+  const state = {
+    pathname: initialUrl.pathname,
+    search: initialUrl.search,
+    hash: initialUrl.hash,
+    origin: "http://memory",
+  };
+
+  // History stack for back/forward
+  const history = [];
+  let historyIndex = -1;
+
+  return {
+    type: "memory",
+
+    getLocation() {
+      return {
+        href: \`\${state.origin}\${state.pathname}\${state.search}\${state.hash}\`,
+        origin: state.origin,
+        pathname: state.pathname,
+        search: state.search,
+        hash: state.hash,
+      };
+    },
+
+    isSamePath(path) {
+      const url = new URL(path, state.origin);
+      const currentHref = \`\${state.pathname}\${state.search}\${state.hash}\`;
+      const newHref = \`\${url.pathname}\${url.search}\${url.hash}\`;
+      return currentHref === newHref;
+    },
+
+    hardNavigate(path) {
+      // Memory routers don't support SSG hard navigation
+      // Just update state instead
+      const url = new URL(path, state.origin);
+      state.pathname = url.pathname;
+      state.search = url.search;
+      state.hash = url.hash;
+    },
+
+    pushState(stateData, path) {
+      const url = new URL(path, state.origin);
+
+      // Update current state
+      state.pathname = url.pathname;
+      state.search = url.search;
+      state.hash = url.hash;
+
+      // Truncate forward history if we're not at the end
+      if (historyIndex < history.length - 1) {
+        history.splice(historyIndex + 1);
+      }
+
+      // Add to history
+      history.push({
+        pathname: state.pathname,
+        search: state.search,
+        hash: state.hash,
+        state: stateData,
+      });
+      historyIndex = history.length - 1;
+    },
+
+    replaceState(stateData, path) {
+      const url = new URL(path, state.origin);
+
+      // Update current state
+      state.pathname = url.pathname;
+      state.search = url.search;
+      state.hash = url.hash;
+
+      // Replace current history entry
+      if (historyIndex >= 0) {
+        history[historyIndex] = {
+          pathname: state.pathname,
+          search: state.search,
+          hash: state.hash,
+          state: stateData,
+        };
+      }
+    },
+
+    back() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        const entry = history[historyIndex];
+        state.pathname = entry.pathname;
+        state.search = entry.search;
+        state.hash = entry.hash;
+        return true; // Indicate navigation occurred
+      }
+      return false; // No navigation (at start of history)
+    },
+
+    forward() {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        const entry = history[historyIndex];
+        state.pathname = entry.pathname;
+        state.search = entry.search;
+        state.hash = entry.hash;
+        return true; // Indicate navigation occurred
+      }
+      return false; // No navigation (at end of history)
+    },
+
+    setTitle(title) {
+      // Memory routers don't update document.title
+      // This is a no-op, but keeps the interface consistent
+    },
+
+    // Memory-specific: Get current history state for inspection
+    getHistory() {
+      return {
+        entries: [...history],
+        index: historyIndex,
+      };
+    },
+  };
+};
 `,mimeType:"text/javascript"},"/$app/router/core.js":{content:`/**
  * @bootstrapp/router - Core Implementation
  * Platform-agnostic router logic
@@ -6522,197 +11171,6 @@ export const createRouterCore = (adapter) => {
   };
 
   return router;
-};
-`,mimeType:"text/javascript"},"/$app/router/adapters.js":{content:`/**
- * @bootstrapp/router - Platform Adapters
- * Abstracts browser and memory-based platform operations
- */
-
-/**
- * Browser Platform Adapter
- * Uses window.location, window.history, and document APIs
- */
-export const createBrowserAdapter = () => ({
-  type: "browser",
-
-  // Get current location information
-  getLocation() {
-    return {
-      href: window.location.href,
-      origin: window.location.origin,
-      pathname: window.location.pathname,
-      search: window.location.search,
-      hash: window.location.hash,
-    };
-  },
-
-  // Check if current URL matches path
-  isSamePath(path) {
-    return window.location.href === path;
-  },
-
-  // Navigate to new path (SSG support)
-  hardNavigate(path) {
-    window.location.href = path;
-  },
-
-  // Push state to history
-  pushState(state, path) {
-    const url = new URL(path, window.location.origin);
-    if (url.href !== window.location.href) {
-      window.history.pushState(state, "", path);
-    }
-  },
-
-  // Replace current state
-  replaceState(state, path) {
-    window.history.replaceState(state, "", path);
-  },
-
-  // Navigate back in history
-  back() {
-    window.history.back();
-  },
-
-  // Navigate forward in history
-  forward() {
-    window.history.forward();
-  },
-
-  // Set document title
-  setTitle(title) {
-    document.title = title;
-  },
-});
-
-/**
- * Memory Platform Adapter
- * Maintains location and history state in memory
- */
-export const createMemoryAdapter = (initialPath = "/") => {
-  // Parse initial path
-  const initialUrl = new URL(initialPath, "http://memory");
-
-  // Internal state
-  const state = {
-    pathname: initialUrl.pathname,
-    search: initialUrl.search,
-    hash: initialUrl.hash,
-    origin: "http://memory",
-  };
-
-  // History stack for back/forward
-  const history = [];
-  let historyIndex = -1;
-
-  return {
-    type: "memory",
-
-    getLocation() {
-      return {
-        href: \`\${state.origin}\${state.pathname}\${state.search}\${state.hash}\`,
-        origin: state.origin,
-        pathname: state.pathname,
-        search: state.search,
-        hash: state.hash,
-      };
-    },
-
-    isSamePath(path) {
-      const url = new URL(path, state.origin);
-      const currentHref = \`\${state.pathname}\${state.search}\${state.hash}\`;
-      const newHref = \`\${url.pathname}\${url.search}\${url.hash}\`;
-      return currentHref === newHref;
-    },
-
-    hardNavigate(path) {
-      // Memory routers don't support SSG hard navigation
-      // Just update state instead
-      const url = new URL(path, state.origin);
-      state.pathname = url.pathname;
-      state.search = url.search;
-      state.hash = url.hash;
-    },
-
-    pushState(stateData, path) {
-      const url = new URL(path, state.origin);
-
-      // Update current state
-      state.pathname = url.pathname;
-      state.search = url.search;
-      state.hash = url.hash;
-
-      // Truncate forward history if we're not at the end
-      if (historyIndex < history.length - 1) {
-        history.splice(historyIndex + 1);
-      }
-
-      // Add to history
-      history.push({
-        pathname: state.pathname,
-        search: state.search,
-        hash: state.hash,
-        state: stateData,
-      });
-      historyIndex = history.length - 1;
-    },
-
-    replaceState(stateData, path) {
-      const url = new URL(path, state.origin);
-
-      // Update current state
-      state.pathname = url.pathname;
-      state.search = url.search;
-      state.hash = url.hash;
-
-      // Replace current history entry
-      if (historyIndex >= 0) {
-        history[historyIndex] = {
-          pathname: state.pathname,
-          search: state.search,
-          hash: state.hash,
-          state: stateData,
-        };
-      }
-    },
-
-    back() {
-      if (historyIndex > 0) {
-        historyIndex--;
-        const entry = history[historyIndex];
-        state.pathname = entry.pathname;
-        state.search = entry.search;
-        state.hash = entry.hash;
-        return true; // Indicate navigation occurred
-      }
-      return false; // No navigation (at start of history)
-    },
-
-    forward() {
-      if (historyIndex < history.length - 1) {
-        historyIndex++;
-        const entry = history[historyIndex];
-        state.pathname = entry.pathname;
-        state.search = entry.search;
-        state.hash = entry.hash;
-        return true; // Indicate navigation occurred
-      }
-      return false; // No navigation (at end of history)
-    },
-
-    setTitle(title) {
-      // Memory routers don't update document.title
-      // This is a no-op, but keeps the interface consistent
-    },
-
-    // Memory-specific: Get current history state for inspection
-    getHistory() {
-      return {
-        entries: [...history],
-        index: historyIndex,
-      };
-    },
-  };
 };
 `,mimeType:"text/javascript"},"/$app/i18n/index.js":{content:`/**
  * i18n Module
@@ -9526,6 +13984,85 @@ registerPlugin("extension", {
     },
   },
 });
+`,mimeType:"text/javascript"},"/$app/maps/search.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import { createMapsClient } from "./index.js";
+
+export default {
+  tag: "maps-search",
+  style: true,
+
+  properties: {
+    query: T.string({ defaultValue: "" }),
+    results: T.array({ defaultValue: [] }),
+    loading: T.boolean({ defaultValue: false }),
+    selectedResult: T.object(),
+    placeholder: T.string({ defaultValue: "Search for a place..." }),
+  },
+
+  async search() {
+    if (!this.query.trim()) return;
+
+    this.loading = true;
+    try {
+      const client = createMapsClient();
+      this.results = await client.search(this.query);
+    } catch (err) {
+      console.error("Maps search error:", err);
+      this.results = [];
+    }
+    this.loading = false;
+  },
+
+  selectResult(result) {
+    this.selectedResult = result;
+    this.emit("place-selected", result);
+  },
+
+  handleKeydown(e) {
+    if (e.key === "Enter") this.search();
+  },
+
+  render() {
+    return html\`<div class="maps-search-input">
+          <uix-input
+            .value=\${this.query}
+            @input=\${(e) => (this.query = e.target.value)}
+            @keydown=\${this.handleKeydown}
+            placeholder=\${this.placeholder}
+            icon="search"
+          ></uix-input>
+          <uix-button @click=\${() => this.search()} ?loading=\${this.loading}>
+            <uix-icon name="search" size="18"></uix-icon>
+            Search
+          </uix-button>
+        </div>
+
+        \${
+          this.results.length > 0
+            ? html\`
+              <div class="maps-results">
+                \${this.results.map(
+                  (r) => html\`
+                    <div
+                      class="maps-result \${this.selectedResult?.id === r.id ? "selected" : ""}"
+                      @click=\${() => this.selectResult(r)}
+                    >
+                      <uix-icon name="map-pin" size="16" class="maps-result-icon"></uix-icon>
+                      <div class="maps-result-content">
+                        <strong class="maps-result-name">\${r.name}</strong>
+                        <small class="maps-result-address">\${r.address}</small>
+                      </div>
+                    </div>
+                  \`,
+                )}
+              </div>
+            \`
+            : ""
+        }
+    \`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/extension/extension-bridge.js":{content:`/**
  * Shared Extension Bridge Singleton
  * Single connection instance shared across all admin components
@@ -9650,85 +14187,6 @@ export default {
   isConnected,
   getExtensionId,
   onConnectionChange,
-};
-`,mimeType:"text/javascript"},"/$app/maps/search.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import { createMapsClient } from "./index.js";
-
-export default {
-  tag: "maps-search",
-  style: true,
-
-  properties: {
-    query: T.string({ defaultValue: "" }),
-    results: T.array({ defaultValue: [] }),
-    loading: T.boolean({ defaultValue: false }),
-    selectedResult: T.object(),
-    placeholder: T.string({ defaultValue: "Search for a place..." }),
-  },
-
-  async search() {
-    if (!this.query.trim()) return;
-
-    this.loading = true;
-    try {
-      const client = createMapsClient();
-      this.results = await client.search(this.query);
-    } catch (err) {
-      console.error("Maps search error:", err);
-      this.results = [];
-    }
-    this.loading = false;
-  },
-
-  selectResult(result) {
-    this.selectedResult = result;
-    this.emit("place-selected", result);
-  },
-
-  handleKeydown(e) {
-    if (e.key === "Enter") this.search();
-  },
-
-  render() {
-    return html\`<div class="maps-search-input">
-          <uix-input
-            .value=\${this.query}
-            @input=\${(e) => (this.query = e.target.value)}
-            @keydown=\${this.handleKeydown}
-            placeholder=\${this.placeholder}
-            icon="search"
-          ></uix-input>
-          <uix-button @click=\${() => this.search()} ?loading=\${this.loading}>
-            <uix-icon name="search" size="18"></uix-icon>
-            Search
-          </uix-button>
-        </div>
-
-        \${
-          this.results.length > 0
-            ? html\`
-              <div class="maps-results">
-                \${this.results.map(
-                  (r) => html\`
-                    <div
-                      class="maps-result \${this.selectedResult?.id === r.id ? "selected" : ""}"
-                      @click=\${() => this.selectResult(r)}
-                    >
-                      <uix-icon name="map-pin" size="16" class="maps-result-icon"></uix-icon>
-                      <div class="maps-result-content">
-                        <strong class="maps-result-name">\${r.name}</strong>
-                        <small class="maps-result-address">\${r.address}</small>
-                      </div>
-                    </div>
-                  \`,
-                )}
-              </div>
-            \`
-            : ""
-        }
-    \`;
-  },
 };
 `,mimeType:"text/javascript"},"/$app/bundler/targets/index.js":{content:`/**
  * Bundler Target Registry
@@ -10281,6 +14739,62 @@ self.addEventListener("fetch", (e) => {
     );
   }
 });\`;
+`,mimeType:"text/javascript"},"/$app/maps/index.js":{content:`/**
+ * @bootstrapp/maps - Provider-Agnostic Maps Client
+ * Prototype implementation with Nominatim (OpenStreetMap)
+ */
+
+// Provider implementations
+const providers = {
+  nominatim: {
+    search: async (query) => {
+      const res = await fetch(
+        \`https://nominatim.openstreetmap.org/search?q=\${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1\`,
+        {
+          headers: {
+            "User-Agent": "Bootstrapp/1.0",
+          },
+        },
+      );
+      const data = await res.json();
+      return data.map((item) => ({
+        id: item.place_id,
+        name: item.name || item.display_name.split(",")[0],
+        address: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        type: item.type,
+        category: item.class,
+      }));
+    },
+  },
+};
+
+/**
+ * Create a maps client instance
+ * @param {string} provider - Provider name (default: 'nominatim')
+ * @returns {Object} Maps client with search method
+ */
+export const createMapsClient = (provider = "nominatim") => {
+  const impl = providers[provider];
+  if (!impl) throw new Error(\`Unknown maps provider: \${provider}\`);
+
+  return {
+    search: (query) => impl.search(query),
+    provider,
+  };
+};
+
+/**
+ * Register a custom maps provider
+ * @param {string} name - Provider name
+ * @param {Object} impl - Provider implementation { search: async (query) => [...] }
+ */
+export const registerProvider = (name, impl) => {
+  providers[name] = impl;
+};
+
+export default createMapsClient;
 `,mimeType:"text/javascript"},"/$app/extension/admin-bridge.js":{content:`/**
  * Bootstrapp Extension - Admin Bridge
  * Use this in your admin panel to communicate with the extension
@@ -10657,62 +15171,6 @@ export const createExtensionBridge = (extensionId) => {
 };
 
 export default createExtensionBridge;
-`,mimeType:"text/javascript"},"/$app/maps/index.js":{content:`/**
- * @bootstrapp/maps - Provider-Agnostic Maps Client
- * Prototype implementation with Nominatim (OpenStreetMap)
- */
-
-// Provider implementations
-const providers = {
-  nominatim: {
-    search: async (query) => {
-      const res = await fetch(
-        \`https://nominatim.openstreetmap.org/search?q=\${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1\`,
-        {
-          headers: {
-            "User-Agent": "Bootstrapp/1.0",
-          },
-        },
-      );
-      const data = await res.json();
-      return data.map((item) => ({
-        id: item.place_id,
-        name: item.name || item.display_name.split(",")[0],
-        address: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-        type: item.type,
-        category: item.class,
-      }));
-    },
-  },
-};
-
-/**
- * Create a maps client instance
- * @param {string} provider - Provider name (default: 'nominatim')
- * @returns {Object} Maps client with search method
- */
-export const createMapsClient = (provider = "nominatim") => {
-  const impl = providers[provider];
-  if (!impl) throw new Error(\`Unknown maps provider: \${provider}\`);
-
-  return {
-    search: (query) => impl.search(query),
-    provider,
-  };
-};
-
-/**
- * Register a custom maps provider
- * @param {string} name - Provider name
- * @param {Object} impl - Provider implementation { search: async (query) => [...] }
- */
-export const registerProvider = (name, impl) => {
-  providers[name] = impl;
-};
-
-export default createMapsClient;
 `,mimeType:"text/javascript"},"/$app/github/index.js":{content:"export default {}"},"/$app/bundler/templates/hydration-script.js":{content:`export default (settings = {}) => \`
         const startApp = async () => {
             if (!("serviceWorker" in navigator)) 
@@ -10880,6 +15338,43 @@ export default {
 };
 
 import "/$app/base/backend.js";
+`,mimeType:"text/javascript"},"/$app/router/ui.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import { keyed } from "/npm/lit-html/directives/keyed.js";
+import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
+import Router from "./index.js";
+
+export default {
+  tag: "router-ui",
+  properties: {
+    currentRoute: T.object({
+      sync: Router,
+    }),
+  },
+  renderRoute(route, params) {
+    const component =
+      typeof route.component === "function"
+        ? route.component(params)
+        : route.component;
+    return route.template
+      ? staticHTML\`<\${unsafeStatic(route.template)} .component=\${component}>
+			</\${unsafeStatic(route.template)}>\`
+      : component;
+  },
+
+  render() {
+    const { route, params } = this.currentRoute || {};
+    return route
+      ? keyed(
+          route.name ?? route.path,
+          this.renderRoute(
+            typeof route === "function" ? { component: route } : route,
+            params,
+          ),
+        )
+      : html\`404: Page not found\`;
+  },
+};
 `,mimeType:"text/javascript"},"/$app/theme/themes/nbs.js":{content:`/**
  * Neobrutalist (NBS) Theme
  * Bold borders, hard shadows, vibrant colors
@@ -11289,43 +15784,6 @@ export default {
     "item-active-font-weight": "600",
   },
 };
-`,mimeType:"text/javascript"},"/$app/router/ui.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import { keyed } from "/npm/lit-html/directives/keyed.js";
-import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
-import Router from "./index.js";
-
-export default {
-  tag: "router-ui",
-  properties: {
-    currentRoute: T.object({
-      sync: Router,
-    }),
-  },
-  renderRoute(route, params) {
-    const component =
-      typeof route.component === "function"
-        ? route.component(params)
-        : route.component;
-    return route.template
-      ? staticHTML\`<\${unsafeStatic(route.template)} .component=\${component}>
-			</\${unsafeStatic(route.template)}>\`
-      : component;
-  },
-
-  render() {
-    const { route, params } = this.currentRoute || {};
-    return route
-      ? keyed(
-          route.name ?? route.path,
-          this.renderRoute(
-            typeof route === "function" ? { component: route } : route,
-            params,
-          ),
-        )
-      : html\`404: Page not found\`;
-  },
-};
 `,mimeType:"text/javascript"},"/$app/base/backend.js":{content:`import config from "/$app/base/config.js";
 import createEventHandler from "/$app/events/index.js";
 import { initSWBackend } from "/$app/sw/backend.js";
@@ -11334,6 +15792,79 @@ import $APP from "/$app.js";
 $APP.addModule({ name: "events", base: createEventHandler({}) });
 initSWBackend($APP, config);
 import "/$app/base/backend/workers/database.js";
+`,mimeType:"text/javascript"},"/$app/base/config.js":{content:`/**
+ * Bootstrapp Framework Configuration
+ *
+ * Central configuration for framework constants and settings
+ * @module config
+ */
+
+/**
+ * Service Worker configuration
+ */
+export const serviceWorker = {
+  /** Timeout in milliseconds for Service Worker initialization */
+  initTimeout: 200,
+  /** Maximum number of retries for Service Worker registration */
+  maxRetries: 5,
+};
+
+/**
+ * Cache configuration for Service Worker file caching
+ */
+export const cache = {
+  /** Cache name for local files */
+  localFiles: "local-files-v1",
+  /** Cache name for staging files */
+  stagingFiles: "staging-files-v1",
+};
+
+/**
+ * Backend communication configuration
+ */
+export const backend = {
+  /** Default timeout in milliseconds for client requests to backend */
+  requestTimeout: 5000,
+};
+
+/**
+ * Test configuration
+ */
+export const test = {
+  /** Default test server host */
+  host: "test.localhost",
+  /** Default test server port */
+  port: 1313,
+  /** Get full test URL */
+  getUrl(path = '/test.html') {
+    return \`http://\${this.host}:\${this.port}\${path}\`;
+  }
+};
+
+/**
+ * Development server configuration
+ */
+export const devServer = {
+  /**
+   * Calculate WebSocket port for dev server hot reload
+   * @param {number} currentPort - Current application port
+   * @returns {number} WebSocket port
+   */
+  getWsPort(currentPort) {
+    return Number.parseInt(currentPort, 10) + 1;
+  }
+};
+
+/**
+ * Default configuration object
+ */
+export default {
+  serviceWorker,
+  cache,
+  backend,
+  test,
+  devServer,
+};
 `,mimeType:"text/javascript"},"/$app/events/index.js":{content:`/**
  * @bootstrapp/events
  * Lightweight event system with pub/sub pattern
@@ -11417,79 +15948,6 @@ function createEventHandler(target = {}, { getter = true } = {}) {
 }
 
 export default createEventHandler;
-`,mimeType:"text/javascript"},"/$app/base/config.js":{content:`/**
- * Bootstrapp Framework Configuration
- *
- * Central configuration for framework constants and settings
- * @module config
- */
-
-/**
- * Service Worker configuration
- */
-export const serviceWorker = {
-  /** Timeout in milliseconds for Service Worker initialization */
-  initTimeout: 200,
-  /** Maximum number of retries for Service Worker registration */
-  maxRetries: 5,
-};
-
-/**
- * Cache configuration for Service Worker file caching
- */
-export const cache = {
-  /** Cache name for local files */
-  localFiles: "local-files-v1",
-  /** Cache name for staging files */
-  stagingFiles: "staging-files-v1",
-};
-
-/**
- * Backend communication configuration
- */
-export const backend = {
-  /** Default timeout in milliseconds for client requests to backend */
-  requestTimeout: 5000,
-};
-
-/**
- * Test configuration
- */
-export const test = {
-  /** Default test server host */
-  host: "test.localhost",
-  /** Default test server port */
-  port: 1313,
-  /** Get full test URL */
-  getUrl(path = '/test.html') {
-    return \`http://\${this.host}:\${this.port}\${path}\`;
-  }
-};
-
-/**
- * Development server configuration
- */
-export const devServer = {
-  /**
-   * Calculate WebSocket port for dev server hot reload
-   * @param {number} currentPort - Current application port
-   * @returns {number} WebSocket port
-   */
-  getWsPort(currentPort) {
-    return Number.parseInt(currentPort, 10) + 1;
-  }
-};
-
-/**
- * Default configuration object
- */
-export default {
-  serviceWorker,
-  cache,
-  backend,
-  test,
-  devServer,
-};
 `,mimeType:"text/javascript"},"/$app/sw/backend.js":{content:`/**
  * @file Service Worker Backend Module
  * @description Service Worker backend with caching, fetch handling, and messaging
@@ -14436,123 +18894,7 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/bundler/models/schema.js":{content:`import T from "/$app/types/index.js";
-
-export default {
-  credentials: {
-    owner: T.string(),
-    repo: T.string(),
-    branch: T.string({ defaultValue: "main" }),
-    token: T.string(),
-  },
-  releases: {
-    version: T.string({
-      index: true,
-    }),
-    notes: T.string(),
-    status: T.string({
-      enum: ["pending", "success", "failed"],
-      defaultValue: "pending",
-    }),
-    deployType: T.string({
-      enum: ["spa", "ssg", "hybrid", "worker"],
-      defaultValue: "hybrid",
-    }),
-    deployTarget: T.string({
-      enum: ["github", "cloudflare", "zip", "targz", "localhost"],
-      defaultValue: "github",
-    }),
-    deployedAt: T.string(),
-    files: T.array(),
-    result: T.object(),
-  },
-};
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/auth/package.json":{content:`{
-  "name": "@bootstrapp/auth",
-  "version": "0.2.0",
-  "description": "Authentication module with session persistence, OAuth, and cross-tab sync",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./frontend": "./frontend.js",
-    "./backend": "./backend.js"
-  },
-  "keywords": [
-    "auth",
-    "authentication",
-    "session",
-    "oauth",
-    "pocketbase",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/auth"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/events": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/base/package.json":{content:`{
-  "name": "@bootstrapp/base",
-  "version": "0.2.0",
-  "description": "Bootstrapp MVC Framework - app shell and meta package",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./app": "./app.js",
-    "./frontend": "./frontend.js",
-    "./backend": "./backend.js",
-    "./config": "./config.js",
-    "./apploader": "./apploader.js",
-    "./bootstrapp": "./bootstrapp.js",
-    "./backend/backend": "./backend/backend.js",
-    "./backend/frontend": "./backend/frontend.js",
-    "./app/*": "./app/*",
-    "./test/*": "./test/*"
-  },
-  "keywords": [
-    "bootstrapp",
-    "framework",
-    "web-components",
-    "pocketbase",
-    "offline-first"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/base"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/types": "^0.2.0",
-    "@bootstrapp/events": "^0.2.0",
-    "@bootstrapp/view": "^0.2.0",
-    "@bootstrapp/router": "^0.1.0",
-    "@bootstrapp/controller": "^0.2.0",
-    "@bootstrapp/theme": "^0.2.0",
-    "@bootstrapp/model": "^0.2.0",
-    "@bootstrapp/auth": "^0.2.0",
-    "@bootstrapp/sw": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/$app/uix/display/calendar.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/display/calendar.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 // Utility functions for calendar logic
@@ -15162,7 +19504,124 @@ export default {
  * ></uix-calendar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/model/package.json":{content:`{
+`,mimeType:"text/javascript"},"/$app/uix/display/calendar.css":{content:`:where(.uix-calendar,uix-calendar){display:block;--calendar-border-width: 2px;--calendar-border-color: black;--calendar-border-radius: .75rem;--calendar-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);--calendar-shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 1);--calendar-today-bg: #fef3c7;--calendar-today-border: #eab308;--calendar-selected-bg: var(--color-accent, #f472b6);--calendar-font-family: inherit;&::part(view-toggle){display:flex;gap:.5rem;margin-bottom:1rem}&::part(toggle-btn){flex:1;padding:.5rem 1rem;font-weight:900;font-size:.875rem;text-transform:uppercase;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);background:#fff;box-shadow:3px 3px #000;cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:1px 1px #000}}&::part(toggle-btn-active){background:var(--calendar-selected-bg)}&::part(header){display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}&::part(nav-btn){width:2.5rem;height:2.5rem;display:flex;align-items:center;justify-content:center;background:#fff;border:3px solid var(--calendar-border-color);border-radius:.5rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(month-label){font-size:1.125rem;font-weight:900;text-transform:uppercase}&::part(today-btn){width:100%;margin-bottom:1rem;padding:.5rem 1rem;background:#f9a8d4;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);font-weight:900;font-size:.875rem;text-transform:uppercase;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(grid){background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;box-shadow:6px 6px #000}&::part(weekday-header){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem;margin-bottom:.5rem}&::part(weekday){text-align:center;font-weight:900;font-size:.75rem;color:#4b5563}&::part(days-grid){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}&::part(day){aspect-ratio:1;position:relative;display:flex;flex-direction:column;align-items:flex-start;padding:.25rem;border-radius:.5rem;border:2px solid #d1d5db;cursor:pointer;overflow:hidden;transition:all .15s ease;&:active{transform:translate(1px,1px)}}&::part(day-today){background:var(--calendar-today-bg);border-color:var(--calendar-today-border);border-width:3px}&::part(day-selected){background:var(--calendar-selected-bg);border-color:var(--calendar-border-color);border-width:3px;box-shadow:var(--calendar-shadow-sm)}&::part(day-other-month){opacity:.4}&::part(day-number){font-size:.75rem;font-weight:700;margin-bottom:.125rem}&::part(day-events){width:100%;display:flex;flex-direction:column;gap:.125rem}&::part(event){font-size:9px;line-height:1.1;font-weight:700;padding:.125rem .25rem;border-radius:.25rem;border:1px solid var(--calendar-border-color);background:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(more-events){font-size:8px;font-weight:700;color:#4b5563;padding:0 .25rem}&::part(list){display:flex;flex-direction:column;gap:1.5rem}&::part(list-section-title){font-size:.875rem;font-weight:900;text-transform:uppercase;color:#4b5563;margin-bottom:.75rem}&::part(list-item){display:flex;gap:1rem;background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:1rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(list-item-image){width:5rem;height:5rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(list-item-title){font-weight:900;font-size:.875rem;line-height:1.25}&::part(list-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(recurring-badge){flex-shrink:0;font-size:.75rem;font-weight:700;background:#ddd6fe;border:1px solid var(--calendar-border-color);padding:.125rem .5rem;border-radius:.25rem}&::part(panel-overlay){position:fixed;inset:0;background:#00000080;z-index:40}&::part(panel){position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:3px solid var(--calendar-border-color);border-radius:1rem 1rem 0 0;z-index:50;max-height:70vh;overflow-y:auto}&::part(panel-header){position:sticky;top:0;background:#fff;border-bottom:2px solid var(--calendar-border-color);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}&::part(panel-title){font-weight:900;font-size:1.125rem}&::part(panel-close){width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--calendar-border-color);border-radius:.5rem;background:#fff;cursor:pointer;&:hover{background:#f3f4f6}}&::part(panel-content){padding:1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem}&::part(panel-item){display:flex;gap:.75rem;background:#f9fafb;border:2px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;cursor:pointer;box-shadow:3px 3px #000;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:none}}&::part(panel-item-image){width:4rem;height:4rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(panel-item-title){font-weight:700;font-size:.875rem;line-height:1.25}&::part(panel-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(panel-empty){text-align:center;font-size:.875rem;font-weight:700;color:#9ca3af;padding:2rem 0}&::part(empty){display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5rem 0;.empty-icon{font-size:3.75rem;margin-bottom:1rem}.empty-text{font-size:1.125rem;font-weight:700;color:#9ca3af}}}
+`,mimeType:"text/css"},"/node_modules/@bootstrapp/bundler/models/schema.js":{content:`import T from "/$app/types/index.js";
+
+export default {
+  credentials: {
+    owner: T.string(),
+    repo: T.string(),
+    branch: T.string({ defaultValue: "main" }),
+    token: T.string(),
+  },
+  releases: {
+    version: T.string({
+      index: true,
+    }),
+    notes: T.string(),
+    status: T.string({
+      enum: ["pending", "success", "failed"],
+      defaultValue: "pending",
+    }),
+    deployType: T.string({
+      enum: ["spa", "ssg", "hybrid", "worker"],
+      defaultValue: "hybrid",
+    }),
+    deployTarget: T.string({
+      enum: ["github", "cloudflare", "zip", "targz", "localhost"],
+      defaultValue: "localhost",
+    }),
+    deployedAt: T.string(),
+    files: T.array(),
+    result: T.object(),
+  },
+};
+`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/auth/package.json":{content:`{
+  "name": "@bootstrapp/auth",
+  "version": "0.2.0",
+  "description": "Authentication module with session persistence, OAuth, and cross-tab sync",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./frontend": "./frontend.js",
+    "./backend": "./backend.js"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "session",
+    "oauth",
+    "pocketbase",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/auth"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/events": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/base/package.json":{content:`{
+  "name": "@bootstrapp/base",
+  "version": "0.2.0",
+  "description": "Bootstrapp MVC Framework - app shell and meta package",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./app": "./app.js",
+    "./frontend": "./frontend.js",
+    "./backend": "./backend.js",
+    "./config": "./config.js",
+    "./apploader": "./apploader.js",
+    "./bootstrapp": "./bootstrapp.js",
+    "./backend/backend": "./backend/backend.js",
+    "./backend/frontend": "./backend/frontend.js",
+    "./app/*": "./app/*",
+    "./test/*": "./test/*"
+  },
+  "keywords": [
+    "bootstrapp",
+    "framework",
+    "web-components",
+    "pocketbase",
+    "offline-first"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/base"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/types": "^0.2.0",
+    "@bootstrapp/events": "^0.2.0",
+    "@bootstrapp/view": "^0.2.0",
+    "@bootstrapp/router": "^0.1.0",
+    "@bootstrapp/controller": "^0.2.0",
+    "@bootstrapp/theme": "^0.2.0",
+    "@bootstrapp/model": "^0.2.0",
+    "@bootstrapp/auth": "^0.2.0",
+    "@bootstrapp/sw": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/model/package.json":{content:`{
   "name": "@bootstrapp/model",
   "version": "0.2.0",
   "description": "ORM-like data layer with reactive arrays, proxy-based API, and subscription management",
@@ -15237,349 +19696,6 @@ export default {
   "dependencies": {
     "@bootstrapp/model": "^0.2.0"
   }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/model-pocketbase/package.json":{content:`{
-  "name": "@bootstrapp/model-pocketbase",
-  "version": "0.2.0",
-  "description": "PocketBase database adapter for @bootstrapp/model with realtime subscriptions",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./adapter": "./adapter.js",
-    "./filter-builder": "./filter-builder.js",
-    "./realtime-manager": "./realtime-manager.js",
-    "./auth-manager": "./auth-manager.js",
-    "./relationship-loader": "./relationship-loader.js"
-  },
-  "keywords": [
-    "pocketbase",
-    "database",
-    "adapter",
-    "realtime",
-    "orm",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/model-pocketbase"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/model": "^0.2.0"
-  },
-  "peerDependencies": {
-    "pocketbase": "^0.21.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/model-hybrid/package.json":{content:`{
-  "name": "@bootstrapp/model-hybrid",
-  "version": "0.2.0",
-  "description": "Hybrid database adapter combining IndexedDB + PocketBase for offline-first architecture",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./adapter": "./adapter.js"
-  },
-  "keywords": [
-    "hybrid",
-    "offline-first",
-    "database",
-    "adapter",
-    "indexeddb",
-    "pocketbase",
-    "sync",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/model-hybrid"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/model": "^0.2.0",
-    "@bootstrapp/model-indexeddb": "^0.2.0",
-    "@bootstrapp/model-pocketbase": "^0.2.0"
-  },
-  "peerDependencies": {
-    "pocketbase": "^0.21.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/sw/package.json":{content:`{
-  "name": "@bootstrapp/sw",
-  "version": "0.2.0",
-  "description": "Service Worker module with caching, messaging, and filesystem API",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./frontend": "./frontend.js",
-    "./backend": "./backend.js",
-    "./adapter": "./adapter.js",
-    "./filesystem": "./filesystem.js"
-  },
-  "keywords": [
-    "service-worker",
-    "sw",
-    "cache",
-    "offline",
-    "filesystem",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/sw"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/events": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/$app/uix/display/calendar.css":{content:`:where(.uix-calendar,uix-calendar){display:block;--calendar-border-width: 2px;--calendar-border-color: black;--calendar-border-radius: .75rem;--calendar-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);--calendar-shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 1);--calendar-today-bg: #fef3c7;--calendar-today-border: #eab308;--calendar-selected-bg: var(--color-accent, #f472b6);--calendar-font-family: inherit;&::part(view-toggle){display:flex;gap:.5rem;margin-bottom:1rem}&::part(toggle-btn){flex:1;padding:.5rem 1rem;font-weight:900;font-size:.875rem;text-transform:uppercase;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);background:#fff;box-shadow:3px 3px #000;cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:1px 1px #000}}&::part(toggle-btn-active){background:var(--calendar-selected-bg)}&::part(header){display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}&::part(nav-btn){width:2.5rem;height:2.5rem;display:flex;align-items:center;justify-content:center;background:#fff;border:3px solid var(--calendar-border-color);border-radius:.5rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(month-label){font-size:1.125rem;font-weight:900;text-transform:uppercase}&::part(today-btn){width:100%;margin-bottom:1rem;padding:.5rem 1rem;background:#f9a8d4;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);font-weight:900;font-size:.875rem;text-transform:uppercase;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:active{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(grid){background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;box-shadow:6px 6px #000}&::part(weekday-header){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem;margin-bottom:.5rem}&::part(weekday){text-align:center;font-weight:900;font-size:.75rem;color:#4b5563}&::part(days-grid){display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}&::part(day){aspect-ratio:1;position:relative;display:flex;flex-direction:column;align-items:flex-start;padding:.25rem;border-radius:.5rem;border:2px solid #d1d5db;cursor:pointer;overflow:hidden;transition:all .15s ease;&:active{transform:translate(1px,1px)}}&::part(day-today){background:var(--calendar-today-bg);border-color:var(--calendar-today-border);border-width:3px}&::part(day-selected){background:var(--calendar-selected-bg);border-color:var(--calendar-border-color);border-width:3px;box-shadow:var(--calendar-shadow-sm)}&::part(day-other-month){opacity:.4}&::part(day-number){font-size:.75rem;font-weight:700;margin-bottom:.125rem}&::part(day-events){width:100%;display:flex;flex-direction:column;gap:.125rem}&::part(event){font-size:9px;line-height:1.1;font-weight:700;padding:.125rem .25rem;border-radius:.25rem;border:1px solid var(--calendar-border-color);background:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(more-events){font-size:8px;font-weight:700;color:#4b5563;padding:0 .25rem}&::part(list){display:flex;flex-direction:column;gap:1.5rem}&::part(list-section-title){font-size:.875rem;font-weight:900;text-transform:uppercase;color:#4b5563;margin-bottom:.75rem}&::part(list-item){display:flex;gap:1rem;background:#fff;border:3px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:1rem;box-shadow:var(--calendar-shadow);cursor:pointer;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:var(--calendar-shadow-sm)}}&::part(list-item-image){width:5rem;height:5rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(list-item-title){font-weight:900;font-size:.875rem;line-height:1.25}&::part(list-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(recurring-badge){flex-shrink:0;font-size:.75rem;font-weight:700;background:#ddd6fe;border:1px solid var(--calendar-border-color);padding:.125rem .5rem;border-radius:.25rem}&::part(panel-overlay){position:fixed;inset:0;background:#00000080;z-index:40}&::part(panel){position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:3px solid var(--calendar-border-color);border-radius:1rem 1rem 0 0;z-index:50;max-height:70vh;overflow-y:auto}&::part(panel-header){position:sticky;top:0;background:#fff;border-bottom:2px solid var(--calendar-border-color);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}&::part(panel-title){font-weight:900;font-size:1.125rem}&::part(panel-close){width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--calendar-border-color);border-radius:.5rem;background:#fff;cursor:pointer;&:hover{background:#f3f4f6}}&::part(panel-content){padding:1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem}&::part(panel-item){display:flex;gap:.75rem;background:#f9fafb;border:2px solid var(--calendar-border-color);border-radius:var(--calendar-border-radius);padding:.75rem;cursor:pointer;box-shadow:3px 3px #000;transition:all .15s ease;&:hover{transform:translate(2px,2px);box-shadow:none}}&::part(panel-item-image){width:4rem;height:4rem;object-fit:cover;border-radius:.5rem;border:2px solid var(--calendar-border-color)}&::part(panel-item-title){font-weight:700;font-size:.875rem;line-height:1.25}&::part(panel-item-meta){font-size:.75rem;color:#4b5563;margin-top:.25rem}&::part(panel-empty){text-align:center;font-size:.875rem;font-weight:700;color:#9ca3af;padding:2rem 0}&::part(empty){display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5rem 0;.empty-icon{font-size:3.75rem;margin-bottom:1rem}.empty-text{font-size:1.125rem;font-weight:700;color:#9ca3af}}}
-`,mimeType:"text/css"},"/node_modules/@bootstrapp/controller/package.json":{content:`{
-  "name": "@bootstrapp/controller",
-  "version": "0.2.0",
-  "description": "Reactive state management with storage, URL, and custom adapters",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./sync": "./sync.js",
-    "./sync-factory": "./sync-factory.js",
-    "./adapters/storage": "./adapters/storage.js",
-    "./adapters/url": "./adapters/url.js",
-    "./app": "./app.js"
-  },
-  "keywords": [
-    "state-management",
-    "reactive",
-    "storage",
-    "url-state",
-    "controller",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/controller"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/events": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/events/package.json":{content:`{
-  "name": "@bootstrapp/events",
-  "version": "0.2.0",
-  "description": "Lightweight event system with pub/sub pattern and event handler installation",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js"
-  },
-  "keywords": [
-    "events",
-    "pub-sub",
-    "event-emitter",
-    "observer-pattern",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/events"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/i18n/package.json":{content:`{
-  "name": "@bootstrapp/i18n",
-  "version": "0.2.0",
-  "description": "Internationalization (i18n) module for Bootstrapp framework",
-  "type": "module",
-  "main": "index.js",
-  "exports": {
-    ".": "./index.js",
-    "./base": "./base.js",
-    "./view-plugin": "./view-plugin.js"
-  },
-  "dependencies": {
-    "@bootstrapp/controller": "^0.2.0",
-    "@bootstrapp/view": "^0.2.0"
-  },
-  "keywords": [
-    "bootstrapp",
-    "i18n",
-    "internationalization",
-    "localization",
-    "translation"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0"
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/icon-lucide/package.json":{content:`{
-  "name": "@bootstrapp/icon-lucide",
-  "version": "0.0.1",
-  "type": "module",
-  "description": "Lucide icon library for Bootstrapp framework",
-  "main": "index.js",
-  "exports": {
-    ".": "./index.js",
-    "./lucide/*": "./lucide/*",
-    "./app.js": "./app.js"
-  },
-  "dependencies": {
-    "@bootstrapp/base": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/router/package.json":{content:`{
-  "name": "@bootstrapp/router",
-  "version": "0.1.0",
-  "description": "Client-side router with URLPattern API support, nested routes, and history management",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./app": "./app.js",
-    "./ui": "./ui.js"
-  },
-  "keywords": [
-    "router",
-    "routing",
-    "spa",
-    "urlpattern",
-    "history",
-    "navigation",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/router"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/controller": "^0.2.0",
-    "@bootstrapp/types": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/tailwind/package.json":{content:`{
-  "name": "@bootstrapp/tailwind",
-  "version": "0.1.0",
-  "description": "Tailwind/UnoCSS styling configuration for Bootstrapp",
-  "type": "module",
-  "main": "index.js",
-  "exports": {
-    ".": "./index.js"
-  },
-  "dependencies": {
-    "@bootstrapp/base": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/theme/package.json":{content:`{
-  "name": "@bootstrapp/theme",
-  "version": "0.2.0",
-  "description": "Standalone theming system with dynamic CSS variable generation and color utilities",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./themes/*": "./themes/*"
-  },
-  "keywords": [
-    "theme",
-    "theming",
-    "css-variables",
-    "color-utilities",
-    "design-system",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/theme"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {
-    "@bootstrapp/view": "^0.2.0"
-  }
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/types/package.json":{content:`{
-  "name": "@bootstrapp/types",
-  "version": "0.2.0",
-  "description": "Type validation and coercion library for model fields and component properties",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js"
-  },
-  "keywords": [
-    "types",
-    "validation",
-    "coercion",
-    "schema",
-    "type-system",
-    "bootstrapp"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "base/types"
-  },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
-  },
-  "dependencies": {},
-  "devDependencies": {}
 }
 `,mimeType:"application/json"},"/$app/admin/views/layout.js":{content:`import Router from "/$app/router/index.js";
 import T from "/$app/types/index.js";
@@ -15730,7 +19846,48 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/admin/utils/model-utils.js":{content:`import $APP from "/$app.js";
+`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/model-pocketbase/package.json":{content:`{
+  "name": "@bootstrapp/model-pocketbase",
+  "version": "0.2.0",
+  "description": "PocketBase database adapter for @bootstrapp/model with realtime subscriptions",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./adapter": "./adapter.js",
+    "./filter-builder": "./filter-builder.js",
+    "./realtime-manager": "./realtime-manager.js",
+    "./auth-manager": "./auth-manager.js",
+    "./relationship-loader": "./relationship-loader.js"
+  },
+  "keywords": [
+    "pocketbase",
+    "database",
+    "adapter",
+    "realtime",
+    "orm",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/model-pocketbase"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/model": "^0.2.0"
+  },
+  "peerDependencies": {
+    "pocketbase": "^0.21.0"
+  }
+}
+`,mimeType:"application/json"},"/$app/admin/utils/model-utils.js":{content:`import $APP from "/$app.js";
 
 /**
  * Get schema fields for a model
@@ -15887,114 +20044,121 @@ export const getPrimaryDisplayField = (modelName) => {
   );
   return stringField?.name || "id";
 };
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/uix/package.json":{content:`{
-  "name": "@bootstrapp/uix",
+`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/model-hybrid/package.json":{content:`{
+  "name": "@bootstrapp/model-hybrid",
   "version": "0.2.0",
-  "description": "UI/UX component toolkit built on @bootstrapp/view with ready-to-use components for modern web applications",
+  "description": "Hybrid database adapter combining IndexedDB + PocketBase for offline-first architecture",
   "main": "./index.js",
   "module": "./index.js",
   "type": "module",
   "exports": {
     ".": "./index.js",
-    "./import.js": "./import.js",
-    "./display/*": "./display/*",
-    "./layout/*": "./layout/*",
-    "./form/*": "./form/*",
-    "./navigation/*": "./navigation/*",
-    "./overlay/*": "./overlay/*",
-    "./feedback/*": "./feedback/*",
-    "./page/*": "./page/*",
-    "./app/*": "./app/*",
-    "./utility/*": "./utility/*",
-    "./theme.css": "./theme.css"
+    "./adapter": "./adapter.js"
   },
   "keywords": [
-    "ui-components",
-    "uix",
-    "web-components",
-    "bootstrapp",
-    "design-system",
-    "component-library",
-    "lit-html",
-    "custom-elements"
+    "hybrid",
+    "offline-first",
+    "database",
+    "adapter",
+    "indexeddb",
+    "pocketbase",
+    "sync",
+    "bootstrapp"
   ],
   "author": "Alan Leal",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/uix"
+    "directory": "public/model-hybrid"
   },
   "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
   "bugs": {
     "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
   },
   "dependencies": {
-    "@bootstrapp/view": "^0.2.0",
-    "@bootstrapp/types": "^0.2.0",
-    "@bootstrapp/theme": "^0.2.0",
-    "@bootstrapp/router": "^0.1.0",
-    "@bootstrapp/controller": "^0.2.0",
-    "@bootstrapp/base": "^0.2.0",
-    "lit-html": "^3.0.0"
+    "@bootstrapp/model": "^0.2.0",
+    "@bootstrapp/model-indexeddb": "^0.2.0",
+    "@bootstrapp/model-pocketbase": "^0.2.0"
+  },
+  "peerDependencies": {
+    "pocketbase": "^0.21.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/sw/package.json":{content:`{
+  "name": "@bootstrapp/sw",
+  "version": "0.2.0",
+  "description": "Service Worker module with caching, messaging, and filesystem API",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./frontend": "./frontend.js",
+    "./backend": "./backend.js",
+    "./adapter": "./adapter.js",
+    "./filesystem": "./filesystem.js"
+  },
+  "keywords": [
+    "service-worker",
+    "sw",
+    "cache",
+    "offline",
+    "filesystem",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/sw"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/events": "^0.2.0"
   }
 }
 `,mimeType:"application/json"},"/$app/admin/views/layout.css":{content:`admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%;--admin-header-height: 4rem;--sidebar-header-min-height: var(--admin-header-height);--sidebar-header-padding: 0 1rem;--navbar-height: var(--admin-header-height);--admin-header-border: 3px;--sidebar-header-border-width: var(--admin-header-border);--navbar-border-color: var(--color-border, #e5e7eb);--sidebar-header-background: var(--color-surface-dark, #f3f4f6);--navbar-background: var(--color-surface-dark, #f3f4f6)}.admin-main uix-navbar::part(container){border-bottom-width:var(--admin-header-border)}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto;padding:1.5rem}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}
-`,mimeType:"text/css"},"/node_modules/@bootstrapp/view/package.json":{content:`{
-  "name": "@bootstrapp/view",
+`,mimeType:"text/css"},"/node_modules/@bootstrapp/controller/package.json":{content:`{
+  "name": "@bootstrapp/controller",
   "version": "0.2.0",
-  "description": "Web components framework built on Custom Elements API with lit-html templating",
+  "description": "Reactive state management with storage, URL, and custom adapters",
   "main": "./index.js",
   "module": "./index.js",
-  "scripts": {
-    "docs": "npx serve docs -p 3000"
-  },
   "type": "module",
   "exports": {
     ".": "./index.js",
-    "./loader": "./loader.js"
+    "./sync": "./sync.js",
+    "./sync-factory": "./sync-factory.js",
+    "./adapters/storage": "./adapters/storage.js",
+    "./adapters/url": "./adapters/url.js",
+    "./app": "./app.js"
   },
   "keywords": [
-    "web-components",
-    "custom-elements",
-    "lit-html",
+    "state-management",
     "reactive",
-    "view",
-    "bootstrapp",
-    "framework"
+    "storage",
+    "url-state",
+    "controller",
+    "bootstrapp"
   ],
   "author": "Alan Leal",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "base/view"
+    "directory": "public/controller"
   },
   "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
   "bugs": {
     "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
   },
   "dependencies": {
-    "@bootstrapp/types": "^0.1.0",
-    "lit-html": "^3.3.1"
-  },
-  "devDependencies": {}
-}
-`,mimeType:"application/json"},"/node_modules/@bootstrapp/admin/package.json":{content:`{
-  "name": "@bootstrapp/admin",
-  "version": "0.1.0",
-  "description": "Bootstrapp Admin Panel",
-  "type": "module",
-  "main": "index.js",
-  "exports": {
-    ".": "./index.js",
-    "./cms/*": "./cms/*",
-    "./project/*": "./project/*",
-    "./views/*": "./views/*"
-  },
-  "dependencies": {
-    "@bootstrapp/base": "^0.2.0",
-    "@bootstrapp/bundler": "^0.1.0"
+    "@bootstrapp/events": "^0.2.0"
   }
 }
 `,mimeType:"application/json"},"/$app/uix/navigation/sidebar.js":{content:`import T from "/$app/types/index.js";
@@ -16125,7 +20289,36 @@ export default {
  * </uix-sidebar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/menu.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/events/package.json":{content:`{
+  "name": "@bootstrapp/events",
+  "version": "0.2.0",
+  "description": "Lightweight event system with pub/sub pattern and event handler installation",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": [
+    "events",
+    "pub-sub",
+    "event-emitter",
+    "observer-pattern",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/events"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  }
+}
+`,mimeType:"application/json"},"/$app/uix/navigation/menu.js":{content:`import T from "/$app/types/index.js";
 
 export default {
   tag: "uix-menu",
@@ -16280,47 +20473,55 @@ export default {
  * </uix-menu>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/maps/package.json":{content:`{
-  "name": "@bootstrapp/maps",
-  "version": "0.1.0",
-  "description": "Provider-agnostic maps integration for searching and geocoding places",
-  "main": "./index.js",
-  "module": "./index.js",
-  "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./app.js": "./app.js",
-    "./search.js": "./search.js",
-    "./search.css": "./search.css"
+`,mimeType:"text/javascript"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+export default {
+  tag: "uix-darkmode",
+  icons: ["moon", "sun"],
+  properties: {
+    width: T.string({ defaultValue: "fit" }),
+    compact: T.boolean(),
+    darkmode: T.boolean({
+      sync: "local",
+      defaultValue: true,
+    }),
+    icon: T.string(),
   },
-  "keywords": [
-    "maps",
-    "geocoding",
-    "places",
-    "nominatim",
-    "openstreetmap",
-    "bootstrapp",
-    "web-components"
-  ],
-  "author": "Alan Leal",
-  "license": "AGPL-3.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
-    "directory": "public/maps"
+
+  click(e) {
+    e.stopPropagation();
+    this.darkmode = !this.darkmode;
+    this.icon = this.darkmode ? "sun" : "moon";
   },
-  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
-  "bugs": {
-    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  willUpdate({ changedProps }) {
+    if (changedProps.has("darkmode"))
+      document.documentElement.classList.toggle("dark");
   },
-  "dependencies": {
-    "@bootstrapp/base": "^0.2.0",
-    "@bootstrapp/types": "^0.2.0",
-    "@bootstrapp/view": "^0.2.0",
-    "lit-html": "^3.0.0"
-  }
-}
-`,mimeType:"application/json"},"/$app/uix/navigation/navbar.js":{content:`import T from "/$app/types/index.js";
+  connected() {
+    this.icon = this.darkmode ? "sun" : "moon";
+    if (this.darkmode) document.documentElement.classList.add("dark");
+    this.on("button#click", this.click.bind(this));
+  },
+  render() {
+    return this.compact
+      ? html\`<button>
+        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
+        </button>
+        \`
+      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
+              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
+              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
+              <div class="ml-auto w-10 h-5 \${
+                this.darkmode ? "bg-red-700" : "bg-gray-600"
+              } rounded-full flex items-center p-1 transition-colors">
+                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
+                    this.darkmode ? "translate-x-4" : ""
+                  }"></div>
+              </div>
+          </button>\`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/navigation/navbar.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
@@ -16547,154 +20748,6 @@ export default {
  * </uix-navbar>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/utility/darkmode.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-export default {
-  tag: "uix-darkmode",
-  icons: ["moon", "sun"],
-  properties: {
-    width: T.string({ defaultValue: "fit" }),
-    compact: T.boolean(),
-    darkmode: T.boolean({
-      sync: "local",
-      defaultValue: true,
-    }),
-    icon: T.string(),
-  },
-
-  click(e) {
-    e.stopPropagation();
-    this.darkmode = !this.darkmode;
-    this.icon = this.darkmode ? "sun" : "moon";
-  },
-  willUpdate({ changedProps }) {
-    if (changedProps.has("darkmode"))
-      document.documentElement.classList.toggle("dark");
-  },
-  connected() {
-    this.icon = this.darkmode ? "sun" : "moon";
-    if (this.darkmode) document.documentElement.classList.add("dark");
-    this.on("button#click", this.click.bind(this));
-  },
-  render() {
-    return this.compact
-      ? html\`<button>
-        <uix-icon ghost name=\${this.icon} class="w-7 h-7 cursor-pointer shrink-0"></uix-icon>
-        </button>
-        \`
-      : html\`<button class="cursor-pointer w-full flex items-center p-2 rounded-md hover:bg-surface-lighter text-left text-sm gap-2">
-              <uix-icon name=\${this.icon} class="w-5 h-5 mr-3 shrink-0"></uix-icon>
-              <span>\${this.darkmode ? "Light Mode" : "Dark Mode"}</span>
-              <div class="ml-auto w-10 h-5 \${
-                this.darkmode ? "bg-red-700" : "bg-gray-600"
-              } rounded-full flex items-center p-1 transition-colors">
-                  <div class="w-4 h-4 bg-white rounded-full transform transition-transform \${
-                    this.darkmode ? "translate-x-4" : ""
-                  }"></div>
-              </div>
-          </button>\`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/display/avatar.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-avatar",
-  properties: {
-    src: T.string(),
-    name: T.string(),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    shape: T.string({
-      defaultValue: "circle",
-      enum: ["circle", "square", "rounded"],
-    }),
-    status: T.string({
-      enum: ["online", "offline", "busy", "away"],
-    }),
-  },
-  style: true,
-
-  getInitials(name) {
-    if (!name) return null;
-    const parts = name.trim().split(/\\s+/);
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  },
-
-  render() {
-    const initials = this.getInitials(this.name);
-
-    return html\`
-      \${this.src
-        ? html\`<img src="\${this.src}" alt="\${this.name || "Avatar"}" />\`
-        : initials
-          ? html\`<span class="initials">\${initials}</span>\`
-          : html\`<uix-icon name="user"></uix-icon>\`
-      }
-      \${this.status
-        ? html\`<span class="status status--\${this.status}"></span>\`
-        : ""
-      }
-    \`;
-  },
-};
-
-/**
- * Avatar Component
- *
- * @component
- * @category display
- * @tag uix-avatar
- *
- * Displays user profile images, initials, or a fallback user icon.
- * Supports status indicators and multiple shapes/sizes.
- *
- * @example Image Avatar
- * \`\`\`html
- * <uix-avatar src="/path/to/image.jpg" name="John Doe"></uix-avatar>
- * \`\`\`
- *
- * @example Initials Avatar
- * \`\`\`html
- * <uix-avatar name="Jane Smith"></uix-avatar>
- * <uix-avatar name="Bob"></uix-avatar>
- * \`\`\`
- *
- * @example Default Icon (no name or src)
- * \`\`\`html
- * <uix-avatar></uix-avatar>
- * <uix-avatar size="lg"></uix-avatar>
- * \`\`\`
- *
- * @example Sizes
- * \`\`\`html
- * <uix-avatar name="XS" size="xs"></uix-avatar>
- * <uix-avatar name="SM" size="sm"></uix-avatar>
- * <uix-avatar name="MD" size="md"></uix-avatar>
- * <uix-avatar name="LG" size="lg"></uix-avatar>
- * <uix-avatar name="XL" size="xl"></uix-avatar>
- * \`\`\`
- *
- * @example Shapes
- * \`\`\`html
- * <uix-avatar name="C" shape="circle"></uix-avatar>
- * <uix-avatar name="S" shape="square"></uix-avatar>
- * <uix-avatar name="R" shape="rounded"></uix-avatar>
- * \`\`\`
- *
- * @example Status Indicator
- * \`\`\`html
- * <uix-avatar name="John" status="online"></uix-avatar>
- * <uix-avatar name="Jane" status="offline"></uix-avatar>
- * <uix-avatar name="Bob" status="busy"></uix-avatar>
- * <uix-avatar name="Alice" status="away"></uix-avatar>
- * \`\`\`
- */
 `,mimeType:"text/javascript"},"/$app/uix/navigation/breadcrumbs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
@@ -16870,466 +20923,959 @@ export default {
  * </uix-breadcrumbs>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/docs/showcase.js":{content:`/**
- * UIX Component Showcase
- * Interactive component library viewer with lazy loading
- */
+`,mimeType:"text/javascript"},"/$app/uix/display/avatar.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
 
-import Theme from "/$app/theme/index.js";
-import T from "/$app/types/index.js";
-import View from "/$app/view/index.js";
-import { html, nothing } from "/npm/lit-html";
-import { unsafeHTML } from "/npm/lit-html/directives/unsafe-html.js";
-import { html as staticHTML, unsafeStatic } from "/npm/lit-html/static.js";
-import {
-  getComponentList,
-  getDefaultValues,
-  loadComponent,
-} from "../utils/component-registry.js";
-import "./showcase-sidebar.js";
-import "./showcase-property-editor.js";
-import "./showcase-code-viewer.js";
-import "./theme-generator.js";
-
-const ShowcaseDefinition = {
-  tag: "uix-showcase",
-  style: true,
+export default {
+  tag: "uix-avatar",
   properties: {
-    selectedCategory: T.string({ sync: "querystring" }),
-    selectedComponentName: T.string({ sync: "querystring" }),
-    selectedResourcePage: T.string({ sync: "querystring" }),
-    currentTheme: T.string("gruvbox-dark"),
-    componentList: T.object(),
-    selectedComponent: T.string(),
-    loading: T.boolean(),
-    error: T.string(),
-    liveProps: T.object(),
+    src: T.string(),
+    name: T.string(),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    shape: T.string({
+      defaultValue: "circle",
+      enum: ["circle", "square", "rounded"],
+    }),
+    status: T.string({
+      enum: ["online", "offline", "busy", "away"],
+    }),
   },
-  connected() {
-    this.componentList = getComponentList();
-    if (this.selectedComponentName)
-      this._handleComponentSelect({
-        detail: {
-          type: "component",
-          category: this.selectedCategory,
-          name: this.selectedComponentName,
-        },
-      });
-  },
+  style: true,
 
-  async _handleComponentSelect({ detail }) {
-    const { type, category, name, page } = detail;
-
-    // Handle resource page selection
-    if (type === "resource") {
-      this.selectedResourcePage = page;
-      this.selectedCategory = null;
-      this.selectedComponentName = null;
-      this.selectedComponent = null;
-      return;
+  getInitials(name) {
+    if (!name) return null;
+    const parts = name.trim().split(/\\s+/);
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
     }
-
-    // Handle component selection
-    if (
-      this.selectedCategory === category &&
-      this.selectedComponentName === name &&
-      this.selectedComponent
-    ) {
-      return;
-    }
-
-    this.selectedResourcePage = null;
-    this.selectedCategory = category;
-    this.selectedComponentName = name;
-    this.selectedComponent = null;
-    this.loading = true;
-    this.error = null;
-
-    try {
-      // Lazy load the component
-      const metadata = await loadComponent(category, name);
-
-      this.selectedComponent = {
-        name,
-        category,
-        ...metadata,
-      };
-
-      // Initialize live props with defaults
-      this.liveProps = getDefaultValues(metadata.properties);
-    } catch (err) {
-      console.error("Failed to load component:", err);
-      this.error = err.message;
-    } finally {
-      this.loading = false;
-    }
-  },
-
-  _handlePropertyChange({ detail }) {
-    const { key, value } = detail;
-    this.liveProps = {
-      ...this.liveProps,
-      [key]: value,
-    };
-  },
-
-  _handleReset() {
-    if (this.selectedComponent) {
-      this.liveProps = getDefaultValues(this.selectedComponent.properties);
-    }
-  },
-
-  _handleThemeChange(themeName) {
-    Theme.loadTheme(themeName);
-  },
-
-  renderLiveComponent() {
-    if (!this.selectedComponent) return nothing;
-
-    const { tag } = this.selectedComponent;
-    const props = this.liveProps;
-
-    // Build attributes string
-    const attributes = Object.entries(props)
-      .map(([key, value]) => {
-        if (value === undefined || value === null) return "";
-        if (typeof value === "boolean") {
-          return value ? key : "";
-        }
-        if (typeof value === "string" || typeof value === "number") {
-          return \`\${key}="\${value}"\`;
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join(" ");
-
-    // Render component dynamically
-    try {
-      return staticHTML\`
-        <\${unsafeStatic(tag)} \${unsafeStatic(attributes)}>
-          \${this.renderComponentSlotContent(tag)}
-        </\${unsafeStatic(tag)}>
-      \`;
-    } catch (err) {
-      return html\`<div class="preview-error">Failed to render component</div>\`;
-    }
-  },
-
-  renderComponentSlotContent(tag) {
-    // Provide default slot content based on component type
-    if (tag.includes("button")) {
-      return "Click me";
-    }
-    if (tag.includes("input")) {
-      return nothing;
-    }
-    if (tag.includes("badge")) {
-      return "Badge";
-    }
-    if (tag.includes("modal")) {
-      return html\`
-        <div slot="header">Modal Header</div>
-        <p>Modal content goes here...</p>
-        <div slot="footer">
-          <uix-button>Cancel</uix-button>
-          <uix-button variant="primary">OK</uix-button>
-        </div>
-      \`;
-    }
-    return "Component content";
-  },
-
-  renderComponentInfo() {
-    if (!this.selectedComponent) return nothing;
-
-    const { hasShadow, parts = [], slots = [] } = this.selectedComponent;
-    const hasInfo =
-      hasShadow !== undefined || parts.length > 0 || slots.length > 0;
-
-    if (!hasInfo) return nothing;
-
-    return html\`
-      <uix-card variant="elevated" padding="lg">
-        <h3 slot="header">Component Information</h3>
-        <uix-grid cols="repeat(auto-fit,minmax(300px,1fr))" gap="md">
-          \${
-            hasShadow !== undefined
-              ? html\`
-            <uix-card variant="filled" padding="md">
-              <uix-flex direction="column" gap="sm">
-                <uix-text size="sm" weight="semibold">Shadow DOM</uix-text>
-                <div>
-                  \${
-                    hasShadow
-                      ? html\`<uix-badge variant="success" size="sm">Enabled</uix-badge>\`
-                      : html\`<uix-badge variant="default" size="sm">Disabled</uix-badge>\`
-                  }
-                </div>
-              </uix-flex>
-            </uix-card>
-          \`
-              : nothing
-          }
-
-          \${
-            slots.length > 0
-              ? html\`
-            <uix-card variant="filled" padding="md">
-              <uix-flex direction="column" gap="sm">
-                <uix-text size="sm" weight="semibold">Slots</uix-text>
-                <div>
-                  <uix-list variant="unstyled" spacing="sm">
-                    \${slots.map(
-                      (slot) => html\`
-                      <uix-list-item>
-                        <uix-flex align="baseline" gap="xs">
-                          <uix-text size="xs" weight="semibold" mono style="background: var(--color-surface-darker); padding: 2px 6px; border-radius: 3px;">\${slot.name}</uix-text>
-                          \${slot.description ? html\`<uix-text size="xs">- \${slot.description}</uix-text>\` : nothing}
-                        </uix-flex>
-                      </uix-list-item>
-                    \`,
-                    )}
-                  </uix-list>
-                </div>
-              </uix-flex>
-            </uix-card>
-          \`
-              : nothing
-          }
-
-          \${
-            parts.length > 0
-              ? html\`
-            <uix-card variant="filled" padding="md">
-              <uix-flex direction="column" gap="sm">
-                <uix-text size="sm" weight="semibold">CSS Parts</uix-text>
-                <div>
-                  <uix-list variant="unstyled" spacing="sm">
-                    \${parts.map(
-                      (part) => html\`
-                      <uix-list-item>
-                        <uix-flex align="baseline" gap="xs">
-                          <uix-text size="xs" weight="semibold" mono style="background: var(--color-surface-darker); padding: 2px 6px; border-radius: 3px;">\${part.name}</uix-text>
-                          \${part.description ? html\`<uix-text size="xs">- \${part.description}</uix-text>\` : nothing}
-                        </uix-flex>
-                      </uix-list-item>
-                    \`,
-                    )}
-                  </uix-list>
-                </div>
-              </uix-flex>
-            </uix-card>
-          \`
-              : nothing
-          }
-        </uix-grid>
-      </uix-card>
-    \`;
-  },
-
-  executeJavaScript(code) {
-    try {
-      // Create context with Lit imports
-      const context = { html, unsafeHTML, nothing };
-
-      // Execute code with controlled scope
-      const fn = new Function(...Object.keys(context), \`return (\${code})\`);
-      const result = fn(...Object.values(context));
-
-      return { success: true, result };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  },
-
-  renderExamples() {
-    if (!this.selectedComponent?.examples?.length) return nothing;
-
-    return html\`
-      <uix-card variant="outlined" padding="lg" style="margin-bottom: 24px;">
-        <uix-heading level="3" size="lg">Examples</uix-heading>
-        <uix-flex direction="column" gap="lg">
-          \${this.selectedComponent.examples.map(
-            (example, idx) => html\`
-            <uix-card variant="elevated" padding="lg">
-              <uix-heading level="4" size="base" slot="header">\${example.title}</uix-heading>
-              \${
-                example.description
-                  ? html\`
-                <uix-text size="sm" style="line-height: 1.6;">\${example.description}</uix-text>
-              \`
-                  : nothing
-              }
-              <uix-flex direction="column" gap="sm">
-                \${example.codeBlocks.map((block) => {
-                  const isJavaScript =
-                    block.language === "js" || block.language === "javascript";
-                  if (isJavaScript) {
-                    const execution = this.executeJavaScript(block.code);
-
-                    return html\`
-                      <uix-flex>
-                        <div flex-1 style="padding: 16px;">
-                          \${
-                            execution.success
-                              ? execution.result
-                              : html\`<uix-text text="danger">Error: \${execution.error}</uix-text>\`
-                          }
-                        </div>
-                        <uix-code style="max-height: 600px;" flex-1 language=\${block.language} .content=\${block.code} readonly></uix-code>
-                      </uix-flex>
-                    \`;
-                  }
-
-                  return html\`
-                    <uix-flex>
-                      <div flex-1 style="padding: 16px;">\${unsafeHTML(block.code)}</div>
-                      <uix-code style="max-height: 600px;" flex-1 language=\${block.language} .content=\${block.code} readonly></uix-code>
-                    </uix-flex>
-                  \`;
-                })}
-              </uix-flex>
-            </uix-card>
-          \`,
-          )}
-        </uix-flex>
-      </uix-card>
-    \`;
-  },
-
-  renderResourcePage() {
-    if (this.selectedResourcePage === "theme-generator")
-      return html\`<uix-theme-generator></uix-theme-generator>\`;
-
-    return html\`
-      <div style="max-width: 800px; margin: 0 auto;">
-        <uix-heading level="1" size="3xl" style="margin-bottom: 24px; text-transform: capitalize;">\${this.selectedResourcePage}</uix-heading>
-        <uix-card variant="filled" padding="lg">
-          <p>
-            Documentation for <strong>\${this.selectedResourcePage}</strong> coming soon...
-          </p>
-        </uix-card>
-      </div>
-    \`;
-  },
-
-  renderMainContent() {
-    // Resource page view
-    if (this.selectedResourcePage) {
-      return this.renderResourcePage();
-    }
-
-    // Empty state
-    if (!this.selectedCategory && !this.selectedComponentName) {
-      return html\`
-        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
-          <uix-icon name="package" style="width: 64px; height: 64px; opacity: 0.3;"></uix-icon>
-          <uix-heading level="2" size="2xl">Select a component</uix-heading>
-          <p>Choose a component from the sidebar to view its details and properties</p>
-        </uix-flex>
-      \`;
-    }
-
-    // Loading state
-    if (this.loading) {
-      return html\`
-        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
-          <uix-spinner size="lg"></uix-spinner>
-          <p>Loading \${this.selectedComponentName}...</p>
-        </uix-flex>
-      \`;
-    }
-
-    // Error state
-    if (this.error) {
-      return html\`
-        <uix-flex direction="column" align="center" justify="center" gap="md" style="min-height: 400px; text-align: center;">
-          <uix-icon name="alert-circle" color="danger" style="width: 48px; height: 48px;"></uix-icon>
-          <uix-heading level="3" size="xl">Failed to load component</uix-heading>
-          <p>\${this.error}</p>
-        </uix-flex>
-      \`;
-    }
-
-    // Component loaded
-    if (!this.selectedComponent) return nothing;
-
-    const { tag, properties } = this.selectedComponent;
-
-    return html\`
-      <uix-flex direction="column" gap="lg" style="max-width: 1200px; margin: 0 auto; padding: 24px;">
-        <div>
-          <uix-flex align="center" gap="md">
-            <uix-heading level="1" size="2xl">&lt;\${tag}&gt;</uix-heading>
-            <uix-badge variant="info" size="sm">\${this.selectedCategory}</uix-badge>
-          </uix-flex>
-        </div>
-
-        \${this.renderComponentInfo()}
-
-        <uix-card variant="elevated" padding="lg">
-          <uix-showcase-property-editor
-            .properties=\${properties}
-            .values=\${this.liveProps}
-            @property-change=\${this._handlePropertyChange}
-            @reset=\${this._handleReset}
-          ></uix-showcase-property-editor>
-        </uix-card>
-
-        \${this.renderExamples()}
-
-        <uix-card variant="elevated" padding="lg">
-          <h3 slot="header">Generated Code</h3>
-          <uix-showcase-code-viewer
-            .tag=\${tag}
-            .props=\${this.liveProps}
-            .category=\${this.selectedCategory}
-            .name=\${this.selectedComponentName}
-          ></uix-showcase-code-viewer>
-        </uix-card>
-      </uix-flex>
-    \`;
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   },
 
   render() {
-    const availableThemes = Theme.availableThemes || {};
+    const initials = this.getInitials(this.name);
 
     return html\`
-      <uix-split-pane direction="vertical"  initialSize="50px" minSize="50px" style="height: 100vh;">
-        <uix-flex w-full slot="primary" justify="space-between" align="center" style="padding: 12px 16px;">
-          <uix-flex align="center" gap="sm">
-            <uix-icon name="package"></uix-icon>
-            <uix-heading level="1" size="xl">UIX Components</uix-heading>
-          </uix-flex>
-          <uix-flex align="center" gap="sm">
-            <uix-text size="sm">Theme</uix-text>
-            <uix-select
-              value=\${this.currentTheme}
-              .options=\${Object.keys(availableThemes)}
-              @change=\${(e) => !this._handleThemeChange(e.target.value)}
-            ></uix-select>
-          </uix-flex>
-        </uix-flex>
-        <uix-split-pane slot="secondary" initialSize="280px" minSize="280px">
-          <uix-showcase-sidebar slot="primary"
-            .componentList=\${this.componentList}
-            @select=\${this._handleComponentSelect}
-            flex-1
-          ></uix-showcase-sidebar>
-          <div slot="secondary" flex-1>
-            \${this.renderMainContent()}
-          </div>
-        </uix-split-pane>
-      </uix-split-pane>
+      \${this.src
+        ? html\`<img src="\${this.src}" alt="\${this.name || "Avatar"}" />\`
+        : initials
+          ? html\`<span class="initials">\${initials}</span>\`
+          : html\`<uix-icon name="user"></uix-icon>\`
+      }
+      \${this.status
+        ? html\`<span class="status status--\${this.status}"></span>\`
+        : ""
+      }
     \`;
   },
 };
 
-View.define("uix-showcase", ShowcaseDefinition);
+/**
+ * Avatar Component
+ *
+ * @component
+ * @category display
+ * @tag uix-avatar
+ *
+ * Displays user profile images, initials, or a fallback user icon.
+ * Supports status indicators and multiple shapes/sizes.
+ *
+ * @example Image Avatar
+ * \`\`\`html
+ * <uix-avatar src="/path/to/image.jpg" name="John Doe"></uix-avatar>
+ * \`\`\`
+ *
+ * @example Initials Avatar
+ * \`\`\`html
+ * <uix-avatar name="Jane Smith"></uix-avatar>
+ * <uix-avatar name="Bob"></uix-avatar>
+ * \`\`\`
+ *
+ * @example Default Icon (no name or src)
+ * \`\`\`html
+ * <uix-avatar></uix-avatar>
+ * <uix-avatar size="lg"></uix-avatar>
+ * \`\`\`
+ *
+ * @example Sizes
+ * \`\`\`html
+ * <uix-avatar name="XS" size="xs"></uix-avatar>
+ * <uix-avatar name="SM" size="sm"></uix-avatar>
+ * <uix-avatar name="MD" size="md"></uix-avatar>
+ * <uix-avatar name="LG" size="lg"></uix-avatar>
+ * <uix-avatar name="XL" size="xl"></uix-avatar>
+ * \`\`\`
+ *
+ * @example Shapes
+ * \`\`\`html
+ * <uix-avatar name="C" shape="circle"></uix-avatar>
+ * <uix-avatar name="S" shape="square"></uix-avatar>
+ * <uix-avatar name="R" shape="rounded"></uix-avatar>
+ * \`\`\`
+ *
+ * @example Status Indicator
+ * \`\`\`html
+ * <uix-avatar name="John" status="online"></uix-avatar>
+ * <uix-avatar name="Jane" status="offline"></uix-avatar>
+ * <uix-avatar name="Bob" status="busy"></uix-avatar>
+ * <uix-avatar name="Alice" status="away"></uix-avatar>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/bundler/views/ui.js":{content:`import Bundler from "/$app/bundler/index.js";
+import T from "/$app/types/index.js";
+import $APP from "/$app.js";
+import { html } from "/npm/lit-html";
 
-export default ShowcaseDefinition;
-`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/extension/package.json":{content:`{
+$APP.define("credentials-manager", {
+  dataQuery: true,
+  properties: {
+    row: T.object(),
+  },
+  render() {
+    if (!this.row)
+      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">GitHub Credentials</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="Owner"
+            .value=\${this.row.owner}
+            @change=\${(e) => (this.row.owner = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Repository"
+            .value=\${this.row.repo}
+            @change=\${(e) => (this.row.repo = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Branch"
+            .value=\${this.row.branch}
+            @change=\${(e) => (this.row.branch = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="GitHub Token"
+            type="password"
+            .value=\${this.row.token}
+            @change=\${(e) => (this.row.token = e.target.value)}
+          ></uix-input>
+        </div>
+        <div slot="footer">
+          <uix-button
+            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row })}
+            label="Save Credentials"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("cloudflare-credentials-manager", {
+  dataQuery: true,
+  properties: {
+    row: T.object(),
+  },
+  render() {
+    if (!this.row)
+      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
+    if (!this.row.cloudflare) this.row.cloudflare = {};
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">Cloudflare Credentials</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="Account ID"
+            .value=\${this.row.cloudflare.accountId}
+            @change=\${(e) => (this.row.cloudflare.accountId = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Pages Project Name"
+            .value=\${this.row.cloudflare.projectName}
+            @change=\${(e) => (this.row.cloudflare.projectName = e.target.value)}
+          ></uix-input>
+          <uix-input
+            class="bundler-full-width"
+            label="API Token"
+            type="password"
+            .value=\${this.row.cloudflare.apiToken}
+            @change=\${(e) => (this.row.cloudflare.apiToken = e.target.value)}
+          ></uix-input>
+        </div>
+        <p class="bundler-help-text">
+          The bundler will automatically create a Cloudflare Pages project if one with the given name doesn't exist.
+        </p>
+        <div slot="footer">
+          <uix-button
+            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row, cloudflare: this.row.cloudflare })}
+            label="Save Cloudflare Credentials"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("release-creator", {
+  properties: {
+    version: T.string(\`v\${new Date().toISOString().slice(0, 10)}\`),
+    notes: T.string(""),
+    deployMode: T.string("spa"),
+    deployTarget: T.string("localhost"),
+    isDeploying: T.boolean(false),
+  },
+
+  getTargetOptions() {
+    const targets = Bundler.getTargets();
+    console.log(targets);
+    return targets.map((t) => ({
+      value: t.name,
+      label: t.label,
+    }));
+  },
+
+  getModeOptions() {
+    // When cloudflare target is selected, only worker mode makes sense
+    if (this.deployTarget === "cloudflare") {
+      return [{ value: "worker", label: "Cloudflare Workers" }];
+    }
+    return [
+      { value: "spa", label: "SPA" },
+      { value: "ssg", label: "SSG" },
+      { value: "hybrid", label: "Hybrid" },
+    ];
+  },
+
+  needsCredentials() {
+    // ZIP, TAR.GZ, and localhost don't need credentials
+    return !["zip", "targz", "localhost"].includes(this.deployTarget);
+  },
+
+  async handleDeploy() {
+    if (this.isDeploying) return;
+
+    this.isDeploying = true;
+    const credentials = await $APP.Model.bundler_credentials.get("singleton");
+
+    // Validate credentials for targets that need them
+    if (this.needsCredentials()) {
+      if (this.deployTarget === "cloudflare") {
+        if (
+          !credentials?.cloudflare?.apiToken ||
+          !credentials?.cloudflare?.accountId ||
+          !credentials?.cloudflare?.projectName
+        ) {
+          alert(
+            "Please provide your Cloudflare Account ID, API Token, and a Project Name before deploying.",
+          );
+          this.isDeploying = false;
+          return;
+        }
+      } else if (this.deployTarget === "github") {
+        if (!credentials || !credentials.token) {
+          alert("Please provide a GitHub token before deploying.");
+          this.isDeploying = false;
+          return;
+        }
+      }
+    }
+    const release = {
+      version: this.version,
+      notes: this.notes,
+      status: "pending",
+      deployedAt: Date.now(),
+      deployType: this.deployMode,
+      deployTarget: this.deployTarget,
+    };
+    try {
+      const [_, newRelease] = await $APP.Model.bundler_releases.add(release);
+      const result = await Bundler.deploy({
+        ...credentials,
+        mode: this.deployMode,
+        target: this.deployTarget,
+        version: this.version,
+      });
+      await $APP.Model.bundler_releases.edit({
+        id: newRelease.id,
+        status: "success",
+        result,
+      });
+
+      const targetLabel =
+        Bundler.getTargets().find((t) => t.name === this.deployTarget)?.label ||
+        this.deployTarget;
+      alert(\`Deployment to \${targetLabel} successful!\`);
+    } catch (error) {
+      console.error(\`Deployment failed:\`, { error });
+      console.trace();
+      alert(\`Deployment failed: \${error.message}\`);
+      if (release?._id) {
+        await $APP.Model.bundler_releases.add({
+          ...release,
+          status: "failed",
+          error: error.message,
+        });
+      }
+    } finally {
+      this.isDeploying = false;
+    }
+  },
+
+  render() {
+    const targetOptions = this.getTargetOptions();
+    const modeOptions = this.getModeOptions();
+
+    // Auto-switch to worker mode when cloudflare is selected
+    if (this.deployTarget === "cloudflare" && this.deployMode !== "worker") {
+      this.deployMode = "worker";
+    }
+    // Switch away from worker mode when not cloudflare
+    if (this.deployTarget !== "cloudflare" && this.deployMode === "worker") {
+      this.deployMode = "hybrid";
+    }
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">New Release</h2>
+        <div class="bundler-form">
+          <uix-input
+            label="Version"
+            .value=\${this.version}
+            @change=\${(e) => (this.version = e.target.value)}
+          ></uix-input>
+          <uix-textarea
+            label="Release Notes"
+            .value=\${this.notes}
+            @change=\${(e) => (this.notes = e.target.value)}
+          ></uix-textarea>
+          <uix-checkbox
+            ?checked=\${!!$APP.settings.obfuscate}
+            @change=\${(e) => ($APP.settings.obfuscate = e.target.checked)}
+            label="Obfuscate"
+          ></uix-checkbox>
+        </div>
+        <div class="bundler-deploy-row">
+          <uix-select
+            label="Build Mode"
+            value=\${this.deployMode}
+            .options=\${modeOptions}
+            @change=\${(e) => (this.deployMode = e.target.value)}
+          >
+          </uix-select>
+          <uix-select
+            label="Deploy Target"
+            value=\${this.deployTarget}
+            .options=\${targetOptions}
+            @change=\${(e) => (this.deployTarget = e.target.value)}
+          >
+          </uix-select>
+          <uix-button
+            @click=\${() => this.handleDeploy()}
+            label=\${this.isDeploying ? \`Deploying...\` : "Deploy"}
+            ?disabled=\${this.isDeploying}
+          ></uix-button>
+        </div>
+        \${
+          !this.needsCredentials()
+            ? html\`<p class="bundler-help-text">This target downloads directly to your browser - no credentials needed.</p>\`
+            : ""
+        }
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("release-history", {
+  dataQuery: true,
+  properties: {
+    rows: T.array(),
+    limit: T.number(0),
+  },
+  render() {
+    let sortedRows = this.rows?.length
+      ? [...this.rows].sort(
+          (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
+        )
+      : [];
+
+    if (this.limit > 0) {
+      sortedRows = sortedRows.slice(0, this.limit);
+    }
+
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">Release History</h2>
+        <div class="bundler-releases">
+          \${
+            sortedRows.length > 0
+              ? sortedRows.map(
+                  (release) => html\`
+                  <div class="bundler-release bundler-release-\${release.status}">
+                    <div class="bundler-release-row">
+                      <span class="bundler-release-version">\${release.version}</span>
+                      <span class="bundler-release-status">\${release.status}</span>
+                      \${
+                        release.deployType
+                          ? html\`<span class="bundler-release-type">\${release.deployType.toUpperCase()}</span>\`
+                          : ""
+                      }
+                      \${
+                        release.deployTarget
+                          ? html\`<span class="bundler-release-target">\${release.deployTarget}</span>\`
+                          : ""
+                      }
+                      <span class="bundler-release-date">\${new Date(release.deployedAt).toLocaleString()}</span>
+                    </div>
+                    \${
+                      release.notes
+                        ? html\`<p class="bundler-release-notes">\${release.notes}</p>\`
+                        : ""
+                    }
+                  </div>
+                \`,
+                )
+              : html\`<p class="bundler-empty">No releases yet.</p>\`
+          }
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+$APP.define("settings-editor", {
+  properties: {
+    _settings: T.object(null),
+  },
+  connected() {
+    this._settings = $APP.settings;
+  },
+  async handleSave() {
+    try {
+      await $APP.settings.set(this._settings);
+      alert("Settings saved successfully!");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      alert("Error saving settings. Check the console for details.");
+    }
+  },
+  render() {
+    if (!this._settings) {
+      return html\`<div class="bundler-loading">Loading settings...</div>\`;
+    }
+    return html\`
+      <uix-card shadow="none" borderWidth="0">
+        <h2 slot="header">App Settings</h2>
+        <div class="bundler-form-grid">
+          <uix-input
+            label="App Name"
+            .value=\${this._settings.name}
+            @change=\${(e) => (this._settings.name = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Short Name"
+            .value=\${this._settings.short_name}
+            @change=\${(e) => (this._settings.short_name = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Emoji Icon"
+            .value=\${this._settings.emojiIcon}
+            @change=\${(e) => (this._settings.emojiIcon = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Icon"
+            .value=\${this._settings.icon}
+            @change=\${(e) => (this._settings.icon = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Start URL"
+            .value=\${this._settings.url}
+            @change=\${(e) => (this._settings.url = e.target.value)}
+          ></uix-input>
+          <uix-input
+            label="Theme Color"
+            type="color"
+            .value=\${this._settings.theme_color}
+            @change=\${(e) => (this._settings.theme_color = e.target.value)}
+          ></uix-input>
+          <uix-input
+            class="bundler-full-width"
+            label="Open Graph Image URL"
+            .value=\${this._settings.og_image}
+            @change=\${(e) => (this._settings.og_image = e.target.value)}
+          ></uix-input>
+          <uix-textarea
+            class="bundler-full-width"
+            label="Description"
+            .value=\${this._settings.description}
+            @change=\${(e) => (this._settings.description = e.target.value)}
+          ></uix-textarea>
+        </div>
+        <div slot="footer">
+          <uix-button
+            @click=\${this.handleSave.bind(this)}
+            label="Save Settings"
+          ></uix-button>
+        </div>
+      </uix-card>
+    \`;
+  },
+});
+
+export default {
+  tag: "bundler-ui",
+  style: true,
+  properties: {
+    activeTab: T.number(0),
+    releaseStats: T.object({
+      defaultValue: {
+        total: 0,
+        success: 0,
+        failed: 0,
+        pending: 0,
+        lastDeploy: null,
+      },
+    }),
+    releases: T.array(),
+  },
+
+  async connected() {
+    await this.loadStats();
+  },
+
+  async loadStats() {
+    try {
+      const releases = await $APP.Model.bundler_releases.getAll();
+      this.releases = releases || [];
+      this.releaseStats = {
+        total: this.releases.length,
+        success: this.releases.filter((r) => r.status === "success").length,
+        failed: this.releases.filter((r) => r.status === "failed").length,
+        pending: this.releases.filter((r) => r.status === "pending").length,
+        lastDeploy:
+          this.releases.length > 0
+            ? [...this.releases].sort(
+                (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
+              )[0]?.deployedAt
+            : null,
+      };
+    } catch (error) {
+      console.error("Failed to load release stats:", error);
+    }
+  },
+
+  formatDate(date) {
+    if (!date) return "Never";
+    return new Date(date).toLocaleDateString();
+  },
+
+  render() {
+    return html\`
+      <div class="bundler-ui">
+        <h1 class="bundler-page-title">Release Manager</h1>
+        <uix-tabs .activeTab=\${this.activeTab} @tab-change=\${(e) => (this.activeTab = e.detail)}>
+          <button slot="tab"><uix-icon name="layout-dashboard"></uix-icon> Dashboard</button>
+          <button slot="tab"><uix-icon name="settings"></uix-icon> Settings</button>
+          <button slot="tab"><uix-icon name="rocket"></uix-icon> Deploy</button>
+          <button slot="tab"><uix-icon name="key"></uix-icon> Credentials</button>
+
+          <div slot="panel">\${this.renderDashboard()}</div>
+          <div slot="panel">\${this.renderSettings()}</div>
+          <div slot="panel">\${this.renderDeploy()}</div>
+          <div slot="panel">\${this.renderCredentials()}</div>
+        </uix-tabs>
+      </div>
+    \`;
+  },
+
+  renderDashboard() {
+    return html\`
+      <div class="bundler-dashboard">
+        <div class="bundler-stats-grid">
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Total Releases" value=\${this.releaseStats.total} centered>
+              <uix-icon slot="figure" name="package" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Successful" value=\${this.releaseStats.success} variant="success" centered>
+              <uix-icon slot="figure" name="circle-check" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Failed" value=\${this.releaseStats.failed} variant="danger" centered>
+              <uix-icon slot="figure" name="circle-x" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+          <uix-card shadow="none" borderWidth="0">
+            <uix-stat title="Last Deploy" value=\${this.formatDate(this.releaseStats.lastDeploy)} centered>
+              <uix-icon slot="figure" name="clock" size="xl"></uix-icon>
+            </uix-stat>
+          </uix-card>
+        </div>
+
+        <uix-card shadow="none" borderWidth="0">
+          <h3 slot="header">Quick Actions</h3>
+          <div class="bundler-quick-actions">
+            <uix-button @click=\${() => (this.activeTab = 2)}>
+              <uix-icon name="rocket"></uix-icon> Deploy Now
+            </uix-button>
+            <uix-button @click=\${() => (this.activeTab = 1)}>
+              <uix-icon name="settings"></uix-icon> Settings
+            </uix-button>
+            <uix-button @click=\${() => this.loadStats()}>
+              <uix-icon name="refresh-cw"></uix-icon> Refresh
+            </uix-button>
+          </div>
+        </uix-card>
+
+        <release-history
+          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
+        ></release-history>
+      </div>
+    \`;
+  },
+
+  renderSettings() {
+    return html\`
+      <div class="bundler-tab-content">
+        <settings-editor></settings-editor>
+      </div>
+    \`;
+  },
+
+  renderDeploy() {
+    return html\`
+      <div class="bundler-tab-content bundler-deploy-content">
+        <release-creator></release-creator>
+        <release-history
+          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
+        ></release-history>
+      </div>
+    \`;
+  },
+
+  renderCredentials() {
+    return html\`
+      <div class="bundler-tab-content bundler-credentials-content">
+        <credentials-manager
+          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
+        ></credentials-manager>
+        <cloudflare-credentials-manager
+          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
+        ></cloudflare-credentials-manager>
+      </div>
+    \`;
+  },
+};
+`,mimeType:"text/javascript"},"/node_modules/@bootstrapp/i18n/package.json":{content:`{
+  "name": "@bootstrapp/i18n",
+  "version": "0.2.0",
+  "description": "Internationalization (i18n) module for Bootstrapp framework",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./base": "./base.js",
+    "./view-plugin": "./view-plugin.js"
+  },
+  "dependencies": {
+    "@bootstrapp/controller": "^0.2.0",
+    "@bootstrapp/view": "^0.2.0"
+  },
+  "keywords": [
+    "bootstrapp",
+    "i18n",
+    "internationalization",
+    "localization",
+    "translation"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0"
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/icon-lucide/package.json":{content:`{
+  "name": "@bootstrapp/icon-lucide",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Lucide icon library for Bootstrapp framework",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./lucide/*": "./lucide/*",
+    "./app.js": "./app.js"
+  },
+  "dependencies": {
+    "@bootstrapp/base": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/router/package.json":{content:`{
+  "name": "@bootstrapp/router",
+  "version": "0.1.0",
+  "description": "Client-side router with URLPattern API support, nested routes, and history management",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./app": "./app.js",
+    "./ui": "./ui.js"
+  },
+  "keywords": [
+    "router",
+    "routing",
+    "spa",
+    "urlpattern",
+    "history",
+    "navigation",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/router"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/controller": "^0.2.0",
+    "@bootstrapp/types": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/tailwind/package.json":{content:`{
+  "name": "@bootstrapp/tailwind",
+  "version": "0.1.0",
+  "description": "Tailwind/UnoCSS styling configuration for Bootstrapp",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "@bootstrapp/base": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/theme/package.json":{content:`{
+  "name": "@bootstrapp/theme",
+  "version": "0.2.0",
+  "description": "Standalone theming system with dynamic CSS variable generation and color utilities",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./themes/*": "./themes/*"
+  },
+  "keywords": [
+    "theme",
+    "theming",
+    "css-variables",
+    "color-utilities",
+    "design-system",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/theme"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/view": "^0.2.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/types/package.json":{content:`{
+  "name": "@bootstrapp/types",
+  "version": "0.2.0",
+  "description": "Type validation and coercion library for model fields and component properties",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": [
+    "types",
+    "validation",
+    "coercion",
+    "schema",
+    "type-system",
+    "bootstrapp"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "base/types"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/uix/package.json":{content:`{
+  "name": "@bootstrapp/uix",
+  "version": "0.2.0",
+  "description": "UI/UX component toolkit built on @bootstrapp/view with ready-to-use components for modern web applications",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./import.js": "./import.js",
+    "./display/*": "./display/*",
+    "./layout/*": "./layout/*",
+    "./form/*": "./form/*",
+    "./navigation/*": "./navigation/*",
+    "./overlay/*": "./overlay/*",
+    "./feedback/*": "./feedback/*",
+    "./page/*": "./page/*",
+    "./app/*": "./app/*",
+    "./utility/*": "./utility/*",
+    "./theme.css": "./theme.css"
+  },
+  "keywords": [
+    "ui-components",
+    "uix",
+    "web-components",
+    "bootstrapp",
+    "design-system",
+    "component-library",
+    "lit-html",
+    "custom-elements"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/uix"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/view": "^0.2.0",
+    "@bootstrapp/types": "^0.2.0",
+    "@bootstrapp/theme": "^0.2.0",
+    "@bootstrapp/router": "^0.1.0",
+    "@bootstrapp/controller": "^0.2.0",
+    "@bootstrapp/base": "^0.2.0",
+    "lit-html": "^3.0.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/view/package.json":{content:`{
+  "name": "@bootstrapp/view",
+  "version": "0.2.0",
+  "description": "Web components framework built on Custom Elements API with lit-html templating",
+  "main": "./index.js",
+  "module": "./index.js",
+  "scripts": {
+    "docs": "npx serve docs -p 3000"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./loader": "./loader.js"
+  },
+  "keywords": [
+    "web-components",
+    "custom-elements",
+    "lit-html",
+    "reactive",
+    "view",
+    "bootstrapp",
+    "framework"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "base/view"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/types": "^0.1.0",
+    "lit-html": "^3.3.1"
+  },
+  "devDependencies": {}
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/admin/package.json":{content:`{
+  "name": "@bootstrapp/admin",
+  "version": "0.1.0",
+  "description": "Bootstrapp Admin Panel",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cms/*": "./cms/*",
+    "./project/*": "./project/*",
+    "./views/*": "./views/*"
+  },
+  "dependencies": {
+    "@bootstrapp/base": "^0.2.0",
+    "@bootstrapp/bundler": "^0.1.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/maps/package.json":{content:`{
+  "name": "@bootstrapp/maps",
+  "version": "0.1.0",
+  "description": "Provider-agnostic maps integration for searching and geocoding places",
+  "main": "./index.js",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./app.js": "./app.js",
+    "./search.js": "./search.js",
+    "./search.css": "./search.css"
+  },
+  "keywords": [
+    "maps",
+    "geocoding",
+    "places",
+    "nominatim",
+    "openstreetmap",
+    "bootstrapp",
+    "web-components"
+  ],
+  "author": "Alan Leal",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bootstrapp-ai/bootstrapp.git",
+    "directory": "public/maps"
+  },
+  "homepage": "https://github.com/bootstrapp-ai/bootstrapp#readme",
+  "bugs": {
+    "url": "https://github.com/bootstrapp-ai/bootstrapp/issues"
+  },
+  "dependencies": {
+    "@bootstrapp/base": "^0.2.0",
+    "@bootstrapp/types": "^0.2.0",
+    "@bootstrapp/view": "^0.2.0",
+    "lit-html": "^3.0.0"
+  }
+}
+`,mimeType:"application/json"},"/node_modules/@bootstrapp/extension/package.json":{content:`{
   "name": "@bootstrapp/extension",
   "version": "0.1.0",
   "description": "Chrome extension for bidirectional communication between admin panel and browser tabs",
@@ -17399,7 +21945,8 @@ export default {
     },
   ],
 };
-`,mimeType:"text/javascript"},"/$app/base/backend/backend.js":{content:`import { initAuthBackend } from "/$app/auth/backend.js";
+`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
+`,mimeType:"text/css"},"/$app/base/backend/backend.js":{content:`import { initAuthBackend } from "/$app/auth/backend.js";
 import config from "/$app/base/config.js";
 import { initModelBackend } from "/$app/model/backend.js";
 import { createDatabase, registerAdapter } from "/$app/model/factory.js";
@@ -17793,7 +22340,11 @@ $APP.events.on("APP:INIT", async () => {
 });
 
 export default Backend;
-`,mimeType:"text/javascript"},"/$app/auth/backend.js":{content:`/**
+`,mimeType:"text/javascript"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
+`,mimeType:"text/css"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
+`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.css":{content:`:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}
+`,mimeType:"text/css"},"/$app/uix/display/avatar.css":{content:`:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}
+`,mimeType:"text/css"},"/$app/auth/backend.js":{content:`/**
  * @file Backend Auth Module
  * @description Handles authentication event handlers in the Web Worker context
  */
@@ -21565,1320 +26116,7 @@ export class SystemModelManager {
 }
 
 export default SystemModelManager;
-`,mimeType:"text/javascript"},"/$app/uix/utils/component-registry.js":{content:`/**
- * UIX Component Registry
- * Provides component list and lazy-loads component modules on-demand
- */
-
-import UIX from "/$app/uix/index.js";
-import {
-  extractDescription,
-  extractExamplesFromComments,
-  extractMetadataTags,
-  extractParts,
-  extractSlots,
-} from "./example-parser.js";
-
-// Cache for loaded component modules
-const componentCache = new Map();
-
-/**
- * Get lightweight component list from uix module
- * Returns component names organized by category
- */
-export function getComponentList() {
-  if (!UIX?.components) {
-    console.warn("UIX module not loaded or no components found");
-    return {};
-  }
-
-  return UIX.components;
-}
-
-/**
- * Lazy load a specific component module
- * @param {string} category - Component category (display, form, overlay, etc.)
- * @param {string} name - Component name (button, input, modal, etc.)
- * @returns {Promise<Object>} Component metadata
- */
-export async function loadComponent(category, name) {
-  const cacheKey = \`\${category}:\${name}\`;
-
-  // Return cached component if already loaded
-  if (componentCache.has(cacheKey)) {
-    return componentCache.get(cacheKey);
-  }
-
-  try {
-    // Dynamically import the component module
-    const module = await import(
-      \`/$app/uix/\${category}/\${name}.js\`
-    );
-
-    // Fetch source code for parsing comments
-    const sourceUrl = \`/$app/uix/\${category}/\${name}.js\`;
-    const response = await fetch(sourceUrl);
-    const sourceCode = await response.text();
-
-    // Extract metadata from component definition
-    const metadata = extractMetadata(module.default, name);
-
-    // Parse examples and description from JSDoc comments
-    const examples = extractExamplesFromComments(sourceCode);
-    const description = extractDescription(sourceCode);
-    const docMetadata = extractMetadataTags(sourceCode);
-    const parts = extractParts(sourceCode);
-    const slots = extractSlots(sourceCode);
-
-    // Combine all metadata
-    const result = {
-      ...metadata,
-      examples,
-      description,
-      parts,
-      slots,
-      ...docMetadata,
-    };
-
-    // Cache the result
-    componentCache.set(cacheKey, result);
-
-    return result;
-  } catch (error) {
-    console.error(\`Failed to load component \${category}/\${name}:\`, error);
-    throw new Error(\`Component not found or failed to load: \${name}\`);
-  }
-}
-
-/**
- * Extract metadata from component definition
- * @param {Object} componentDef - Component definition object
- * @param {string} name - Component name
- * @returns {Object} Extracted metadata
- */
-function extractMetadata(componentDef, name) {
-  if (!componentDef) {
-    throw new Error("Invalid component definition");
-  }
-
-  const properties = {};
-
-  // Extract property definitions
-  if (componentDef.properties) {
-    for (const [key, typeDef] of Object.entries(componentDef.properties)) {
-      properties[key] = extractPropertyMetadata(typeDef);
-    }
-  }
-
-  return {
-    tag: componentDef.tag || \`uix-\${name}\`,
-    properties,
-    hasStyle: componentDef.style === true,
-    hasShadow: componentDef.shadow === true,
-    i18n: componentDef.i18n || {},
-    module: componentDef,
-  };
-}
-
-/**
- * Extract metadata from a property type definition
- * @param {Object} typeDef - Type definition from T.*
- * @returns {Object} Property metadata
- */
-function extractPropertyMetadata(typeDef) {
-  // Handle simple default values (T.string("default"))
-  if (
-    typeof typeDef === "string" ||
-    typeof typeDef === "number" ||
-    typeof typeDef === "boolean"
-  ) {
-    return {
-      type: typeof typeDef,
-      defaultValue: typeDef,
-    };
-  }
-
-  // Handle object-based type definitions
-  if (typeDef && typeof typeDef === "object") {
-    return {
-      type: typeDef._type || "unknown",
-      defaultValue: typeDef._defaultValue ?? typeDef.defaultValue,
-      enum: typeDef._enum || typeDef.enum,
-      required: typeDef._required || typeDef.required || false,
-      attribute: typeDef._attribute ?? typeDef.attribute ?? true,
-    };
-  }
-
-  return {
-    type: "unknown",
-    defaultValue: undefined,
-  };
-}
-
-/**
- * Get default values for all properties
- * @param {Object} properties - Properties metadata
- * @returns {Object} Default values
- */
-export function getDefaultValues(properties) {
-  const defaults = {};
-
-  for (const [key, metadata] of Object.entries(properties)) {
-    if (metadata.defaultValue !== undefined) {
-      defaults[key] = metadata.defaultValue;
-    }
-  }
-
-  return defaults;
-}
-
-/**
- * Clear the component cache
- */
-export function clearCache() {
-  componentCache.clear();
-}
-`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-sidebar.js":{content:`/**
- * UIX Showcase Sidebar
- * Navigation for component categories and components using UIX components
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import View from "/$app/view/index.js";
-
-const resources = [
-  { id: "installation", label: "Installation", icon: "download" },
-  { id: "usage", label: "Usage", icon: "book-open" },
-  { id: "themes", label: "Themes", icon: "droplet" },
-  { id: "theme-generator", label: "Theme Generator", icon: "sliders-vertical" },
-];
-const categoryIcons = {
-  display: "eye",
-  form: "list-checks",
-  overlay: "layers",
-  layout: "layout-grid",
-  navigation: "compass",
-  feedback: "loader",
-  utility: "pen-tool",
-};
-
-const ShowcaseSidebarDefinition = {
-  tag: "uix-showcase-sidebar",
-  properties: {
-    componentList: T.object(), // Component categories and names
-    selectedCategory: T.string({ sync: "querystring" }), // Currently selected category
-    selectedComponent: T.string({ sync: "querystring" }), // Currently selected component
-    selectedResourcePage: T.string({ sync: "querystring" }), // Currently selected resource page
-    searchQuery: T.string(""), // Search filter
-  },
-  selectComponent(category, name) {
-    this.emit("select", { type: "component", category, name });
-  },
-  selectResource(page) {
-    this.emit("select", { type: "resource", page });
-  },
-  filterComponents(components, query) {
-    if (!query) return components;
-    const lowerQuery = query.toLowerCase();
-    return components.filter((name) => name.toLowerCase().includes(lowerQuery));
-  },
-  getCategoryIcon(category) {
-    return categoryIcons[category] || "package";
-  },
-  render() {
-    if (!this.componentList || Object.keys(this.componentList).length === 0) {
-      return html\`
-        <div part="container" class="sidebar-container">
-          <div class="empty-state">
-            <p>No components found</p>
-          </div>
-        </div>
-      \`;
-    }
-
-    return html\`
-      <div part="container" class="sidebar-container">
-        <!-- Search Input -->
-        <uix-container part="search" padding="md">
-            <uix-input
-              w-full
-              type="search"
-              placeholder="Search components..."
-              class="search-input"
-              .value=\${this.searchQuery}
-              @input=\${(e) => {
-                this.searchQuery = e.target.value;
-              }}
-            >
-            <uix-icon name="search"></uix-icon>
-          </uix-input>
-        </uix-container>
-
-        <uix-accordion>
-          <uix-nav-item
-            prevent-collapse
-            open
-            icon="book"
-            label="Resources"
-          >
-          </uix-nav-item>
-          <uix-menu>
-            \${resources.map(
-              (resource) => html\`
-                <uix-nav-item
-                  icon=\${resource.icon}
-                  label=\${resource.label}
-                  size="sm"
-                  ?active=\${this.selectedResourcePage === resource.id}
-                  ?activeBg=\${this.selectedResourcePage === resource.id}
-                  @nav-item-click=\${() => this.selectResource(resource.id)}
-                ></uix-nav-item>
-              \`,
-            )}
-          </uix-menu>
-
-          <!-- Component Categories -->
-          \${Object.entries(this.componentList).map(([category, components]) => {
-            const filteredComponents = this.filterComponents(
-              components,
-              this.searchQuery,
-            );
-            const componentCount = filteredComponents.length;
-
-            // Hide category if no matches after filtering
-            if (componentCount === 0 && this.searchQuery) return null;
-
-            const hasSelection = this.selectedCategory === category;
-
-            return html\`
-              <uix-nav-item
-                ?open=\${hasSelection}
-                icon=\${this.getCategoryIcon(category)}
-                label=\${category}
-                badge=\${componentCount}
-                header
-              >
-              </uix-nav-item>
-              <uix-menu>
-                \${filteredComponents.map((name) => {
-                  const isSelected =
-                    this.selectedCategory === category &&
-                    this.selectedComponent === name;
-
-                  return html\`
-                    <uix-nav-item
-                      label=\${name}
-                      size="sm"
-                      ?active=\${isSelected}
-                      ?activeBg=\${isSelected}
-                      @nav-item-click=\${() =>
-                        this.selectComponent(category, name)}
-                    ></uix-nav-item>
-                  \`;
-                })}
-              </uix-menu>
-            \`;
-          })}
-        </uix-accordion>
-      </div>
-    \`;
-  },
-};
-
-View.define("uix-showcase-sidebar", ShowcaseSidebarDefinition);
-
-export default ShowcaseSidebarDefinition;
-`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-property-editor.js":{content:`/**
- * UIX Showcase Property Editor
- * Interactive controls to modify component properties in real-time
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import View from "/$app/view/index.js";
-
-const ShowcasePropertyEditorDefinition = {
-  tag: "uix-showcase-property-editor",
-  properties: {
-    properties: T.object(), // Component property metadata
-    values: T.object(), // Current property values
-  },
-
-  handleChange(key, value) {
-    // Emit change event to parent
-    this.emit("property-change", { key, value });
-  },
-
-  renderPropertyControl(key, metadata) {
-    const currentValue = this.values?.[key] ?? metadata.defaultValue;
-    const { type, enum: enumValues, defaultValue } = metadata;
-
-    // Helper for default value text
-    const renderDefault = () =>
-      defaultValue !== undefined
-        ? html\`<uix-text size="xs" muted style="font-style: italic">default: \${defaultValue}</uix-text>\`
-        : null;
-
-    // Boolean: Toggle switch
-    if (type === "boolean") {
-      return html\`
-        <uix-card variant="filled" padding="sm">
-          <uix-grid cols="200px 1fr auto" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>boolean</uix-text>
-            </uix-flex>
-            <uix-switch
-              .checked=\${currentValue}
-              @change=\${(e) => this.handleChange(key, e.detail.checked)}
-            ></uix-switch>
-            \${renderDefault()}
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // String with enum: Dropdown
-    if (type === "string" && enumValues && enumValues.length > 0) {
-      return html\`
-        <uix-card variant="filled" padding="sm">
-          <uix-grid cols="200px 1fr auto" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>enum</uix-text>
-            </uix-flex>
-            <uix-select
-              .value=\${currentValue}
-              .options=\${enumValues}
-              @change=\${(e) => this.handleChange(key, e.detail.value)}
-            ></uix-select>
-            \${renderDefault()}
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // Number: Number input
-    if (type === "number") {
-      return html\`
-        <uix-card variant="filled" padding="sm">
-          <uix-grid cols="200px 1fr auto" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>number</uix-text>
-            </uix-flex>
-            <uix-input
-              type="number"
-              size="sm"
-              .value=\${currentValue}
-              @input=\${(e) => this.handleChange(key, parseFloat(e.target.value) || 0)}
-            ></uix-input>
-            \${renderDefault()}
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // String (no enum): Text input
-    if (type === "string") {
-      return html\`
-        <uix-card variant="filled" padding="sm">
-          <uix-grid cols="200px 1fr auto" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>string</uix-text>
-            </uix-flex>
-            <uix-input
-              type="text"
-              size="sm"
-              .value=\${currentValue || ""}
-              @input=\${(e) => this.handleChange(key, e.target.value)}
-            ></uix-input>
-            \${renderDefault()}
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // Array or Object: JSON editor
-    if (type === "array" || type === "object") {
-      const jsonValue = JSON.stringify(currentValue, null, 2);
-      return html\`
-        <uix-card variant="filled" padding="sm">
-          <uix-grid cols="200px 1fr" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>\${type}</uix-text>
-            </uix-flex>
-            <uix-textarea
-              size="sm"
-              .value=\${jsonValue}
-              style="min-height: 80px; font-family: monospace"
-              @input=\${(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  this.handleChange(key, parsed);
-                  e.target.removeAttribute("error");
-                } catch (err) {
-                  // Visual feedback for invalid JSON
-                  e.target.setAttribute("error", "");
-                }
-              }}
-            ></uix-textarea>
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // Function: Display only
-    if (type === "function") {
-      return html\`
-        <uix-card variant="filled" padding="sm" style="opacity: 0.6">
-          <uix-grid cols="200px 1fr" gap="md">
-            <uix-flex direction="column" gap="xs">
-              <uix-text size="sm" weight="semibold">\${key}</uix-text>
-              <uix-text size="xs" muted mono>function</uix-text>
-            </uix-flex>
-            <uix-text size="sm" muted style="font-style: italic">Event handler (immutable)</uix-text>
-          </uix-grid>
-        </uix-card>
-      \`;
-    }
-
-    // Unknown type
-    return html\`
-      <uix-card variant="filled" padding="sm" style="opacity: 0.6">
-        <uix-grid cols="200px 1fr" gap="md">
-          <uix-flex direction="column" gap="xs">
-            <uix-text size="sm" weight="semibold">\${key}</uix-text>
-            <uix-text size="xs" muted mono>\${type || "unknown"}</uix-text>
-          </uix-flex>
-          <uix-text size="sm" muted>Not editable</uix-text>
-        </uix-grid>
-      </uix-card>
-    \`;
-  },
-
-  render() {
-    if (!this.properties || Object.keys(this.properties).length === 0) {
-      return html\`
-        <uix-card variant="filled" padding="md" style="text-align: center">
-          <uix-text muted>No configurable properties</uix-text>
-        </uix-card>
-      \`;
-    }
-
-    return html\`
-      <uix-flex direction="column" gap="md" style="font-family: var(--font-sans)">
-        <uix-flex justify="space-between" align="center">
-          <uix-heading level="3" size="lg">Properties</uix-heading>
-          <uix-button
-            outline
-            size="xs"
-            @click=\${() => this.emit("reset")}
-            title="Reset to defaults"
-          >
-          <uix-icon name="rotate-ccw"></uix-icon>    
-          Reset
-          </uix-button>
-        </uix-flex>
-        <uix-flex direction="column" gap="sm">
-          \${Object.entries(this.properties).map(([key, metadata]) =>
-            this.renderPropertyControl(key, metadata),
-          )}
-        </uix-flex>
-      </uix-flex>
-    \`;
-  },
-};
-
-View.define("uix-showcase-property-editor", ShowcasePropertyEditorDefinition);
-
-export default ShowcasePropertyEditorDefinition;
-`,mimeType:"text/javascript"},"/$app/uix/docs/showcase-code-viewer.js":{content:`/**
- * UIX Showcase Code Viewer
- * Displays code examples with syntax highlighting
- */
-
-import T from "/$app/types/index.js";
-import View from "/$app/view/index.js";
-import { html } from "/npm/lit-html";
-
-const ShowcaseCodeViewerDefinition = {
-  tag: "uix-showcase-code-viewer",
-  properties: {
-    componentTag: T.string(), // Component tag name
-    props: T.object(), // Current property values
-    category: T.string(), // Component category
-    name: T.string(), // Component file name
-    copiedBasic: T.boolean(),
-    copiedImport: T.boolean(),
-  },
-  generateBasicExample() {
-    if (!this.componentTag) return "";
-
-    const { tag, props } = this;
-    const attributes = [];
-
-    // Generate attributes from props
-    for (const [key, value] of Object.entries(props || {})) {
-      if (value === undefined || value === null) continue;
-
-      if (typeof value === "boolean") {
-        if (value) attributes.push(key);
-      } else if (typeof value === "string") {
-        attributes.push(\`\${key}="\${value}"\`);
-      } else if (typeof value === "number") {
-        attributes.push(\`\${key}="\${value}"\`);
-      }
-    }
-
-    const attrsString = attributes.length > 0 ? " " + attributes.join(" ") : "";
-
-    return \`<\${tag}\${attrsString}>
-  <!-- Component Content -->
-</\${tag}>\`;
-  },
-
-  generateImportCode() {
-    if (!this.category || !this.name) return "";
-
-    return \`import "/$app/uix/app.js";
-
-// Component auto-loaded from:
-// /$app/uix/\${this.category}/\${this.name}.js\`;
-  },
-
-  async copyToClipboard(text, type) {
-    const triggerSuccess = () => {
-      this[\`copied\${type}\`] = true;
-      setTimeout(() => {
-        this[\`copied\${type}\`] = false;
-      }, 2000);
-    };
-
-    try {
-      // 1. Try Modern API
-      await navigator.clipboard.writeText(text);
-      triggerSuccess();
-    } catch (err) {
-      // 2. Fallback (iframe/legacy)
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-
-        // Ensure it's not visible but part of DOM
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.top = "0";
-        document.body.appendChild(textArea);
-
-        textArea.focus();
-        textArea.select();
-
-        const successful = document.execCommand("copy");
-        document.body.removeChild(textArea);
-
-        if (successful) triggerSuccess();
-      } catch (fallbackErr) {
-        console.error("Failed to copy:", fallbackErr);
-      }
-    }
-  },
-
-  render() {
-    if (!this.componentTag) {
-      return html\`
-        <uix-card variant="outlined" padding="md">
-          <uix-text size="sm" align="center" muted>No code example available</uix-text>
-        </uix-card>
-      \`;
-    }
-
-    const basicExample = this.generateBasicExample();
-    const importCode = this.generateImportCode();
-
-    return html\`
-      <uix-flex direction="column" gap="md">
-        <!-- Import Section -->
-        <uix-flex direction="column" gap="sm" style="position: relative;">
-          <uix-flex justify="space-between" align="center">
-            <uix-text size="sm" weight="semibold" text="inverse" style="text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;">Import</uix-text>
-            <uix-button
-              size="xs"
-              ghost
-              primary
-              @click=\${() => this.copyToClipboard(importCode, "Import")}
-              title="Copy import path"
-            >
-              <uix-icon name=\${this.copiedImport ? "check" : "copy"} size="14"></uix-icon>
-              \${this.copiedImport ? "Copied" : "Copy"}
-            </uix-button>
-          </uix-flex>
-          <uix-card variant="outlined" overflow="hidden">
-            <uix-code language="javascript" .content=\${importCode} ?lineNumber=\${false} readonly></uix-code>
-          </uix-card>
-        </uix-flex>
-
-        <!-- Basic Usage Section -->
-        <uix-flex direction="column" gap="sm" style="position: relative;">
-          <uix-flex justify="space-between" align="center">
-            <uix-text size="sm" weight="semibold" text="inverse" style="text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;">Usage</uix-text>
-            <uix-button
-              size="xs"
-              ghost
-              primary
-              @click=\${() => this.copyToClipboard(basicExample, "Basic")}
-              title="Copy code example"
-            >
-              <uix-icon name=\${this.copiedBasic ? "check" : "copy"} size="14"></uix-icon>
-              \${this.copiedBasic ? "Copied" : "Copy"}
-            </uix-button>
-          </uix-flex>
-          <uix-card variant="outlined" overflow="hidden">
-            <uix-code language="html" .content=\${basicExample} readonly></uix-code>
-          </uix-card>
-        </uix-flex>
-      </uix-flex>
-    \`;
-  },
-};
-
-View.define("uix-showcase-code-viewer", ShowcaseCodeViewerDefinition);
-
-export default ShowcaseCodeViewerDefinition;
-`,mimeType:"text/javascript"},"/$app/uix/navigation/sidebar.css":{content:`uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}
-`,mimeType:"text/css"},"/$app/uix/docs/theme-generator.js":{content:`/**
- * UIX Theme Generator
- * Interactive tool for creating custom themes
- * Uses the new semantic shade format (lighter, light, DEFAULT, dark, darker)
- */
-import Theme from "/$app/theme/index.js";
-import T from "/$app/types/index.js";
-import { html, nothing } from "/npm/lit-html";
-
-// Color categories with their default values (Gruvbox-inspired)
-const DEFAULT_COLORS = {
-  primary: {
-    DEFAULT: "#fabd2f",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  secondary: {
-    DEFAULT: "#83a598",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  success: {
-    DEFAULT: "#b8bb26",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  danger: {
-    DEFAULT: "#fb4934",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  warning: {
-    DEFAULT: "#fe8019",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  info: {
-    DEFAULT: "#83a598",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  surface: {
-    DEFAULT: "#504945",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-  inverse: {
-    DEFAULT: "#282828",
-    lighter: null,
-    light: null,
-    dark: null,
-    darker: null,
-  },
-};
-
-export default {
-  properties: {
-    themeName: T.string("custom-theme"),
-    sectionTab: T.number(0),
-    // Color palette - new semantic format
-    colors: T.object({ defaultValue: structuredClone(DEFAULT_COLORS) }),
-    // Track which colors have expanded shade editors
-    expandedColors: T.object({ defaultValue: {} }),
-    // Text color
-    textColor: T.string("default"),
-    // Spacing scale
-    spacing: T.object({
-      defaultValue: {
-        xs: "0.25rem",
-        sm: "0.5rem",
-        md: "0.75rem",
-        lg: "1rem",
-        xl: "1.5rem",
-        "2xl": "2rem",
-        "3xl": "3rem",
-      },
-    }),
-    // Border radius
-    radius: T.object({
-      defaultValue: {
-        none: "0",
-        sm: "0.25rem",
-        md: "0.375rem",
-        lg: "0.5rem",
-        xl: "0.75rem",
-        full: "9999px",
-      },
-    }),
-    // Typography
-    typography: T.object({
-      defaultValue: {
-        fontSize: {
-          xs: "0.75rem",
-          sm: "0.875rem",
-          base: "1rem",
-          lg: "1.125rem",
-          xl: "1.25rem",
-          "2xl": "1.5rem",
-          "3xl": "1.875rem",
-        },
-        fontWeight: {
-          normal: "400",
-          medium: "500",
-          semibold: "600",
-          bold: "700",
-        },
-        lineHeight: {
-          tight: "1.2",
-          normal: "1.5",
-          relaxed: "1.75",
-        },
-      },
-    }),
-  },
-
-  _updateColor(category, shade, value) {
-    this.colors = {
-      ...this.colors,
-      [category]: {
-        ...this.colors[category],
-        [shade]: value,
-      },
-    };
-    this._applyPreview();
-  },
-
-  _applyPreview() {
-    const theme = this.generateThemeObject();
-    Theme.applyTheme(theme);
-  },
-
-  _toggleExpanded(category) {
-    this.expandedColors = {
-      ...this.expandedColors,
-      [category]: !this.expandedColors[category],
-    };
-  },
-
-  _toggleAutoShade(category, shade) {
-    const currentValue = this.colors[category][shade];
-    if (currentValue === null) {
-      // Set to a default value (copy from DEFAULT)
-      this._updateColor(category, shade, this.colors[category].DEFAULT);
-    } else {
-      // Set back to auto
-      this._updateColor(category, shade, null);
-    }
-  },
-
-  generateThemeObject() {
-    // Generate theme object matching gruvbox-dark.js format
-    const colorOutput = {};
-
-    for (const [category, shades] of Object.entries(this.colors)) {
-      // Check if any shades are customized (non-null)
-      const hasCustomShades = Object.entries(shades).some(
-        ([key, val]) => key !== "DEFAULT" && val !== null,
-      );
-
-      if (hasCustomShades) {
-        // Output as object with only non-null values
-        const colorObj = { DEFAULT: shades.DEFAULT };
-        for (const [shade, value] of Object.entries(shades)) {
-          if (shade !== "DEFAULT" && value !== null) {
-            colorObj[shade] = value;
-          }
-        }
-        colorOutput[category] = colorObj;
-      } else {
-        // Output as simple string
-        colorOutput[category] = shades.DEFAULT;
-      }
-    }
-
-    return {
-      name: this.themeName,
-      link: { color: "var(--color-primary)" },
-      text: { color: this.textColor },
-      color: colorOutput,
-      spacing: this.spacing,
-      typography: this.typography,
-      radius: this.radius,
-    };
-  },
-
-  exportTheme() {
-    const theme = this.generateThemeObject();
-    const themeCode = \`/**
- * \${theme.name} Theme
- * Generated with UIX Theme Generator
- */
-
-export default \${JSON.stringify(theme, null, 2)};
-\`;
-
-    const blob = new Blob([themeCode], { type: "application/javascript" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = \`\${this.themeName}.js\`;
-    a.click();
-    URL.revokeObjectURL(url);
-  },
-
-  renderColorPaletteSection() {
-    const categories = Object.keys(this.colors);
-    const shadeNames = ["lighter", "light", "dark", "darker"];
-
-    return html\`
-      <uix-container padding="md">
-        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-md)">Color Palette</uix-heading>
-
-        <!-- Text Color -->
-        <uix-container variant="filled" padding="sm" style="margin-bottom: var(--spacing-lg)">
-          <uix-flex direction="row" align="center" justify="space-between" style="margin-bottom: var(--spacing-xs)">
-            <uix-text size="sm" weight="medium">Text Color</uix-text>
-            <uix-input
-              type="text"
-              .value=\${this.textColor}
-              @input=\${(e) => {
-                this.textColor = e.target.value;
-                this._applyPreview();
-              }}
-              size="xs"
-              mono
-              style="width: 6rem"
-            ></uix-input>
-          </uix-flex>
-          <input
-            type="color"
-            .value=\${this.textColor}
-            @input=\${(e) => {
-              this.textColor = e.target.value;
-              this._applyPreview();
-            }}
-            w-full
-            cursor-pointer
-          />
-        </uix-container>
-
-        <!-- Color Categories -->
-        <uix-flex direction="column" gap="md">
-          \${categories.map((category) => {
-            const colorData = this.colors[category];
-            const isExpanded = this.expandedColors[category];
-
-            return html\`
-              <uix-container variant="filled" padding="sm">
-                <!-- Main color row -->
-                <uix-flex direction="row" align="center" gap="sm" style="margin-bottom: var(--spacing-xs)">
-                  <input
-                    type="color"
-                    .value=\${colorData.DEFAULT}
-                    @input=\${(e) => this._updateColor(category, "DEFAULT", e.target.value)}
-                    style="width: 3rem; height: 3rem; flex-shrink: 0; border-radius: var(--radius-md); cursor: pointer"
-                  />
-                  <uix-flex direction="column" gap="xs" style="flex: 1">
-                    <uix-text size="sm" weight="medium" transform="capitalize">\${category}</uix-text>
-                    <uix-input
-                      type="text"
-                      .value=\${colorData.DEFAULT}
-                      @input=\${(e) => this._updateColor(category, "DEFAULT", e.target.value)}
-                      size="xs"
-                      mono
-                      w-full
-                    ></uix-input>
-                  </uix-flex>
-                  <uix-button
-                    @click=\${() => this._toggleExpanded(category)}
-                    ghost
-                    size="sm"
-                    title="Customize shades"
-                  >
-                    <uix-icon name=\${isExpanded ? "chevron-up" : "chevron-down"} size="sm"></uix-icon>
-                  </uix-button>
-                </uix-flex>
-
-                <!-- Expanded shade editors -->
-                \${
-                  isExpanded
-                    ? html\`
-                  <uix-grid cols="2" gap="sm" style="margin-top: var(--spacing-sm); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-surface)">
-                    \${shadeNames.map((shade) => {
-                      const shadeValue = colorData[shade];
-                      const isAuto = shadeValue === null;
-
-                      return html\`
-                        <uix-flex direction="row" align="center" gap="sm">
-                          <input
-                            type="color"
-                            .value=\${isAuto ? colorData.DEFAULT : shadeValue}
-                            ?disabled=\${isAuto}
-                            @input=\${(e) => this._updateColor(category, shade, e.target.value)}
-                            style="width: 2rem; height: 2rem; border-radius: var(--radius-md); cursor: pointer"
-                            class="\${isAuto ? "opacity-50" : ""}"
-                          />
-                          <uix-flex direction="column" style="flex: 1; min-width: 0">
-                            <uix-flex direction="row" align="center" gap="xs">
-                              <uix-text size="xs" weight="medium" transform="capitalize">\${shade}</uix-text>
-                              <label style="margin-left: auto; display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; opacity: 0.7">
-                                <input
-                                  type="checkbox"
-                                  ?checked=\${isAuto}
-                                  @change=\${() => this._toggleAutoShade(category, shade)}
-                                  style="width: 0.75rem; height: 0.75rem"
-                                />
-                                Auto
-                              </label>
-                            </uix-flex>
-                          </uix-flex>
-                        </uix-flex>
-                      \`;
-                    })}
-                  </uix-grid>
-                \`
-                    : nothing
-                }
-              </uix-container>
-            \`;
-          })}
-        </uix-flex>
-      </uix-container>
-    \`;
-  },
-
-  renderSpacingSection() {
-    return html\`
-      <uix-container padding="md">
-        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Spacing</uix-heading>
-        <uix-grid cols="2" gap="sm">
-          \${Object.entries(this.spacing).map(
-            ([key, value]) => html\`
-              <uix-flex direction="column">
-                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
-                <uix-input
-                  type="text"
-                  .value=\${value}
-                  @input=\${(e) => {
-                    this.spacing = { ...this.spacing, [key]: e.target.value };
-                  }}
-                  size="sm"
-                  mono
-                  w-full
-                ></uix-input>
-              </uix-flex>
-            \`,
-          )}
-        </uix-grid>
-      </uix-container>
-    \`;
-  },
-
-  renderEdgesSection() {
-    return html\`
-      <uix-container padding="md">
-        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Border Radius</uix-heading>
-        <uix-grid cols="2" gap="sm">
-          \${Object.entries(this.radius).map(
-            ([key, value]) => html\`
-              <uix-flex direction="column">
-                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
-                <uix-input
-                  type="text"
-                  .value=\${value}
-                  @input=\${(e) => {
-                    this.radius = { ...this.radius, [key]: e.target.value };
-                  }}
-                  size="sm"
-                  mono
-                  w-full
-                ></uix-input>
-              </uix-flex>
-            \`,
-          )}
-        </uix-grid>
-      </uix-container>
-    \`;
-  },
-
-  renderTypographySection() {
-    return html\`
-      <uix-container padding="md">
-        <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Typography</uix-heading>
-
-        <uix-heading level="4" size="sm" style="margin-bottom: var(--spacing-xs)">Font Sizes</uix-heading>
-        <uix-grid cols="2" gap="sm" style="margin-bottom: var(--spacing-md)">
-          \${Object.entries(this.typography.fontSize).map(
-            ([key, value]) => html\`
-              <uix-flex direction="column">
-                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
-                <uix-input
-                  type="text"
-                  .value=\${value}
-                  @input=\${(e) => {
-                    this.typography = {
-                      ...this.typography,
-                      fontSize: {
-                        ...this.typography.fontSize,
-                        [key]: e.target.value,
-                      },
-                    };
-                  }}
-                  size="sm"
-                  mono
-                  w-full
-                ></uix-input>
-              </uix-flex>
-            \`,
-          )}
-        </uix-grid>
-
-        <uix-heading level="4" size="sm" style="margin-bottom: var(--spacing-xs)">Font Weights</uix-heading>
-        <uix-grid cols="2" gap="sm">
-          \${Object.entries(this.typography.fontWeight).map(
-            ([key, value]) => html\`
-              <uix-flex direction="column">
-                <uix-text size="sm" weight="medium" style="margin-bottom: var(--spacing-xs)">\${key}</uix-text>
-                <uix-input
-                  type="text"
-                  .value=\${value}
-                  @input=\${(e) => {
-                    this.typography = {
-                      ...this.typography,
-                      fontWeight: {
-                        ...this.typography.fontWeight,
-                        [key]: e.target.value,
-                      },
-                    };
-                  }}
-                  size="sm"
-                  mono
-                  w-full
-                ></uix-input>
-              </uix-flex>
-            \`,
-          )}
-        </uix-grid>
-      </uix-container>
-    \`;
-  },
-
-  renderControlsPanel() {
-    const sections = [
-      {
-        id: "colors",
-        label: "Colors",
-        render: this.renderColorPaletteSection.bind(this),
-      },
-      {
-        id: "spacing",
-        label: "Spacing",
-        render: this.renderSpacingSection.bind(this),
-      },
-      {
-        id: "edges",
-        label: "Edges",
-        render: this.renderEdgesSection.bind(this),
-      },
-      {
-        id: "typography",
-        label: "Type",
-        render: this.renderTypographySection.bind(this),
-      },
-    ];
-
-    return html\`
-      <uix-flex direction="column" style="height: 100%;overflow-x: hidden;">
-        <uix-tabs @tab-change=\${(e) => (this.sectionTab = e.detail)} style="flex: 1; display: flex; flex-direction: column; min-height: 0">
-          \${sections.map((section) => html\`<button slot="tab">\${section.label}</button>\`)}
-          <div slot="panel" style="flex: 1">
-            \${sections[this.sectionTab] ? sections[this.sectionTab].render() : nothing}
-          </div>
-        </uix-tabs>
-
-        <uix-container padding="md" style="border-top: 1px solid var(--color-surface)">
-          <uix-input
-            type="text"
-            .value=\${this.themeName}
-            @input=\${(e) => {
-              this.themeName = e.target.value;
-            }}
-            placeholder="Theme name..."
-            size="sm"
-            w-full
-            style="margin-bottom: var(--spacing-sm)"
-          ></uix-input>
-          <uix-button variant="primary" w-full @click=\${() => this.exportTheme()}>
-            <uix-icon name="download"></uix-icon>
-            Export Theme
-          </uix-button>
-        </uix-container>
-      </uix-flex>
-    \`;
-  },
-
-  renderPreviewPanel() {
-    return html\`
-      <uix-flex direction="column" style="flex: 1; overflow-y: auto; padding: var(--spacing-lg); background: var(--color-surface)">
-        <uix-heading level="2" size="2xl" style="margin-bottom: var(--spacing-lg)">Preview</uix-heading>
-
-        <uix-flex direction="column" gap="xl" style="max-width: 800px">
-          <!-- Buttons -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Buttons</uix-heading>
-            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap">
-              <uix-button>Default</uix-button>
-              <uix-button variant="primary">Primary</uix-button>
-              <uix-button variant="secondary">Secondary</uix-button>
-              <uix-button variant="success">Success</uix-button>
-              <uix-button variant="danger">Danger</uix-button>
-              <uix-button variant="warning">Warning</uix-button>
-            </uix-flex>
-            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap; margin-top: var(--spacing-sm)">
-              <uix-button ghost>Ghost</uix-button>
-              <uix-button ghost variant="primary">Ghost Primary</uix-button>
-              <uix-button outline variant="primary">Outline</uix-button>
-              <uix-button bordered variant="primary">Bordered</uix-button>
-            </uix-flex>
-          </section>
-
-          <!-- Stats -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Stats</uix-heading>
-            <uix-join>
-              <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
-              <uix-stat title="New Users" value="4,200" variant="success">+400 (22%)</uix-stat>
-              <uix-stat title="Errors" value="12" variant="danger">-5 (14%)</uix-stat>
-            </uix-join>
-          </section>
-
-          <!-- Badges -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Badges</uix-heading>
-            <uix-flex direction="row" gap="sm" style="flex-wrap: wrap">
-              <uix-badge>Default</uix-badge>
-              <uix-badge variant="success">Success</uix-badge>
-              <uix-badge variant="danger">Danger</uix-badge>
-              <uix-badge variant="warning">Warning</uix-badge>
-              <uix-badge variant="info">Info</uix-badge>
-            </uix-flex>
-          </section>
-
-          <!-- Form Controls -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Form Controls</uix-heading>
-            <uix-flex direction="column" gap="md">
-              <uix-grid cols="2" gap="sm">
-                <uix-input placeholder="Text input"></uix-input>
-                <uix-input type="email" placeholder="Email input"></uix-input>
-              </uix-grid>
-              <uix-flex direction="row" gap="md" style="flex-wrap: wrap">
-                <uix-checkbox checked>Checkbox</uix-checkbox>
-                <uix-switch checked>Switch</uix-switch>
-              </uix-flex>
-              <uix-slider min="0" max="100" value="50"></uix-slider>
-            </uix-flex>
-          </section>
-
-          <!-- Navigation -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Navigation</uix-heading>
-            <uix-tabs>
-              <button slot="tab">Tab 1</button>
-              <button slot="tab">Tab 2</button>
-              <button slot="tab">Tab 3</button>
-              <div slot="panel">Tab 1 content</div>
-              <div slot="panel">Tab 2 content</div>
-              <div slot="panel">Tab 3 content</div>
-            </uix-tabs>
-          </section>
-
-          <!-- Feedback -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Feedback</uix-heading>
-            <uix-flex direction="column" gap="sm">
-              <uix-progress-bar value="65" max="100"></uix-progress-bar>
-              <uix-progress-bar value="30" max="100" variant="success"></uix-progress-bar>
-              <uix-flex direction="row" gap="sm" align="center">
-                <uix-spinner size="sm"></uix-spinner>
-                <uix-spinner size="md"></uix-spinner>
-                <uix-spinner size="lg"></uix-spinner>
-              </uix-flex>
-            </uix-flex>
-          </section>
-
-          <!-- Card -->
-          <section>
-            <uix-heading level="3" size="lg" style="margin-bottom: var(--spacing-sm)">Card</uix-heading>
-            <uix-card variant="elevated" padding="lg">
-              <h4 slot="header">Card Header</h4>
-              <p>Card content with theme colors applied.</p>
-              <div slot="footer">
-                <uix-button size="sm">Action</uix-button>
-              </div>
-            </uix-card>
-          </section>
-        </uix-flex>
-      </uix-flex>
-    \`;
-  },
-
-  render() {
-    return html\`
-      <uix-flex direction="row" style="height: 100%; min-height: 0">
-        \${this.renderPreviewPanel()}
-        <div style="width: 400px; flex-shrink: 0; height: 100%; min-height: 0">
-          \${this.renderControlsPanel()}
-        </div>
-      </uix-flex>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/navigation/menu.css":{content:`:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/breadcrumbs.css":{content:`:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}
-`,mimeType:"text/css"},"/$app/uix/display/avatar.css":{content:`:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}
-`,mimeType:"text/css"},"/$app/uix/navigation/navbar.css":{content:`:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}
+`,mimeType:"text/javascript"},"/$app/bundler/views/ui.css":{content:`.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}
 `,mimeType:"text/css"},"/views/templates/app.js":{content:`import Router from "/$app/router/index.js";
 import T from "/$app/types/index.js";
 import $APP from "/$app.js";
@@ -23207,599 +26445,793 @@ export default {
  * * <uix-icon name="heart" size="xl" color="danger" solid></uix-icon>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/utils/example-parser.js":{content:`export function extractExamplesFromComments(sourceCode) {
-  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
-  if (!matches || matches.length === 0) return [];
-
-  const lastComment = matches[matches.length - 1];
-  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
-  const examples = [];
-  const exampleRegex = /@example\\s+([^\\n]*)\\n([\\s\\S]*?)(?=\\n\\s*\\*\\s*@(?:example|component|category|tag|param|returns|prop|slot|part|event)\\b|$)/g;
-  let match;
-
-  while ((match = exampleRegex.exec(docstring)) !== null) {
-    const title = match[1].replace(/^\\s*\\*\\s?/, '').trim();
-    const content = match[2]
-      .split("\\n")
-      .map((line) => line.replace(/^\\s*\\*\\s?/, ""))
-      .join("\\n")
-      .trim();
-
-    const codeBlocks = [];
-    const codeRegex = /\`\`\`(\\w+)?\\n([\\s\\S]*?)\`\`\`/g;
-    let codeMatch;
-
-    while ((codeMatch = codeRegex.exec(content)) !== null) {
-      codeBlocks.push({
-        language: codeMatch[1] || "html",
-        code: codeMatch[2].trim(),
-      });
-    }
-
-    const description = content.split("\`\`\`")[0].trim();
-
-    if (codeBlocks.length > 0) {
-      examples.push({
-        title: title || \`Example \${examples.length + 1}\`,
-        description: description || null,
-        codeBlocks,
-      });
-    }
-  }
-
-  return examples;
-}
-
-export function extractDescription(sourceCode) {
-  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
-  if (!matches || matches.length === 0) return "";
-
-  const lastComment = matches[matches.length - 1];
-  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
-
-  const lines = docstring.split("\\n");
-  const descLines = [];
-
-  for (const line of lines) {
-    const cleaned = line.replace(/^\\s*\\*\\s?/, "").trim();
-
-    if (cleaned.startsWith("@")) break;
-
-    if (descLines.length === 0 && !cleaned) continue;
-
-    descLines.push(cleaned);
-  }
-
-  return descLines.join("\\n").trim();
-}
-
-export function extractMetadataTags(sourceCode) {
-  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
-  if (!matches || matches.length === 0) return {};
-
-  const lastComment = matches[matches.length - 1];
-  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
-  const metadata = {};
-
-  const tagMatch = docstring.match(/@tag\\s+(\\S+)/);
-  if (tagMatch) metadata.tag = tagMatch[1];
-
-  const categoryMatch = docstring.match(/@category\\s+(\\S+)/);
-  if (categoryMatch) metadata.category = categoryMatch[1];
-
-  metadata.isComponent = /@component/.test(docstring);
-
-  return metadata;
-}
-
-export function extractParts(sourceCode) {
-  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
-  if (!matches || matches.length === 0) return [];
-
-  const lastComment = matches[matches.length - 1];
-  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
-  const parts = [];
-  const partRegex = /@part\\s+(\\S+)\\s+-\\s+(.+?)(?=\\n\\s*[@*]|$)/gm;
-  let match;
-
-  while ((match = partRegex.exec(docstring)) !== null) {
-    parts.push({
-      name: match[1].trim(),
-      description: match[2].trim(),
-    });
-  }
-
-  return parts;
-}
-
-export function extractSlots(sourceCode) {
-  const matches = sourceCode.match(/\\/\\*\\*([\\s\\S]*?)\\*\\//g);
-  if (!matches || matches.length === 0) return [];
-
-  const lastComment = matches[matches.length - 1];
-  const docstring = lastComment.replace(/^\\/\\*\\*/, "").replace(/\\*\\/$/, "");
-  const slots = [];
-  const slotRegex = /@slot\\s+([^\\s-]*)\\s*-?\\s*(.*)$/gm;
-  let match;
-
-  while ((match = slotRegex.exec(docstring)) !== null) {
-    const name = match[1].trim();
-    const description = match[2].trim();
-
-    slots.push({
-      name: name || "default",
-      description: description || "Default slot",
-    });
-  }
-
-  return slots;
-}
-`,mimeType:"text/javascript"},"/$app/uix/display/heading.js":{content:`/**
- * UIX Heading Component
- * Semantic headings (h1-h6) with consistent styling
- */
-
-import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
+  tag: "uix-tabs",
   properties: {
-    level: T.number({ defaultValue: 2, min: 1, max: 6 }),
-    size: T.string({
-      enum: ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl"],
-    }), // Optional size override
+    activeTab: T.number(0),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "pills", "underline"],
+    }),
+    vertical: T.boolean(),
   },
-
-  render() {
-    const HeadingTag = \`h\${this.level}\`;
-    return html\`<\${HeadingTag}><slot></slot></\${HeadingTag}>\`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/layout/split-pane.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-let throttleTimeout = null;
-let lastEvent = null;
-
-export default {
-  tag: "uix-split-pane",
-  i18n: {},
-  properties: {
-    direction: T.string("horizontal"),
-    initialSize: T.string("50%"), // Supports "200px" or "30%"
-    minSize: T.string(), // Minimum size constraint e.g., "200px" or "10%"
-    maxSize: T.string(), // Maximum size constraint e.g., "500px" or "90%"
-    primarySize: T.string(), // Current size (with units)
-    dividerSize: T.number(2),
-    storageKey: T.string(),
-    resizable: T.boolean(false), // Whether divider can be dragged
-  },
-  extends: "uix-flex",
   style: true,
   shadow: true,
-  connected() {
-    this.isDragging = false;
-    this.loadSize();
-    this.boundHandlePointerMove = this._handlePointerMove.bind(this);
-    this.boundHandlePointerUp = this._handlePointerUp.bind(this);
-  },
+
   firstUpdated() {
-    this.primaryPanel = this.shadowRoot.querySelector('[part="primary"]');
-    this.secondaryPanel = this.shadowRoot.querySelector('[part="secondary"]');
+    const slot = this.shadowRoot.querySelector("slot[name=panel]");
+    slot.addEventListener("slotchange", () => {
+      this.updateActivePanels();
+    });
   },
 
-  // Parse size string to { value, unit }
-  _parseSize(size) {
-    if (!size) return null;
-    const match = String(size).match(/^([\\d.]+)(px|%)?$/);
-    if (!match) return null;
-    return {
-      value: parseFloat(match[1]),
-      unit: match[2] || "%",
-    };
-  },
+  updateActivePanels() {
+    const panelSlot = this.shadowRoot.querySelector("slot[name=panel]");
+    const tabSlot = this.shadowRoot.querySelector("slot[name=tab]");
 
-  // Convert size to pixels based on container
-  _toPixels(size, containerSize) {
-    const parsed = this._parseSize(size);
-    if (!parsed) return null;
-    if (parsed.unit === "px") return parsed.value;
-    return (parsed.value / 100) * containerSize;
-  },
+    if (!panelSlot) return;
 
-  loadSize() {
-    if (this.storageKey) {
-      const saved = localStorage.getItem(\`uix-split-pane:\${this.storageKey}\`);
-      if (saved) {
-        this.primarySize = saved;
-        return;
+    const panels = panelSlot.assignedNodes({ flatten: true });
+    const tabs = tabSlot?.assignedElements() || [];
+
+    // Update panel visibility
+    if (panels.length > 1) {
+      panels.forEach((panel, index) => {
+        if (index === this.activeTab) {
+          panel.removeAttribute("hide");
+        } else {
+          panel.setAttribute("hide", "");
+        }
+      });
+    }
+
+    // Update tab active state
+    tabs.forEach((tab, index) => {
+      if (index === this.activeTab) {
+        tab.setAttribute("active", "");
+      } else {
+        tab.removeAttribute("active");
       }
+    });
+  },
+
+  selectTab(e) {
+    const clickedElement = e.target;
+    const slot = clickedElement.assignedSlot;
+    if (slot && slot.name === "tab") {
+      const tabs = slot.assignedElements();
+      const index = tabs.indexOf(clickedElement);
+      this.activeTab = index;
+      this.updateActivePanels();
+      this.emit("tab-change", index);
     }
-    this.primarySize = this.initialSize;
-  },
-
-  saveSize() {
-    if (this.storageKey && this.primarySize) {
-      localStorage.setItem(
-        \`uix-split-pane:\${this.storageKey}\`,
-        this.primarySize,
-      );
-    }
-  },
-
-  _handleDividerPointerDown(e) {
-    if (!this.resizable) return;
-    e.preventDefault();
-    this.isDragging = true;
-    this.startPos = this.direction === "horizontal" ? e.clientX : e.clientY;
-
-    const rect = this.getBoundingClientRect();
-    this.containerSize =
-      this.direction === "horizontal" ? rect.width : rect.height;
-    this.startPrimaryPx = this._toPixels(this.primarySize, this.containerSize);
-
-    this.shadowRoot.addEventListener(
-      "pointermove",
-      this.boundHandlePointerMove,
-    );
-    this.setAttribute("dragging", "");
-  },
-
-  _handlePointerMove(e) {
-    if (!this.isDragging) return;
-    lastEvent = e;
-    if (throttleTimeout) return;
-    throttleTimeout = setTimeout(() => {
-      throttleTimeout = null;
-      this._calculateNewSize(lastEvent);
-    }, 15);
-  },
-
-  _calculateNewSize(e) {
-    const currentPos = this.direction === "horizontal" ? e.clientX : e.clientY;
-    const delta = currentPos - this.startPos;
-    let newPrimaryPx = this.startPrimaryPx + delta;
-
-    // Apply min/max constraints
-    const minPx = this._toPixels(this.minSize, this.containerSize);
-    const maxPx = this._toPixels(this.maxSize, this.containerSize);
-
-    if (minPx !== null) newPrimaryPx = Math.max(minPx, newPrimaryPx);
-    if (maxPx !== null) newPrimaryPx = Math.min(maxPx, newPrimaryPx);
-
-    // Ensure secondary panel has space
-    const minSecondary = 50; // minimum 50px for secondary
-    newPrimaryPx = Math.min(newPrimaryPx, this.containerSize - minSecondary);
-
-    if (this.primaryPanel && this.secondaryPanel) {
-      this.primaryPanel.style.flexBasis = \`\${newPrimaryPx}px\`;
-      this.secondaryPanel.style.flexBasis = \`\${this.containerSize - newPrimaryPx}px\`;
-    }
-    this.primarySize = \`\${newPrimaryPx}px\`;
-  },
-
-  _handlePointerUp() {
-    if (!this.isDragging) return;
-    this.isDragging = false;
-    this.removeAttribute("dragging");
-    this.shadowRoot.removeEventListener(
-      "pointermove",
-      this.boundHandlePointerMove,
-    );
-    this.saveSize();
   },
 
   render() {
-    const parsed = this._parseSize(this.primarySize);
-    const primaryStyle = parsed
-      ? \`flex-basis: \${parsed.value}\${parsed.unit}\`
-      : "flex-basis: 50%";
+    return html\`
+        <div
+          part="tab-list"
+          role="tablist"
+          aria-orientation=\${this.vertical ? "vertical" : "horizontal"}
+        >
+          <slot name="tab" part="tab" @click=\${this.selectTab.bind(this)}></slot>
+        </div>
+        <slot part="tab-panel" name="panel" part="panel"></slot>
+     
+    \`;
+  },
+};
 
-    return html\`<slot name="primary" part="primary" style="\${primaryStyle}"></slot>
-      <div
-        part="divider"
-        @pointerdown=\${this._handleDividerPointerDown.bind(this)}
-        @pointerup=\${this._handlePointerUp.bind(this)}
-        style="--divider-size: \${this.dividerSize}px"
-      ></div>
-      <slot part="secondary" name="secondary"></slot>\`;
+/**
+ * Tabs Component
+ *
+ * @component
+ * @category navigation
+ * @tag uix-tabs
+ *
+ * Accessible tabs with keyboard navigation and flexible content
+ *
+ * @example
+ * // Pattern 1: Static tabs with multiple panels (each panel rendered separately)
+ * \`\`\`html
+ * <uix-tabs activeTab=2>
+ *   <button slot="tab">Profile</button>
+ *   <button slot="tab">Settings</button>
+ *   <button slot="tab">Account</button>
+ *
+ *   <div slot="panel">Profile content...</div>
+ *   <div slot="panel">Settings content...</div>
+ *   <div slot="panel">Account content...</div>
+ * </uix-tabs>
+ * \`\`\`
+ *
+ * @example
+ * // Pattern 2: Dynamic tabs with single panel (content switches based on active tab)
+ * \`\`\`js
+ * html\`<uix-tabs>
+ *   \${sections.map(section => html\`
+ *     <button slot="tab">
+ *       <uix-icon name=\${section.icon}></uix-icon>
+ *       \${section.label}
+ *     </button>
+ *   \`)}
+ *   <div slot="panel">
+ *     \${sections[this.activeTab].render()}
+ *   </div>
+ * </uix-tabs>\`
+ * \`\`\`
+ * @example
+ * // With variants
+ *
+ * \`\`\`html
+ * <uix-tabs variant="pills">
+ *   <button slot="tab">Tab 1</button>
+ *   <button slot="tab">Tab 2</button>
+ *   <div slot="panel">Panel 1</div>
+ *   <div slot="panel">Panel 2</div>
+ * </uix-tabs>
+ * \`\`\`
+ *
+ * @example
+ * // Vertical orientation
+ * \`\`\`html
+ * <uix-tabs vertical variant="underline">
+ *   <button slot="tab">Navigation</button>
+ *   <button slot="tab">Content</button>
+ *   <div slot="panel">Nav content</div>
+ *   <div slot="panel">Main content</div>
+ * </uix-tabs>
+ * \`\`\`
+ * @example
+ * // Controlled with property binding
+ * \`\`\`js
+ * html\`<uix-tabs .activeTab=\${this.currentTab} @tab-change=\${this.handleTabChange}>
+ *   <button slot="tab">First</button>
+ *   <button slot="tab">Second</button>
+ *   <div slot="panel">First panel</div>
+ *   <div slot="panel">Second panel</div>
+ * </uix-tabs>\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  extends: "uix-container",
+  i18n: {},
+  style: true,
+  shadow: true,
+  properties: {
+    borderWidth: T.string({
+      defaultValue: "1",
+      enum: ["none", "1", "2", "3"],
+    }),
+    borderStyle: T.string({
+      defaultValue: "solid",
+      enum: ["solid", "dashed", "dotted"],
+    }),
+    shadow: T.string({
+      defaultValue: "none",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    hover: T.boolean({
+      defaultValue: false,
+    }),
+    gap: T.string({
+      defaultValue: "md",
+      enum: ["none", "xs", "sm", "md", "lg", "xl"],
+    }),
+  },
+  render() {
+    return html\`
+      <slot name="header" part="header"></slot>
+      <slot part="body"><slot></slot></slot>
+      
+      <slot part="footer" name="footer"></slot>
+    \`;
   },
 };
 
 /**
  * Copyright (c) Alan Carlos Meira Leal
  *
- * Split Pane Component
+ * Card Component
  *
  * @component
  * @category layout
- * @tag uix-split-pane
+ * @tag uix-card
  *
- * A split pane layout for dividing space between two panels.
- * By default, the divider is non-resizable (just a visual separator).
- * Add the \`resizable\` attribute to enable drag-to-resize functionality.
- * Supports both pixel and percentage-based sizing.
+ * A versatile container component for displaying grouped content with optional
+ * header and footer sections. Supports different variants and padding options.
  *
- * @slot primary - Primary (left/top) panel content
- * @slot secondary - Secondary (right/bottom) panel content
- * @part primary - Primary panel container
- * @part divider - Divider between panels
- * @part secondary - Secondary panel container
+ * @slot header - Optional header content
+ * @slot - Default slot for card body content
+ * @slot footer - Optional footer content
+ * @part header - The card header container
+ * @part body - The card body container
+ * @part footer - The card footer container
  *
- * @example Fixed Sidebar (Non-resizable)
+ * @example Basic Card
  * \`\`\`html
- * <uix-split-pane initialSize="200px" minSize="200px">
- *   <div slot="primary">Fixed 200px sidebar</div>
- *   <div slot="secondary">Main content</div>
- * </uix-split-pane>
+ * <uix-card>
+ *   <h3 slot="header">Card Title</h3>
+ *   <p>Card content goes here...</p>
+ * </uix-card>
  * \`\`\`
  *
- * @example Resizable Split
+ * @example Card with Footer
  * \`\`\`html
- * <uix-split-pane initialSize="30%" resizable>
- *   <div slot="primary">Resizable panel</div>
- *   <div slot="secondary">Main content</div>
- * </uix-split-pane>
+ * <uix-card>
+ *   <header slot="header"><h3 class="flex">User Profile</h3></header>
+ *   <article>
+ *     <p>John Doe</p>
+ *     <p>Software Engineer</p>
+ *   </article>
+ *   <footer slot="footer">
+ *     <uix-button primary>Edit</uix-button>
+ *     <uix-button>Cancel</uix-button>
+ *   </footer>
+ * </uix-card>
  * \`\`\`
  *
- * @example With Constraints
+ * @example Card Variants
  * \`\`\`html
- * <uix-split-pane
- *   initialSize="250px"
- *   minSize="150px"
- *   maxSize="400px"
- *   resizable
- *   storageKey="editor-sidebar"
- * >
- *   <div slot="primary">Sidebar</div>
- *   <div slot="secondary">Editor</div>
- * </uix-split-pane>
+ * <div class="flex flex-row gap-2">
+ *  <uix-card variant="default">Default Card</uix-card>
+ *  <uix-card variant="elevated">Elevated Card</uix-card>
+ * </div>
+ * \`\`\`
+ *
+ * @example Card Padding Options
+ * \`\`\`html
+ * <div class="flex flex-row gap-2">
+ *  <uix-card padding="none">No Padding</uix-card>
+ *  <uix-card padding="sm">Small Padding</uix-card>
+ *  <uix-card padding="md">Medium Padding</uix-card>
+ *  <uix-card padding="lg">Large Padding</uix-card>
+ * </div>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/display/text.js":{content:`/**
- * UIX Text Component
- * Styled text with size, weight, and variant options
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
+`,mimeType:"text/javascript"},"/$app/uix/display/stat.js":{content:`import T from "/$app/types/index.js";
+import { html, nothing } from "/npm/lit-html";
 
 export default {
-  style: true,
+  tag: "uix-stat",
   properties: {
+    title: T.string(""),
+    value: T.any(""),
+    desc: T.string(""),
     size: T.string({
-      defaultValue: "base",
-      enum: ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"],
+      defaultValue: "md",
+      enum: ["sm", "md", "lg"],
     }),
-    weight: T.string({
-      defaultValue: "normal",
-      enum: ["normal", "medium", "semibold", "bold"],
-    }),
-    color: T.string({
+    variant: T.string({
+      defaultValue: "default",
       enum: [
+        "default",
         "primary",
         "secondary",
         "success",
         "danger",
         "warning",
         "info",
-        "muted",
-        "inverse",
       ],
     }),
-    muted: T.boolean(false),
-    mono: T.boolean(false),
-    align: T.string({
-      defaultValue: "left",
-      enum: ["left", "center", "right"],
-    }),
-    transform: T.string({
-      enum: ["capitalize", "uppercase", "lowercase", "none"],
-    }),
-    as: T.string({ defaultValue: "span", enum: ["span", "p", "div"] }),
+    centered: T.boolean(false),
   },
-};
-`,mimeType:"text/javascript"},"/$app/uix/layout/flex.js":{content:`/**
- * UIX Flex Component
- * Flexible container for flexbox layouts
- * No shadow DOM - host element is the flex container
- */
-
-import T from "/$app/types/index.js";
-
-export default {
   style: true,
-  properties: {
-    direction: T.string({
-      defaultValue: "row",
-      enum: ["row", "column", "row-reverse", "column-reverse"],
-    }),
-    gap: T.string({
-      enum: ["none", "xs", "sm", "md", "lg", "xl", "2xl", "3xl"],
-    }),
-    align: T.string({
-      defaultValue: "stretch",
-      enum: ["start", "center", "end", "stretch", "baseline"],
-    }),
-    justify: T.string({
-      defaultValue: "start",
-      enum: [
-        "start",
-        "center",
-        "end",
-        "space-between",
-        "space-around",
-        "space-evenly",
-      ],
-    }),
-    wrap: T.string({
-      defaultValue: "nowrap",
-      enum: ["wrap", "nowrap", "wrap-reverse"],
-    }),
+  shadow: true,
+
+  render() {
+    return html\`
+      <div part="figure">
+        <slot name="figure"></slot>
+      </div>
+      <div part="body">
+        \${this.title ? html\`<div part="title">\${this.title}</div>\` : nothing}
+        \${this.value !== "" ? html\`<div part="value">\${this.value}</div>\` : nothing}
+        <div part="desc">
+          \${this.desc ? this.desc : html\`<slot></slot>\`}
+        </div>
+      </div>
+    \`;
   },
 };
 
 /**
- * UIX Flex Component
+ * Stat Component
  *
  * @component
- * @category layout
- * @tag uix-flex
+ * @category display
+ * @tag uix-stat
  *
- * A flexible container component for creating flexbox layouts.
- * No shadow DOM - the host element itself becomes the flex container.
+ * Display statistics with title, value, and description in a clean format.
+ * Supports icons/figures and works great when grouped with uix-join.
  *
- * ## Flex Item Attributes
+ * @slot default - Description content below the value
+ * @slot figure - Icon, avatar, or image to display alongside the stat
  *
- * Direct children can use these attributes for individual flex behavior:
- * - \`flex-1\` - Grow and shrink equally (flex: 1 1 0%)
- * - \`flex-auto\` - Grow and shrink with auto basis (flex: 1 1 auto)
- * - \`flex-initial\` - Don't grow, can shrink (flex: 0 1 auto)
- * - \`flex-none\` - Don't grow or shrink (flex: none)
- * - \`flex-grow\` - Allow growing (flex-grow: 1)
- * - \`flex-shrink="0"\` - Prevent shrinking
- * - \`align-self="center|start|end|stretch"\` - Individual alignment
+ * @part figure - Container for the figure slot
+ * @part body - Container for title, value, and description
+ * @part title - The stat title/label
+ * @part value - The main stat value (hero element)
+ * @part desc - Description text below the value
  *
  * @example
- * // Basic row layout
+ * // Basic stat
  * \`\`\`html
- * <uix-flex gap="md">
- *   <div>Item 1</div>
- *   <div>Item 2</div>
- *   <div>Item 3</div>
- * </uix-flex>
+ * <uix-stat title="Total Users" value="1,234"></uix-stat>
  * \`\`\`
  *
  * @example
- * // Column layout with gap
+ * // With description
  * \`\`\`html
- * <uix-flex direction="column" gap="lg">
- *   <div>Top</div>
- *   <div>Middle</div>
- *   <div>Bottom</div>
- * </uix-flex>
+ * <uix-stat title="Downloads" value="31K" desc="Jan 1st - Feb 1st"></uix-stat>
  * \`\`\`
  *
  * @example
- * // Centered content
+ * // With icon figure
  * \`\`\`html
- * <uix-flex align="center" justify="center" style="min-height: 200px;">
- *   <div>Centered Content</div>
- * </uix-flex>
+ * <uix-stat title="Total Likes" value="25.6K" variant="primary">
+ *   <uix-icon slot="figure" name="heart" size="lg"></uix-icon>
+ *   21% more than last month
+ * </uix-stat>
  * \`\`\`
  *
  * @example
- * // Sidebar layout with flex-1
+ * // With colored variants
  * \`\`\`html
- * <uix-flex gap="md">
- *   <aside style="width: 250px;">
- *     Sidebar (fixed width)
- *   </aside>
- *   <main flex-1>
- *     Main content (takes remaining space)
- *   </main>
- * </uix-flex>
+ * <uix-stat title="Active" value="85" variant="success">\u2191 12%</uix-stat>
+ * <uix-stat title="Errors" value="3" variant="danger">\u2193 5%</uix-stat>
  * \`\`\`
  *
  * @example
- * // Toolbar with flexible search
+ * // Grouped stats with uix-join
  * \`\`\`html
- * <uix-flex align="center" gap="sm">
- *   <uix-button flex-none>New</uix-button>
- *   <uix-button flex-none>Save</uix-button>
- *   <uix-input flex-1 placeholder="Search..."></uix-input>
- *   <uix-button flex-none variant="primary">Submit</uix-button>
- * </uix-flex>
+ * <uix-join>
+ *   <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
+ *   <uix-stat title="New Users" value="4,200">\u2191 400 (22%)</uix-stat>
+ *   <uix-stat title="New Registers" value="1,200">\u2193 90 (14%)</uix-stat>
+ * </uix-join>
  * \`\`\`
  *
  * @example
- * // Card with flexible body
+ * // Stats with icons grouped
  * \`\`\`html
- * <uix-flex direction="column" gap="none" style="height: 400px;">
- *   <div flex-none style="padding: 1rem; border-bottom: 1px solid #ddd;">
- *     Header
- *   </div>
- *   <div flex-1 style="padding: 1rem; overflow-y: auto;">
- *     Body content that grows to fill available space
- *   </div>
- *   <div flex-none style="padding: 1rem; border-top: 1px solid #ddd;">
- *     Footer
- *   </div>
- * </uix-flex>
+ * <uix-join>
+ *   <uix-stat title="Total Likes" value="25.6K" variant="primary">
+ *     <uix-icon slot="figure" name="heart"></uix-icon>
+ *     21% more than last month
+ *   </uix-stat>
+ *   <uix-stat title="Page Views" value="2.6M" variant="secondary">
+ *     <uix-icon slot="figure" name="zap"></uix-icon>
+ *     21% more than last month
+ *   </uix-stat>
+ * </uix-join>
  * \`\`\`
  *
  * @example
- * // Space between items
+ * // Centered stats
  * \`\`\`html
- * <uix-flex justify="space-between" align="center">
- *   <h2>Page Title</h2>
- *   <uix-button variant="primary">Action</uix-button>
- * </uix-flex>
+ * <uix-join>
+ *   <uix-stat title="Passed" value="85" variant="success" centered></uix-stat>
+ *   <uix-stat title="Failed" value="3" variant="danger" centered></uix-stat>
+ *   <uix-stat title="Pending" value="12" variant="warning" centered></uix-stat>
+ * </uix-join>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/display/button.js":{content:`import T from "/$app/types/index.js";
+
+export default {
+  tag: "uix-button",
+  properties: {
+    variant: T.string(),
+    primary: T.boolean(),
+    secondary: T.boolean(),
+    danger: T.boolean(),
+    success: T.boolean(),
+    ghost: T.boolean(),
+    outline: T.boolean(),
+    border: T.boolean(),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    wFull: T.boolean(false),
+  },
+  extends: "uix-link",
+  style: true,
+};
+
+/**
+ * Button Component
+ *
+ * @component
+ * @category display
+ * @tag uix-button
+ *
+ * A flexible button component for user actions. Supports multiple variants,
+ * sizes, icons, and states. Extends uix-link for navigation functionality.
+ *
+ * @example Basic Button
+ * \`\`\`html
+ * <uix-button>Click me</uix-button>
+ * \`\`\`
+ *
+ * @example Button Variants
+ * Different visual styles for various action types
+ * \`\`\`html
+ * <div class="flex flex-col gap-2 items-center">
+ *  <uix-button>Default</uix-button>
+ *  <uix-button primary>Primary</uix-button>
+ *  <uix-button secondary>Secondary</uix-button>
+ *  <uix-button success>Success</uix-button>
+ *  <uix-button danger>Danger</uix-button>
+ * </div>
+ * \`\`\`
+ *
+ * @example Button Styles
+ * Different style treatments
+ * \`\`\`html
+ * <div class="flex flex-col gap-2 items-center">
+ *  <uix-button primary>Solid</uix-button>
+ *  <uix-button danger ghost>Ghost</uix-button>
+ *  <uix-button secondary outline>Outline</uix-button>
+ *  <uix-button primary border>Border</uix-button>
+ * </div>
+ * \`\`\`
+ *
+ * @example Button Sizes
+ * \`\`\`html
+ * <div class="flex flex-col gap-2 items-center">
+ *  <uix-button size="xs">Extra Small</uix-button>
+ *  <uix-button size="sm">Small</uix-button>
+ *  <uix-button size="md">Medium</uix-button>
+ *  <uix-button size="lg">Large</uix-button>
+ *  <uix-button size="xl">Extra Large</uix-button>
+ * </div>
+ * \`\`\`
+ *
+ * @example Disabled Button
+ * \`\`\`html
+ * <uix-button disabled>Cannot Click</uix-button>
+ * \`\`\`
+ *
+ * @example With Click Handler
+ * \`\`\`javascript
+ * import { html } from "/npm/lit-html";
+ *
+ * export default {
+ *   tag: "my-component",
+ *
+ *   handleClick() {
+ *     alert("Button clicked!");
+ *   },
+ *
+ *   render() {
+ *     return html\`
+ *       <uix-button
+ *         primary
+ *         @click=\${this.handleClick.bind(this)}
+ *       >
+ *         Click me
+ *       </uix-button>
+ *     \`;
+ *   }
+ * };
+ * \`\`\`
+ *
+ * @example As Link
+ * \`\`\`html
+ * <uix-button href="/dashboard">Go to Dashboard</uix-button>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/form/input.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-input-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-input",
+  properties: {
+    label: T.string(),
+    name: T.string(),
+    id: T.string(),
+    value: T.string(""),
+    placeholder: T.string(""),
+    type: T.string({
+      defaultValue: "text",
+      enum: ["text", "email", "tel", "url", "search", "password"],
+    }),
+    size: T.string({
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    disabled: T.boolean(false),
+    readonly: T.boolean(false),
+    required: T.boolean(false),
+    error: T.boolean(false),
+    fullWidth: T.boolean(false),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
+    }),
+  },
+  style: true,
+  shadow: false,
+
+  connected() {
+    if (!this.id && !this._inputId) {
+      this._inputId = generateId();
+    }
+  },
+
+  getInputId() {
+    return this.id || this._inputId || (this._inputId = generateId());
+  },
+
+  handleInput(e) {
+    this.value = e.target.value;
+    this.emit("input", { value: this.value });
+  },
+
+  handleChange(e) {
+    this.value = e.target.value;
+    this.emit("change", { value: this.value });
+  },
+
+  render() {
+    const id = this.getInputId();
+    return html\`
+      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+      <input
+        id=\${id}
+        name=\${this.name ?? id}
+        class="input"
+        type=\${this.type}
+        value=\${this.value}
+        placeholder=\${this.placeholder}
+        ?disabled=\${this.disabled}
+        ?readonly=\${this.readonly}
+        ?required=\${this.required}
+        @input=\${this.handleInput.bind(this)}
+        @change=\${this.handleChange.bind(this)}
+      />
+    \`;
+  },
+};
+
+/**
+ * Input Component
+ *
+ * @component
+ * @category form
+ * @tag uix-input
+ *
+ * Text input field with size variants matching button sizes for use in uix-join
+ *
+ * @example
+ * // Basic input
+ * \`\`\`html
+ * <uix-input placeholder="Enter text..."></uix-input>
  * \`\`\`
  *
  * @example
- * // Individual item alignment
+ * // With sizes
  * \`\`\`html
- * <uix-flex gap="md" style="height: 150px;">
- *   <div align-self="start">Aligned to start</div>
- *   <div align-self="center">Centered</div>
- *   <div align-self="end">Aligned to end</div>
- *   <div align-self="stretch">Stretched</div>
- * </uix-flex>
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input size="xs" placeholder="Extra small"></uix-input>
+ *   <uix-input size="sm" placeholder="Small"></uix-input>
+ *   <uix-input size="md" placeholder="Medium"></uix-input>
+ *   <uix-input size="lg" placeholder="Large"></uix-input>
+ *   <uix-input size="xl" placeholder="Extra large"></uix-input>
+ * </div>
  * \`\`\`
  *
  * @example
- * // Wrap items
+ * // Different input types
  * \`\`\`html
- * <uix-flex wrap="wrap" gap="sm">
- *   <uix-badge>Tag 1</uix-badge>
- *   <uix-badge>Tag 2</uix-badge>
- *   <uix-badge>Tag 3</uix-badge>
- *   <uix-badge>Tag 4</uix-badge>
- *   <uix-badge>Tag 5</uix-badge>
- * </uix-flex>
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input type="text" placeholder="Text"></uix-input>
+ *   <uix-input type="email" placeholder="Email"></uix-input>
+ *   <uix-input type="tel" placeholder="Phone"></uix-input>
+ *   <uix-input type="url" placeholder="URL"></uix-input>
+ *   <uix-input type="search" placeholder="Search"></uix-input>
+ *   <uix-input type="password" placeholder="Password"></uix-input>
+ * </div>
  * \`\`\`
  *
  * @example
- * // Dashboard layout
+ * // In button group with uix-join
  * \`\`\`html
- * <uix-flex direction="column" gap="lg" style="height: 100vh;">
- *   <header flex-none>
- *     <uix-navbar>Navigation</uix-navbar>
- *   </header>
- *
- *   <uix-flex flex-1 gap="md">
- *     <aside flex-none style="width: 300px;">
- *       <uix-sidebar>Sidebar</uix-sidebar>
- *     </aside>
- *
- *     <main flex-1>
- *       <div style="padding: 2rem;">
- *         Main content area
- *       </div>
- *     </main>
- *   </uix-flex>
- *
- *   <footer flex-none>
- *     Footer content
- *   </footer>
- * </uix-flex>
+ * <uix-join>
+ *   <uix-input placeholder="Search..." size="md"></uix-input>
+ *   <uix-button variant="primary" size="md">Search</uix-button>
+ * </uix-join>
  * \`\`\`
  *
  * @example
- * // Form row with labels
- * \`\`\`html
- * <uix-flex direction="column" gap="md">
- *   <uix-flex align="center" gap="sm">
- *     <label flex-none style="width: 120px;">Name:</label>
- *     <uix-input flex-1></uix-input>
- *   </uix-flex>
+ * // With binding
+ * \`\`\`js
+ * html\`<uix-input
+ *   .value=\${this.searchQuery}
+ *   @input=\${(e) => this.searchQuery = e.detail.value}
+ *   placeholder="Search..."
+ * ></uix-input>\`
+ * \`\`\`
  *
- *   <uix-flex align="center" gap="sm">
- *     <label flex-none style="width: 120px;">Email:</label>
- *     <uix-input flex-1 type="email"></uix-input>
- *   </uix-flex>
- * </uix-flex>
+ * @example
+ * // States
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-input placeholder="Normal"></uix-input>
+ *   <uix-input placeholder="Disabled" disabled></uix-input>
+ *   <uix-input placeholder="Readonly" value="Read only text" readonly></uix-input>
+ *   <uix-input placeholder="Required" required></uix-input>
+ * </div>
+ * \`\`\`
+ */
+`,mimeType:"text/javascript"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
+
+export default {
+  tag: "uix-textarea",
+  properties: {
+    label: T.string(),
+    id: T.string(),
+    value: T.string(""),
+    placeholder: T.string(""),
+    rows: T.number({ defaultValue: 4 }),
+    cols: T.number({ defaultValue: 50 }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    disabled: T.boolean(false),
+    readonly: T.boolean(false),
+    required: T.boolean(false),
+    maxlength: T.number({ defaultValue: null }),
+    minlength: T.number({ defaultValue: null }),
+    resize: T.string({
+      defaultValue: "vertical",
+      enum: ["none", "both", "horizontal", "vertical"],
+    }),
+    error: T.boolean(false),
+    fullWidth: T.boolean(false),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "primary", "secondary", "success", "warning", "error"],
+    }),
+    name: T.string(),
+  },
+  style: true,
+  shadow: false,
+  formAssociated: true,
+
+  connected() {
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._internals.setFormValue(this.value);
+    if (!this.id && !this._textareaId) {
+      this._textareaId = generateId();
+    }
+  },
+
+  get textareaId() {
+    return this.id || this._textareaId || (this._textareaId = generateId());
+  },
+
+  handleInput(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("input", { value: this.value });
+  },
+
+  handleChange(e) {
+    this.value = e.target.value;
+    this._internals?.setFormValue(this.value);
+    this.emit("change", { value: this.value });
+  },
+
+  render() {
+    const id = this.textareaId;
+    const attrs = {};
+    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
+    if (this.minlength !== null) attrs.minlength = this.minlength;
+
+    return html\`
+      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
+      <textarea
+        id=\${id}
+        class="textarea"
+        name=\${this.name}
+        value=\${this.value}
+        placeholder=\${this.placeholder}
+        rows=\${this.rows}
+        cols=\${this.cols}
+        ?disabled=\${this.disabled}
+        ?readonly=\${this.readonly}
+        ?required=\${this.required}
+        @input=\${this.handleInput.bind(this)}
+        @change=\${this.handleChange.bind(this)}
+      ></textarea>
+    \`;
+  },
+};
+
+/**
+ * Textarea Component
+ *
+ * @component
+ * @category form
+ * @tag uix-textarea
+ *
+ * Multi-line text input field with size variants and resize options.
+ *
+ * @example
+ * // Basic textarea
+ * \`\`\`html
+ * <uix-textarea placeholder="Enter your message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // With custom rows
+ * \`\`\`html
+ * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // Size variants
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
+ *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
+ *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
+ *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
+ *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // Resize options
+ * \`\`\`html
+ * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+ *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
+ *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
+ *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
+ *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With character limit
+ * \`\`\`html
+ * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
+ * \`\`\`
+ *
+ * @example
+ * // States
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-textarea placeholder="Normal"></uix-textarea>
+ *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
+ *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
+ *   <uix-textarea placeholder="Required" required></uix-textarea>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With binding
+ * \`\`\`js
+ * html\`<uix-textarea
+ *   .value=\${this.message}
+ *   @input=\${(e) => this.message = e.detail.value}
+ *   placeholder="Type your message..."
+ * ></uix-textarea>\`
  * \`\`\`
  */
 `,mimeType:"text/javascript"},"/$app/uix/form/select.js":{content:`import T from "/$app/types/index.js";
@@ -23965,356 +27397,212 @@ export default {
  * ></uix-select>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/layout/container.js":{content:`/**
- * UIX Container Component
- * Generic container component with padding, overflow, and variant support
- */
-
-import T from "/$app/types/index.js";
-
-export default {
-  style: true,
-  properties: {
-    padding: T.string({
-      defaultValue: "md",
-      enum: ["none", "sm", "md", "lg"],
-    }),
-    overflow: T.string({
-      enum: ["visible", "hidden", "auto", "scroll"],
-    }),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "filled", "outlined", "elevated"],
-    }),
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/navigation/accordion.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/javascript"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
+const generateId = () => \`uix-checkbox-\${Math.random().toString(36).slice(2, 9)}\`;
+
 export default {
-  tag: "uix-accordion",
+  tag: "uix-checkbox",
   properties: {
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "bordered", "filled", "flush", "separated"],
+    id: T.string(),
+    label: T.string(),
+    checked: T.boolean(false),
+    value: T.string(""),
+    name: T.string(""),
+    disabled: T.boolean(false),
+    required: T.boolean(false),
+    indeterminate: T.boolean(false),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
     }),
-    single: T.boolean(false),
-    rounded: T.boolean(true),
-    openItems: T.array([]),
+    variant: T.string({
+      defaultValue: "primary",
+      enum: ["primary", "secondary", "success", "warning", "error"],
+    }),
   },
   style: true,
-  shadow: true,
+  shadow: false,
+  formAssociated: true,
+
   connected() {
-    this.openItems = [];
-  },
-  firstUpdated() {
-    const slot = this.shadowRoot.querySelector("slot");
-    if (slot) {
-      slot.addEventListener("slotchange", () => {
-        this.initializeItems();
-      });
-      this.initializeItems();
+    if (!this._internals) {
+      this._internals = this.attachInternals();
+    }
+    this._updateFormValue();
+    if (!this.id && !this._checkboxId) {
+      this._checkboxId = generateId();
     }
   },
-  initializeItems() {
-    const slot = this.shadowRoot.querySelector("slot");
-    if (!slot) return;
-    const items = slot.assignedElements();
-    items.forEach((item, index) => {
-      if (
-        index % 2 === 0 &&
-        (item.hasAttribute("open") || item.hasAttribute("prevent-collapse"))
-      ) {
-        const panelIndex = Math.floor(index / 2);
-        if (!this.openItems.includes(panelIndex)) {
-          this.openItems.push(panelIndex);
-        }
-      }
-    });
 
-    this.updatePanels();
+  get checkboxId() {
+    return this.id || this._checkboxId || (this._checkboxId = generateId());
   },
 
-  updatePanels() {
-    const slot = this.shadowRoot.querySelector("slot");
-    if (!slot) return;
-
-    const items = slot.assignedElements();
-
-    items.forEach((item, index) => {
-      const isHeader = index % 2 === 0;
-      const panelIndex = Math.floor(index / 2);
-
-      if (isHeader) {
-        // Header element (even index)
-        if (this.openItems.includes(panelIndex)) {
-          item.setAttribute("active", "");
-        } else {
-          item.removeAttribute("active");
-        }
-      } else {
-        // Panel element (odd index)
-        if (this.openItems.includes(panelIndex)) {
-          item.removeAttribute("hide");
-        } else {
-          item.setAttribute("hide", "");
-        }
-      }
-    });
-  },
-  handleClick(e) {
-    // Find the closest element with the 'header' attribute
-    const headerElement = e.target.closest("[header]");
-
-    if (!headerElement) return;
-    if (headerElement.hasAttribute("prevent-collapse")) return;
-
-    // Get all direct children of the accordion element
-    const items = Array.from(this.children);
-    const clickedIndex = items.indexOf(headerElement);
-
-    // Calculate which panel was clicked (every header+content pair)
-    const panelIndex = Math.floor(clickedIndex / 2);
-
-    if (this.single) {
-      // Single mode: only one item open at a time
-      if (this.openItems.includes(panelIndex)) {
-        this.openItems = [];
-      } else {
-        this.openItems = [panelIndex];
-      }
-    } else {
-      // Multiple mode: toggle individual items
-      if (this.openItems.includes(panelIndex)) {
-        this.openItems = this.openItems.filter((i) => i !== panelIndex);
-      } else {
-        this.openItems = [...this.openItems, panelIndex];
+  updated({ changedProps }) {
+    if (changedProps.has("checked")) {
+      this._updateFormValue();
+    }
+    // Handle indeterminate state
+    if (changedProps.has("indeterminate")) {
+      const input =
+        this.shadowRoot?.querySelector("input") || this.querySelector("input");
+      if (input) {
+        input.indeterminate = this.indeterminate;
       }
     }
-
-    this.updatePanels();
-    this.emit("accordion-toggle", {
-      index: panelIndex,
-      open: this.openItems.includes(panelIndex),
-    });
   },
+
+  _updateFormValue() {
+    if (this._internals) {
+      this._internals.setFormValue(this.checked ? this.value || "on" : null);
+    }
+  },
+
+  handleChange(e) {
+    this.checked = e.target.checked;
+    this.indeterminate = false;
+    this._updateFormValue();
+    this.emit("change", { checked: this.checked, value: this.value });
+  },
+
   render() {
+    const id = this.checkboxId;
     return html\`
-      <div part="container" class="accordion-container">
-        <slot @click=\${this.handleClick.bind(this)}></slot>
-      </div>
+      <input
+        type="checkbox"
+        id=\${id}
+        class="checkbox"
+        ?checked=\${this.checked}
+        .indeterminate=\${this.indeterminate}
+        value=\${this.value}
+        name=\${this.name}
+        ?disabled=\${this.disabled}
+        ?required=\${this.required}
+        @change=\${this.handleChange.bind(this)}
+      />
+      \${this.label ? html\`<uix-label inline for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
     \`;
   },
 };
 
 /**
- * Accordion Component
+ * Checkbox Component
  *
  * @component
- * @category layout
- * @tag uix-accordion
+ * @category form
+ * @tag uix-checkbox
  *
- * Collapsible container with alternating header/content pairs. Click even-indexed elements to toggle odd-indexed elements.
+ * A checkbox input for boolean selections with label support.
  *
  * @example
- * // Basic accordion - alternating headers and content
+ * // Basic checkbox
  * \`\`\`html
- * <uix-accordion>
- *   <button>Section 1</button>
- *   <div>Content for section 1</div>
- *   <button>Section 2</button>
- *   <div>Content for section 2</div>
- *   <button>Section 3</button>
- *   <div>Content for section 3</div>
- * </uix-accordion>
+ * <uix-checkbox label="Accept terms and conditions"></uix-checkbox>
  * \`\`\`
  *
  * @example
- * // FAQ style accordion
+ * // Checked by default
  * \`\`\`html
- * <uix-accordion variant="bordered">
- *   <div>What is UIX?</div>
- *   <div><p>UIX is a component library built with Lit and web components.</p></div>
- *   <div>How do I install it?</div>
- *   <div><p>Follow the installation guide in the documentation.</p></div>
- *   <div>Is it free?</div>
- *   <div><p>Yes, UIX is completely free and open source.</p></div>
- * </uix-accordion>
+ * <uix-checkbox checked label="Subscribe to newsletter"></uix-checkbox>
  * \`\`\`
  *
  * @example
- * // Single mode - only one item open at a time
+ * // Size variants
  * \`\`\`html
- * <uix-accordion single>
- *   <button>Profile</button>
- *   <div>Profile settings content...</div>
- *   <button>Settings</button>
- *   <div>General settings content...</div>
- *   <button>Privacy</button>
- *   <div>Privacy settings content...</div>
- * </uix-accordion>
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox size="xs" label="Extra small"></uix-checkbox>
+ *   <uix-checkbox size="sm" label="Small"></uix-checkbox>
+ *   <uix-checkbox size="md" checked label="Medium"></uix-checkbox>
+ *   <uix-checkbox size="lg" label="Large"></uix-checkbox>
+ *   <uix-checkbox size="xl" label="Extra large"></uix-checkbox>
+ * </div>
  * \`\`\`
  *
  * @example
- * // With initial open state
+ * // Color variants
  * \`\`\`html
- * <uix-accordion>
- *   <button open>Already Open</button>
- *   <div>This panel starts open</div>
- *   <button>Closed</button>
- *   <div>This panel starts closed</div>
- *   <button open>Also Open</button>
- *   <div>This panel starts open too</div>
- * </uix-accordion>
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox variant="primary" checked label="Primary"></uix-checkbox>
+ *   <uix-checkbox variant="secondary" checked label="Secondary"></uix-checkbox>
+ *   <uix-checkbox variant="success" checked label="Success"></uix-checkbox>
+ *   <uix-checkbox variant="warning" checked label="Warning"></uix-checkbox>
+ *   <uix-checkbox variant="error" checked label="Error"></uix-checkbox>
+ * </div>
  * \`\`\`
  *
  * @example
- * // With variants
+ * // Indeterminate state
  * \`\`\`html
- * <uix-accordion variant="filled">
- *   <div>Header 1</div>
- *   <div>Panel 1 content</div>
- *   <div>Header 2</div>
- *   <div>Panel 2 content</div>
- * </uix-accordion>
+ * <uix-checkbox indeterminate label="Select all"></uix-checkbox>
  * \`\`\`
  *
  * @example
- * // With event handler
+ * // Disabled state
+ * \`\`\`html
+ * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+ *   <uix-checkbox disabled label="Disabled unchecked"></uix-checkbox>
+ *   <uix-checkbox checked disabled label="Disabled checked"></uix-checkbox>
+ * </div>
+ * \`\`\`
+ *
+ * @example
+ * // With event handling
  * \`\`\`js
- * html\`<uix-accordion
- *   @accordion-toggle=\${(e) => console.log('Item', e.detail.index, 'is now', e.detail.open ? 'open' : 'closed')}
- * >
- *   <button>Item 1</button>
- *   <div>Content 1</div>
- *   <button>Item 2</button>
- *   <div>Content 2</div>
- * </uix-accordion>\`
+ * html\`<uix-checkbox
+ *   .checked=\${this.agreed}
+ *   @change=\${(e) => this.agreed = e.detail.checked}
+ *   label="I agree to the terms"
+ * ></uix-checkbox>\`
  * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/nav-item.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-/**
- * @component uix-nav-item
- * @description A navigation item component with icon, label, badge, and active state support
- *
- * @property {string} icon - Icon name (uses uix-icon)
- * @property {string} label - Label text for the navigation item
- * @property {string} badge - Optional badge text/number to display
- * @property {boolean} active - Whether the item is currently active/selected
- * @property {string} href - Optional link URL (renders as anchor)
- * @property {boolean} disabled - Whether the item is disabled
- * @property {string} size - Size variant (sm, md, lg)
- *
- * @event nav-item-click - Emitted when the item is clicked {href?, active, disabled}
- *
- *
- * @part container - The main container element (button or anchor)
- * @part icon - The icon wrapper
- * @part label - The label wrapper
- * @part badge - The badge wrapper
  *
  * @example
- * <uix-nav-item icon="house" label="Home" active></uix-nav-item>
- * <uix-nav-item icon="settings" label="Settings" badge="3"></uix-nav-item>
- * <uix-nav-item href="/docs" label="Documentation"></uix-nav-item>
+ * // In a form
+ * \`\`\`html
+ * <form>
+ *   <uix-checkbox name="newsletter" value="yes" label="Subscribe to newsletter"></uix-checkbox>
+ *   <uix-checkbox name="terms" value="accepted" required label="Accept terms"></uix-checkbox>
+ *   <button type="submit">Submit</button>
+ * </form>
+ * \`\`\`
  */
+`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+import $APP from "/$app.js";
+
 export default {
-  tag: "uix-nav-item",
-  properties: {
-    icon: T.string({ defaultValue: "" }),
-    label: T.string({ defaultValue: "" }),
-    badge: T.string({ defaultValue: "" }),
-    active: T.boolean(false),
-    href: T.string({ defaultValue: "" }),
-    disabled: T.boolean(false),
-    activeBg: T.boolean(),
-    iconOnly: T.boolean(false),
-    indicatorPosition: T.string({
-      defaultValue: "none",
-      enum: ["none", "left", "right", "top", "bottom"],
-    }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["sm", "md", "lg"],
-    }),
-  },
   style: true,
-  _handleClick(e) {
-    if (this.disabled) {
-      e.preventDefault();
-      return;
-    }
-
-    this.emit("nav-item-click", {
-      href: this.href,
-      active: this.active,
-      disabled: this.disabled,
-    });
+  properties: {
+    item: T.object({ attribute: false }),
+    isOpen: T.boolean({ defaultValue: false }),
   },
-
+  handleClose() {
+    this.isOpen = false;
+    this.item = null;
+    this.dispatchEvent(
+      new CustomEvent("close", { bubbles: true, composed: true }),
+    );
+  },
   render() {
-    const content = this.iconOnly
-      ? html\`
-          \${
-            this.icon
-              ? html\`
-                <span part="icon" class="nav-item-icon">
-                  <uix-icon name=\${this.icon} size=\${this.size}></uix-icon>
-                </span>
-              \`
-              : null
-          }
-        \`
-      : html\`
-          <span part="label" class="nav-item-label label">
-          \${
-            this.icon
-              ? html\`
-                <span part="icon" class="nav-item-icon">
-                  <uix-icon name=\${this.icon} size=\${this.size}></uix-icon>
-                </span>
-              \`
-              : null
-          }
-            \${this.label}
-          </span>
-          \${
-            this.badge
-              ? html\`
-                <span part="badge" class="nav-item-badge badge">\${this.badge}</span>
-              \`
-              : null
-          }
-        \`;
-
-    const title = this.iconOnly ? this.label : "";
-
-    if (this.href && !this.disabled) {
-      return html\`
-        <a
-          part="container"
-          class="nav-item"
-          href=\${this.href}
-          title=\${title}
-          @click=\${this._handleClick.bind(this)}
-        >
-          \${content}
-        </a>
-      \`;
-    }
+    if (!this.item) return null;
 
     return html\`
-      <button
-        part="container"
-        class="nav-item"
-        title=\${title}
-        ?disabled=\${this.disabled}
-        @click=\${this._handleClick.bind(this)}
+      <uix-modal
+        .open=\${this.isOpen}
+        @modal-close=\${this.handleClose.bind(this)}
+        @modal-cancel=\${this.handleClose.bind(this)}
       >
-        \${content}
-      </button>
+        <view-content-card .content=\${this.item}></view-content-card>
+        <div slot="footer" class="pt-4">
+          <button
+            data-close
+            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            \u2715 \${$APP.i18n.t("actions.close")}
+          </button>
+        </div>
+      </uix-modal>
     \`;
   },
 };
@@ -24505,192 +27793,9 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/views/item-modal.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-
-export default {
-  style: true,
-  properties: {
-    item: T.object({ attribute: false }),
-    isOpen: T.boolean({ defaultValue: false }),
-  },
-  handleClose() {
-    this.isOpen = false;
-    this.item = null;
-    this.dispatchEvent(
-      new CustomEvent("close", { bubbles: true, composed: true }),
-    );
-  },
-  render() {
-    if (!this.item) return null;
-
-    return html\`
-      <uix-modal
-        .open=\${this.isOpen}
-        @modal-close=\${this.handleClose.bind(this)}
-        @modal-cancel=\${this.handleClose.bind(this)}
-      >
-        <view-content-card .content=\${this.item}></view-content-card>
-        <div slot="footer" class="pt-4">
-          <button
-            data-close
-            class="w-full bg-danger border-3 border-black text-white rounded-xl font-black py-3 uppercase text-sm shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
-          >
-            \u2715 \${$APP.i18n.t("actions.close")}
-          </button>
-        </div>
-      </uix-modal>
-    \`;
-  },
-};
 `,mimeType:"text/javascript"},"/$app/uix/display/link.css":{content:`:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}
-`,mimeType:"text/css"},"/$app/uix/form/input.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-input-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-input",
-  properties: {
-    label: T.string(),
-    name: T.string(),
-    id: T.string(),
-    value: T.string(""),
-    placeholder: T.string(""),
-    type: T.string({
-      defaultValue: "text",
-      enum: ["text", "email", "tel", "url", "search", "password"],
-    }),
-    size: T.string({
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    disabled: T.boolean(false),
-    readonly: T.boolean(false),
-    required: T.boolean(false),
-    error: T.boolean(false),
-    fullWidth: T.boolean(false),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-  },
-  style: true,
-  shadow: false,
-
-  connected() {
-    if (!this.id && !this._inputId) {
-      this._inputId = generateId();
-    }
-  },
-
-  getInputId() {
-    return this.id || this._inputId || (this._inputId = generateId());
-  },
-
-  handleInput(e) {
-    this.value = e.target.value;
-    this.emit("input", { value: this.value });
-  },
-
-  handleChange(e) {
-    this.value = e.target.value;
-    this.emit("change", { value: this.value });
-  },
-
-  render() {
-    const id = this.getInputId();
-    return html\`
-      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-      <input
-        id=\${id}
-        name=\${this.name ?? id}
-        class="input"
-        type=\${this.type}
-        value=\${this.value}
-        placeholder=\${this.placeholder}
-        ?disabled=\${this.disabled}
-        ?readonly=\${this.readonly}
-        ?required=\${this.required}
-        @input=\${this.handleInput.bind(this)}
-        @change=\${this.handleChange.bind(this)}
-      />
-    \`;
-  },
-};
-
-/**
- * Input Component
- *
- * @component
- * @category form
- * @tag uix-input
- *
- * Text input field with size variants matching button sizes for use in uix-join
- *
- * @example
- * // Basic input
- * \`\`\`html
- * <uix-input placeholder="Enter text..."></uix-input>
- * \`\`\`
- *
- * @example
- * // With sizes
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input size="xs" placeholder="Extra small"></uix-input>
- *   <uix-input size="sm" placeholder="Small"></uix-input>
- *   <uix-input size="md" placeholder="Medium"></uix-input>
- *   <uix-input size="lg" placeholder="Large"></uix-input>
- *   <uix-input size="xl" placeholder="Extra large"></uix-input>
- * </div>
- * \`\`\`
- *
- * @example
- * // Different input types
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input type="text" placeholder="Text"></uix-input>
- *   <uix-input type="email" placeholder="Email"></uix-input>
- *   <uix-input type="tel" placeholder="Phone"></uix-input>
- *   <uix-input type="url" placeholder="URL"></uix-input>
- *   <uix-input type="search" placeholder="Search"></uix-input>
- *   <uix-input type="password" placeholder="Password"></uix-input>
- * </div>
- * \`\`\`
- *
- * @example
- * // In button group with uix-join
- * \`\`\`html
- * <uix-join>
- *   <uix-input placeholder="Search..." size="md"></uix-input>
- *   <uix-button variant="primary" size="md">Search</uix-button>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // With binding
- * \`\`\`js
- * html\`<uix-input
- *   .value=\${this.searchQuery}
- *   @input=\${(e) => this.searchQuery = e.detail.value}
- *   placeholder="Search..."
- * ></uix-input>\`
- * \`\`\`
- *
- * @example
- * // States
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-input placeholder="Normal"></uix-input>
- *   <uix-input placeholder="Disabled" disabled></uix-input>
- *   <uix-input placeholder="Readonly" value="Read only text" readonly></uix-input>
- *   <uix-input placeholder="Required" required></uix-input>
- * </div>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/docs/showcase.css":{content:`:where(.uix-showcase){display:flex;width:100%}
-`,mimeType:"text/css"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/views/utils.js":{content:`import { html } from "/npm/lit-html";
 
 // Category definitions
 export const CATEGORIES = {
@@ -24725,8 +27830,135 @@ export const getUser = () => $APP.Auth?.user || null;
 export const isGuest = () => $APP.Auth?.isGuest ?? true;
 
 export const styleTag = (css) => html\`<style>\${css}</style>\`;
-`,mimeType:"text/javascript"},"/views/item-modal.css":{content:`app-item-modal .uix-modal::part(dialog){background:transparent;border:none;box-shadow:none;padding:1rem;max-width:42rem;width:100%;max-height:90vh;overflow:auto}app-item-modal .uix-modal::part(dialog)::backdrop{background:var(--modal-overlay, rgba(0,0,0,.6));backdrop-filter:blur(4px)}app-item-modal .uix-modal::part(header),app-item-modal .uix-modal::part(footer){display:none}app-item-modal .uix-modal::part(body){padding:0}
-`,mimeType:"text/css"},"/$app/uix/display/icon.css":{content:`:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}
+`,mimeType:"text/javascript"},"/$app/uix/display/icon.css":{content:`:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/house.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map-pin.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/feedback/spinner.js":{content:`/**
+ * Spinner Component
+ *
+ * @component
+ * @category feedback
+ * @tag uix-spinner
+ *
+ * A loading spinner component with multiple animation variants and sizes.
+ * Uses pure CSS animations for performance.
+ *
+ * @example Basic Spinner
+ * \`\`\`html
+ * <uix-spinner></uix-spinner>
+ * \`\`\`
+ *
+ * @example Spinner Variants
+ * Different animation styles
+ * \`\`\`html
+ * <div class="flex gap-4">
+ *   <uix-spinner variant="circular"></uix-spinner>
+ *   <uix-spinner variant="dots"></uix-spinner>
+ *   <uix-spinner variant="bars"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Spinner Sizes
+ * \`\`\`html
+ * <div class="flex gap-4 items-center">
+ *   <uix-spinner size="xs"></uix-spinner>
+ *   <uix-spinner size="sm"></uix-spinner>
+ *   <uix-spinner size="md"></uix-spinner>
+ *   <uix-spinner size="lg"></uix-spinner>
+ *   <uix-spinner size="xl"></uix-spinner>
+ * </div>
+ * \`\`\`
+ *
+ * @example Colored Spinner
+ * \`\`\`html
+ * <uix-spinner primary></uix-spinner>
+ * <uix-spinner secondary></uix-spinner>
+ * <uix-spinner success></uix-spinner>
+ * <uix-spinner danger></uix-spinner>
+ * \`\`\`
+ *
+ * @example Custom Color
+ * \`\`\`html
+ * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
+ * \`\`\`
+ */
+
+import T from "/$app/types/index.js";
+import { html } from "/npm/lit-html";
+
+export default {
+  tag: "uix-spinner",
+  properties: {
+    variant: T.string({
+      defaultValue: "circular",
+      enum: ["circular", "dots", "bars"],
+    }),
+    size: T.string({
+      defaultValue: "md",
+      enum: ["xs", "sm", "md", "lg", "xl"],
+    }),
+    primary: T.boolean(),
+    secondary: T.boolean(),
+    success: T.boolean(),
+    danger: T.boolean(),
+    warning: T.boolean(),
+    info: T.boolean(),
+  },
+  style: true,
+  render() {
+    // Circular variant uses CSS ::before pseudo-element
+    if (this.variant === "circular") {
+      return html\`\`;
+    }
+
+    // Dots and bars variants need 3 elements
+    if (this.variant === "dots") {
+      return html\`
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      \`;
+    }
+
+    if (this.variant === "bars") {
+      return html\`
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      \`;
+    }
+
+    return html\`\`;
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+`,mimeType:"text/css"},"/$app/uix/layout/container.js":{content:`/**
+ * UIX Container Component
+ * Generic container component with padding, overflow, and variant support
+ */
+
+import T from "/$app/types/index.js";
+
+export default {
+  style: true,
+  properties: {
+    padding: T.string({
+      defaultValue: "md",
+      enum: ["none", "sm", "md", "lg"],
+    }),
+    overflow: T.string({
+      enum: ["visible", "hidden", "auto", "scroll"],
+    }),
+    variant: T.string({
+      defaultValue: "default",
+      enum: ["default", "filled", "outlined", "elevated"],
+    }),
+  },
+};
+`,mimeType:"text/javascript"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
+`,mimeType:"text/css"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
+`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
+`,mimeType:"text/css"},"/$app/uix/form/textarea.css":{content:`:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/css"},"/$app/uix/form/select.css":{content:`:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/css"},"/$app/uix/form/checkbox.css":{content:`:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}
 `,mimeType:"text/css"},"/views/auth-modal.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 import $APP from "/$app.js";
@@ -24828,3241 +28060,9 @@ export default {
     \`;
   },
 };
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/palette.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688c0-.437-.18-.835-.437-1.125c-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/puzzle.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.98.98 0 0 1-.276.837l-1.61 1.61a2.4 2.4 0 0 1-1.705.707a2.4 2.4 0 0 1-1.704-.706l-1.568-1.568a1.03 1.03 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.03 1.03 0 0 0-.289-.877l-1.568-1.568A2.4 2.4 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303c.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073c-.05-.336.062-.676.303-.917l1.525-1.525A2.4 2.4 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29c.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0zm.894.211v15M9 3.236v15"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-left.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18l-6-6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/shield.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/database.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/chevron-right.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-dashboard.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/bell.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9m4.3 13a1.94 1.94 0 0 0 3.4 0"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/package.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m7.5 4.27l9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/search.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21l-4.3-4.3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sun.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/settings.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/menu.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M4 6h16M4 18h16"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/display/text.css":{content:`:where(.uix-text,uix-text){span,p,div{margin:0;color:var(--text-color);font-family:inherit}&[size=xs]{span,p,div{font-size:var(--text-xs, .75rem)}}&[size=sm]{span,p,div{font-size:var(--text-sm, .875rem)}}&[size=base]{span,p,div{font-size:var(--text-base, 1rem)}}&[size=lg]{span,p,div{font-size:var(--text-lg, 1.125rem)}}&[size=xl]{span,p,div{font-size:var(--text-xl, 1.25rem)}}&[size="2xl"]{span,p,div{font-size:var(--text-2xl, 1.5rem)}}&[size="3xl"]{span,p,div{font-size:var(--text-3xl, 1.875rem)}}&[weight=normal]{span,p,div{font-weight:var(--font-normal, 400)}}&[weight=medium]{span,p,div{font-weight:var(--font-medium, 500)}}&[weight=semibold]{span,p,div{font-weight:var(--font-semibold, 600)}}&[weight=bold]{span,p,div{font-weight:var(--font-bold, 700)}}&[muted]{span,p,div{opacity:.6}}&[mono]{span,p,div{font-family:monospace}}&[align=left]{span,p,div{text-align:left}}&[align=center]{span,p,div{text-align:center}}&[align=right]{span,p,div{text-align:right}}&[color=primary]{span,p,div{color:var(--color-primary)}}&[color=secondary]{span,p,div{color:var(--color-secondary)}}&[color=success]{span,p,div{color:var(--color-success)}}&[color=danger]{span,p,div{color:var(--color-danger)}}&[color=warning]{span,p,div{color:var(--color-warning)}}&[color=info]{span,p,div{color:var(--color-info)}}&[color=muted]{span,p,div{opacity:.6}}&[color=inverse]{span,p,div{color:var(--color-inverse)}}&[transform=capitalize]{span,p,div{text-transform:capitalize}}&[transform=uppercase]{span,p,div{text-transform:uppercase}}&[transform=lowercase]{span,p,div{text-transform:lowercase}}&[transform=none]{span,p,div{text-transform:none}}}
-`,mimeType:"text/css"},"/$app/uix/form/select.css":{content:`:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
-`,mimeType:"text/css"},"/$app/uix/layout/flex.css":{content:`:where(.uix-flex,uix-flex){display:flex;flex-direction:var(--flex-direction, row);gap:var(--flex-gap);align-items:var(--flex-align, stretch);justify-content:var(--flex-justify, flex-start);flex-wrap:var(--flex-wrap, nowrap);box-sizing:border-box;&[direction=row]{--flex-direction: row}&[direction=column]{--flex-direction: column}&[direction=row-reverse]{--flex-direction: row-reverse}&[direction=column-reverse]{--flex-direction: column-reverse}&[gap=none]{--flex-gap: 0}&[gap=xs]{--flex-gap: var(--spacing-xs, .25rem)}&[gap=sm]{--flex-gap: var(--spacing-sm, .5rem)}&[gap=md]{--flex-gap: var(--spacing-md, .75rem)}&[gap=lg]{--flex-gap: var(--spacing-lg, 1rem)}&[gap=xl]{--flex-gap: var(--spacing-xl, 1.5rem)}&[gap="2xl"]{--flex-gap: var(--spacing-2xl, 2rem)}&[gap="3xl"]{--flex-gap: var(--spacing-3xl, 3rem)}&[align=start]{--flex-align: flex-start}&[align=center]{--flex-align: center}&[align=end]{--flex-align: flex-end}&[align=stretch]{--flex-align: stretch}&[align=baseline]{--flex-align: baseline}&[justify=start]{--flex-justify: flex-start}&[justify=center]{--flex-justify: center}&[justify=end]{--flex-justify: flex-end}&[justify=space-between]{--flex-justify: space-between}&[justify=space-around]{--flex-justify: space-around}&[justify=space-evenly]{--flex-justify: space-evenly}&[wrap=wrap]{--flex-wrap: wrap}&[wrap=nowrap]{--flex-wrap: nowrap}&[wrap=wrap-reverse]{--flex-wrap: wrap-reverse}>[flex-1]{flex:1 1 0%}>[flex-auto]{flex:1 1 auto}>[flex-initial]{flex:0 1 auto}>[flex-none]{flex:none}>[flex-grow]{flex-grow:1}>[flex-grow="0"]{flex-grow:0}>[flex-shrink]{flex-shrink:1}>[flex-shrink="0"]{flex-shrink:0}>[flex-basis=auto]{flex-basis:auto}>[flex-basis="0"]{flex-basis:0}>[align-self=start]{align-self:flex-start}>[align-self=center]{align-self:center}>[align-self=end]{align-self:flex-end}>[align-self=stretch]{align-self:stretch}>[w-full]{width:100%}}
-`,mimeType:"text/css"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/accordion.css":{content:`:where(.uix-accordion,uix-accordion){display:flex;width:100%;--accordion-border-radius: var(--radius-md, .375rem);--accordion-padding: .25rem .5rem;--accordion-gap: 0;--accordion-background: transparent;--accordion-border-color: transparent;--accordion-header-background: transparent;--accordion-header-color: var(--color-surface-lighter);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-color-hover: var(--color-inverse);--accordion-header-background-active: var(--color-surface-darker);--accordion-header-color-active: var(--color-inverse);--accordion-panel-background: transparent;--accordion-panel-color: var(--color-surface-lighter);--accordion-transition: background-color .2s ease, color .2s ease, border-color .2s ease;&::part(container){display:flex;flex-direction:column;width:100%;gap:var(--accordion-gap);background:var(--accordion-background);border:1px solid var(--accordion-border-color);border-radius:var(--accordion-border-radius);overflow:hidden}>*:nth-child(odd){display:flex;width:100%;text-align:left;cursor:pointer;user-select:none;padding:var(--accordion-padding);font-size:var(--text-base, 1rem);font-weight:var(--font-medium, 500);background:var(--accordion-header-background);border:none;border-top:1px solid var(--header-border-top);transition:var(--accordion-transition);&:hover{background:var(--accordion-header-background-hover)}&[active][activeBg]{background:var(--accordion-header-background-active)}}>*:nth-child(1){border-top:none}>*:nth-child(2n){background:var(--accordion-panel-background);color:var(--accordion-panel-color);font-size:var(--text-sm, .875rem);line-height:var(--leading-relaxed, 1.6);transition:var(--accordion-transition);>*{padding-left:40px;padding-block:.5rem}&[hide]{display:none}}&[variant=bordered]{--accordion-border-color: var(--color-surface-dark);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-background-active: var(--color-surface-darker);&::part(container){border-width:2px}>*:nth-child(odd){border-top-width:1px}}&[variant=filled]{--accordion-background: var(--color-surface-lighter);--accordion-border-color: transparent;--header-border-top: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: var(--color-surface);--accordion-header-background-hover: var(--color-surface);>*:nth-child(odd)[active]{box-shadow:0 1px 2px #0003}}&[variant=flush]{--accordion-background: transparent;--accordion-border-color: transparent;--accordion-padding: 0;--header-border-top: transparent;--accordion-header-background: transparent;--accordion-header-background-hover: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: transparent;&::part(container){border:none;padding:0}>*:nth-child(odd){border-top:none}}&[variant=separated]{--accordion-gap: var(--spacing-sm, .5rem);--accordion-border-color: transparent;--header-border-top: transparent;&::part(container){border:none;padding:var(--spacing-sm, .5rem)}>*:nth-child(odd){border:1px solid var(--color-surface-dark);border-radius:var(--accordion-border-radius)}>*:nth-child(2n){border:1px solid var(--color-surface-dark);border-top:none;border-radius:0 0 var(--accordion-border-radius) var(--accordion-border-radius)}}&:not([rounded]){--accordion-border-radius: 0;&::part(container){border-radius:0}}}
-`,mimeType:"text/css"},"/$app/uix/navigation/nav-item.css":{content:`:where(.uix-nav-item,uix-nav-item){--nav-item-padding-y: .5rem;--nav-item-padding-x: .75rem;--nav-item-gap: .75rem;--nav-item-font-size: var(--text-sm, .875rem);--nav-item-line-height: var(--leading-tight, 1.25rem);--nav-item-border-radius: 0;--nav-item-color: var(--text-color, inherit);--nav-item-background: transparent;--nav-item-hover-background: var(--color-surface-dark, rgba(0, 0, 0, .05));--nav-item-hover-color: var(--text-color, inherit);--nav-item-active-background: var(--color-primary, rgba(0, 0, 0, .1));--nav-item-active-color: var(--color-surface-darker, inherit);--nav-item-disabled-opacity: .5;--nav-item-indicator-width: 2px;--nav-item-indicator-color: var(--color-primary, currentColor);--nav-item-indicator-length: 50%;--nav-item-badge-background: var(--color-surface-darker);--nav-item-badge-color: var(--text-color, #fff);--nav-item-badge-padding: .2rem .4rem;--nav-item-badge-font-size: var(--text-xs, .6rem);--nav-item-badge-border-radius: var(--radius-md);all:unset;display:flex;align-items:center;gap:var(--nav-item-gap);padding:var(--nav-item-padding-y) var(--nav-item-padding-x);font-size:var(--nav-item-font-size);line-height:var(--nav-item-line-height);color:var(--nav-item-color);background-color:var(--nav-item-background);border-radius:var(--nav-item-border-radius);cursor:pointer;transition:background-color .15s ease-in-out;width:100%;text-decoration:none;box-sizing:border-box;button{display:flex;justify-content:space-between;width:100%}&[rounded]{--nav-item-border-radius: var(--radius-md, .375rem)}&:not([prevent-collapse]){&:hover:not(:disabled){background-color:var(--nav-item-hover-background)}button{cursor:pointer}}&[size=sm]{--nav-item-padding-y: .375rem;--nav-item-padding-x: .5rem;--nav-item-gap: .5rem;--nav-item-font-size: var(--text-sm, .8125rem);--nav-item-line-height: var(--leading-tight, 1.125rem)}&[size=lg]{--nav-item-padding-y: .625rem;--nav-item-padding-x: 1rem;--nav-item-gap: 1rem;--nav-item-font-size: var(--text-base, 1rem);--nav-item-line-height: var(--leading-normal, 1.5rem)}&[active][activeBg]{background-color:var(--nav-item-active-background);color:var(--nav-item-active-color);font-weight:var(--font-semibold, 600)}&[active]:not([activeBg]){background-color:transparent;color:var(--link-active-color);font-weight:var(--font-semibold, 600)}&:disabled{opacity:var(--nav-item-disabled-opacity);cursor:not-allowed}.uix-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0}.label{flex:1;display:flex;flex-direction:row;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:inline-flex;align-items:center;justify-content:center;padding:var(--nav-item-badge-padding);font-size:var(--nav-item-badge-font-size);font-weight:var(--font-semibold, 600);line-height:1;color:var(--nav-item-badge-color);background-color:var(--nav-item-badge-background);border-radius:var(--nav-item-badge-border-radius);flex-shrink:0}&[header] button{position:relative;&:before{content:"";display:inline-block;width:.5em;height:.5em;margin-top:5px;margin-left:.5rem;margin-right:1rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s ease;flex-shrink:0;vertical-align:middle}}&[header][active] button:before{transform:rotate(45deg);margin-top:3px}&[iconOnly]{justify-content:center;padding:var(--nav-item-padding-y);.nav-item-icon{margin:0}}&[indicatorPosition]:not([indicatorPosition=none])[active]{background-color:transparent}&[indicatorPosition=left]{position:relative;&[active]:before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 var(--radius-md, 4px) var(--radius-md, 4px) 0}}&[indicatorPosition=right]{position:relative;&[active]:before{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) 0 0 var(--radius-md, 4px)}}&[indicatorPosition=top]{position:relative;&[active]:before{content:"";position:absolute;top:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 0 var(--radius-md, 4px) var(--radius-md, 4px)}}&[indicatorPosition=bottom]{position:relative;&[active]:before{content:"";position:absolute;bottom:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) var(--radius-md, 4px) 0 0}}&:not([prevent-collapse]):hover:not(:disabled):not([active]){color:var(--nav-item-hover-color)}}
-`,mimeType:"text/css"},"/$app/uix/form/input.css":{content:`:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}
-`,mimeType:"text/css"},"/$app/icon-lucide/lucide/house.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/users.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/user.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>',mimeType:"image/svg+xml"},"/views/auth-modal.css":{content:`uix-modal::part(dialog){border:4px solid black;border-radius:1.5rem;box-shadow:8px 8px #ffffff80;max-width:28rem;padding:0;overflow:hidden}uix-modal::part(header){background:var(--color-primary);color:#000;border-bottom:3px solid black;padding:1.5rem}uix-modal::part(body){padding:0}
-`,mimeType:"text/css"},"/$app/uix/layout/split-pane.css":{content:`:where(.uix-split-pane,uix-split-pane){display:flex;width:100%;height:100%;overflow:hidden;>[slot]{width:100%}&::part(primary),&::part(secondary){width:100%;display:flex;overflow:auto;background:var( --split-pane-panel-bg, var(--color-surface-darker, #282828) );flex-shrink:0;flex-grow:0}&::part(primary){min-width:0;min-height:0}&::part(secondary){flex:1;min-width:0;min-height:0}&::part(divider){display:flex;align-items:center;justify-content:center;background:var( --split-pane-divider-bg, var(--color-surface, #504945) );flex-shrink:0;position:relative;z-index:10;transition:background .15s ease}&[direction=horizontal],&:not([direction]){flex-direction:row;&::part(divider){width:var(--divider-size, 4px);cursor:default;&:before{width:var(--divider-size, 4px);height:48px}}}&[direction=vertical]{flex-direction:column;&::part(divider){height:var(--divider-size, 4px);cursor:default;&:before{width:48px;height:var(--divider-size, 4px)}}}&[resizable]{&::part(divider):hover{background:var( --split-pane-divider-hover-bg, var(--color-primary, #fabd2f) )}&::part(divider):active{background:var( --split-pane-divider-active-bg, var(--color-primary, #fabd2f) )}&::part(divider):before{content:"";position:absolute;background:var(--color-surface-light, #3c3836);border-radius:var(--radius-full, 9999px);opacity:0;transition:opacity .2s ease}&::part(divider):hover:before{opacity:1}&[direction=horizontal]::part(divider),&:not([direction])::part(divider){cursor:col-resize}&[direction=vertical]::part(divider){cursor:row-resize}}&[dragging]{user-select:none;&[direction=horizontal],&:not([direction]){cursor:col-resize;*{cursor:col-resize!important}}&[direction=vertical]{cursor:row-resize;*{cursor:row-resize!important}}}}@media (pointer: coarse){:where(.uix-split-pane,uix-split-pane){&[direction=horizontal]::part(divider),&:not([direction])::part(divider){width:calc(var(--divider-size, 4px) * 2);margin-left:calc(var(--divider-size, 4px) * -.5);margin-right:calc(var(--divider-size, 4px) * -.5)}&[direction=vertical]::part(divider){height:calc(var(--divider-size, 4px) * 2);margin-top:calc(var(--divider-size, 4px) * -.5);margin-bottom:calc(var(--divider-size, 4px) * -.5)}}}
-`,mimeType:"text/css"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/book-open.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/book.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/download.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5l5-5m-5 5V3"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/sliders-vertical.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M2 14h4m4-6h4m4 8h4"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/droplet.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/compass.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16.24 7.76l-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/eye.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layers.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83ZM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65m20-5l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/layout-grid.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/loader.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4m4.2 1.8l2.9-2.9M18 12h4m-5.8 4.2l2.9 2.9M12 18v4m-7.1-2.9l2.9-2.9M2 12h4M4.9 4.9l2.9 2.9"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/pen-tool.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/><path d="m18 13l-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18M2.3 2.3l7.286 7.286"/><circle cx="11" cy="11" r="2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list-checks.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m3 17l2 2l4-4M3 7l2 2l4-4m4 1h8m-8 6h8m-8 6h8"/></svg>',mimeType:"image/svg+xml"},"/$app/admin/views/dashboard.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import { getModelNames, capitalize } from "../utils/model-utils.js";
-
-export default {
-  tag: "admin-dashboard",
-  style: true,
-  properties: {
-    modelStats: T.object({ defaultValue: {} }),
-    loading: T.boolean({ defaultValue: true }),
-  },
-
-  async connected() {
-    await this.loadStats();
-  },
-
-  async loadStats() {
-    this.loading = true;
-    const stats = {};
-    const models = getModelNames();
-
-    for (const model of models) {
-      try {
-        const records = await $APP.Model[model].getAll();
-        stats[model] = Array.isArray(records) ? records.length : 0;
-      } catch (error) {
-        console.error(\`Error loading stats for \${model}:\`, error);
-        stats[model] = 0;
-      }
-    }
-
-    this.modelStats = stats;
-    this.loading = false;
-  },
-
-  navigate(path) {
-    $APP.Router.go(path);
-  },
-
-  render() {
-    if (this.loading) {
-      return html\`
-        <div class="admin-dashboard-loading">
-          <uix-spinner size="lg"></uix-spinner>
-        </div>
-      \`;
-    }
-
-    const models = Object.entries(this.modelStats);
-    const totalRecords = Object.values(this.modelStats).reduce((a, b) => a + b, 0);
-
-    return html\`
-      <div class="admin-dashboard">
-        <!-- Header -->
-        <div class="admin-dashboard-header">
-          <h1 class="admin-dashboard-title">Dashboard</h1>
-          <p class="admin-dashboard-subtitle">Manage your application data and settings</p>
-        </div>
-
-        <!-- Summary Card -->
-        <uix-card class="admin-dashboard-summary">
-          <div class="admin-dashboard-summary-content">
-            <div>
-              <p class="admin-dashboard-stat-label">Total Records</p>
-              <p class="admin-dashboard-stat-value">\${totalRecords}</p>
-            </div>
-            <div class="admin-dashboard-stat-right">
-              <p class="admin-dashboard-stat-label">Models</p>
-              <p class="admin-dashboard-stat-value">\${models.length}</p>
-            </div>
-          </div>
-        </uix-card>
-
-        <!-- Model Stats Grid -->
-        <section class="admin-dashboard-section">
-          <h2 class="admin-dashboard-section-title">Models</h2>
-          <div class="admin-dashboard-grid">
-            \${models.map(
-              ([model, count]) => html\`
-                <uix-card
-                  hover
-                  class="admin-dashboard-model-card"
-                  @click=\${() => this.navigate(\`/admin/models/\${model}\`)}
-                >
-                  <div class="admin-dashboard-model-header">
-                    <uix-icon name="database" size="24"></uix-icon>
-                    <span class="admin-dashboard-model-count">\${count}</span>
-                  </div>
-                  <p class="admin-dashboard-model-name">\${model}</p>
-                  <p class="admin-dashboard-model-label">
-                    \${count === 1 ? "record" : "records"}
-                  </p>
-                </uix-card>
-              \`,
-            )}
-          </div>
-        </section>
-
-        <!-- Quick Actions -->
-        <section class="admin-dashboard-section">
-          <h2 class="admin-dashboard-section-title">Quick Actions</h2>
-          <div class="admin-dashboard-actions">
-            <uix-button
-              class="admin-action-deploy"
-              @click=\${() => this.navigate("/admin/deploy")}
-            >
-              <uix-icon name="rocket" size="24"></uix-icon>
-              Deploy
-            </uix-button>
-
-            <uix-button
-              class="admin-action-theme"
-              @click=\${() => this.navigate("/admin/theme")}
-            >
-              <uix-icon name="palette" size="24"></uix-icon>
-              Theme
-            </uix-button>
-
-            <uix-button
-              class="admin-action-refresh"
-              @click=\${() => this.loadStats()}
-            >
-              <uix-icon name="refresh-cw" size="24"></uix-icon>
-              Refresh
-            </uix-button>
-          </div>
-        </section>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/admin/views/dashboard.css":{content:`.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}
-`,mimeType:"text/css"},"/$app/uix/feedback/spinner.js":{content:`/**
- * Spinner Component
- *
- * @component
- * @category feedback
- * @tag uix-spinner
- *
- * A loading spinner component with multiple animation variants and sizes.
- * Uses pure CSS animations for performance.
- *
- * @example Basic Spinner
- * \`\`\`html
- * <uix-spinner></uix-spinner>
- * \`\`\`
- *
- * @example Spinner Variants
- * Different animation styles
- * \`\`\`html
- * <div class="flex gap-4">
- *   <uix-spinner variant="circular"></uix-spinner>
- *   <uix-spinner variant="dots"></uix-spinner>
- *   <uix-spinner variant="bars"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Spinner Sizes
- * \`\`\`html
- * <div class="flex gap-4 items-center">
- *   <uix-spinner size="xs"></uix-spinner>
- *   <uix-spinner size="sm"></uix-spinner>
- *   <uix-spinner size="md"></uix-spinner>
- *   <uix-spinner size="lg"></uix-spinner>
- *   <uix-spinner size="xl"></uix-spinner>
- * </div>
- * \`\`\`
- *
- * @example Colored Spinner
- * \`\`\`html
- * <uix-spinner primary></uix-spinner>
- * <uix-spinner secondary></uix-spinner>
- * <uix-spinner success></uix-spinner>
- * <uix-spinner danger></uix-spinner>
- * \`\`\`
- *
- * @example Custom Color
- * \`\`\`html
- * <uix-spinner style="--spinner-color: #ff6b6b;"></uix-spinner>
- * \`\`\`
- */
-
-import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-spinner",
-  properties: {
-    variant: T.string({
-      defaultValue: "circular",
-      enum: ["circular", "dots", "bars"],
-    }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    primary: T.boolean(),
-    secondary: T.boolean(),
-    success: T.boolean(),
-    danger: T.boolean(),
-    warning: T.boolean(),
-    info: T.boolean(),
-  },
-  style: true,
-  render() {
-    // Circular variant uses CSS ::before pseudo-element
-    if (this.variant === "circular") {
-      return html\`\`;
-    }
-
-    // Dots and bars variants need 3 elements
-    if (this.variant === "dots") {
-      return html\`
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      \`;
-    }
-
-    if (this.variant === "bars") {
-      return html\`
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-      \`;
-    }
-
-    return html\`\`;
-  },
-};
 `,mimeType:"text/javascript"},"/$app/uix/feedback/spinner.css":{content:`:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}
-`,mimeType:"text/css"},"/$app/uix/layout/card.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  extends: "uix-container",
-  i18n: {},
-  style: true,
-  shadow: true,
-  properties: {
-    borderWidth: T.string({
-      defaultValue: "1",
-      enum: ["none", "1", "2", "3"],
-    }),
-    borderStyle: T.string({
-      defaultValue: "solid",
-      enum: ["solid", "dashed", "dotted"],
-    }),
-    shadow: T.string({
-      defaultValue: "none",
-      enum: ["none", "sm", "md", "lg"],
-    }),
-    hover: T.boolean({
-      defaultValue: false,
-    }),
-    gap: T.string({
-      defaultValue: "md",
-      enum: ["none", "xs", "sm", "md", "lg", "xl"],
-    }),
-  },
-  render() {
-    return html\`
-      <slot name="header" part="header"></slot>
-      <slot part="body"><slot></slot></slot>
-      
-      <slot part="footer" name="footer"></slot>
-    \`;
-  },
-};
-
-/**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * Card Component
- *
- * @component
- * @category layout
- * @tag uix-card
- *
- * A versatile container component for displaying grouped content with optional
- * header and footer sections. Supports different variants and padding options.
- *
- * @slot header - Optional header content
- * @slot - Default slot for card body content
- * @slot footer - Optional footer content
- * @part header - The card header container
- * @part body - The card body container
- * @part footer - The card footer container
- *
- * @example Basic Card
- * \`\`\`html
- * <uix-card>
- *   <h3 slot="header">Card Title</h3>
- *   <p>Card content goes here...</p>
- * </uix-card>
- * \`\`\`
- *
- * @example Card with Footer
- * \`\`\`html
- * <uix-card>
- *   <header slot="header"><h3 class="flex">User Profile</h3></header>
- *   <article>
- *     <p>John Doe</p>
- *     <p>Software Engineer</p>
- *   </article>
- *   <footer slot="footer">
- *     <uix-button primary>Edit</uix-button>
- *     <uix-button>Cancel</uix-button>
- *   </footer>
- * </uix-card>
- * \`\`\`
- *
- * @example Card Variants
- * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card variant="default">Default Card</uix-card>
- *  <uix-card variant="elevated">Elevated Card</uix-card>
- * </div>
- * \`\`\`
- *
- * @example Card Padding Options
- * \`\`\`html
- * <div class="flex flex-row gap-2">
- *  <uix-card padding="none">No Padding</uix-card>
- *  <uix-card padding="sm">Small Padding</uix-card>
- *  <uix-card padding="md">Medium Padding</uix-card>
- *  <uix-card padding="lg">Large Padding</uix-card>
- * </div>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/display/button.js":{content:`import T from "/$app/types/index.js";
-
-export default {
-  tag: "uix-button",
-  properties: {
-    variant: T.string(),
-    primary: T.boolean(),
-    secondary: T.boolean(),
-    danger: T.boolean(),
-    success: T.boolean(),
-    ghost: T.boolean(),
-    outline: T.boolean(),
-    border: T.boolean(),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    wFull: T.boolean(false),
-  },
-  extends: "uix-link",
-  style: true,
-};
-
-/**
- * Button Component
- *
- * @component
- * @category display
- * @tag uix-button
- *
- * A flexible button component for user actions. Supports multiple variants,
- * sizes, icons, and states. Extends uix-link for navigation functionality.
- *
- * @example Basic Button
- * \`\`\`html
- * <uix-button>Click me</uix-button>
- * \`\`\`
- *
- * @example Button Variants
- * Different visual styles for various action types
- * \`\`\`html
- * <div class="flex flex-col gap-2 items-center">
- *  <uix-button>Default</uix-button>
- *  <uix-button primary>Primary</uix-button>
- *  <uix-button secondary>Secondary</uix-button>
- *  <uix-button success>Success</uix-button>
- *  <uix-button danger>Danger</uix-button>
- * </div>
- * \`\`\`
- *
- * @example Button Styles
- * Different style treatments
- * \`\`\`html
- * <div class="flex flex-col gap-2 items-center">
- *  <uix-button primary>Solid</uix-button>
- *  <uix-button danger ghost>Ghost</uix-button>
- *  <uix-button secondary outline>Outline</uix-button>
- *  <uix-button primary border>Border</uix-button>
- * </div>
- * \`\`\`
- *
- * @example Button Sizes
- * \`\`\`html
- * <div class="flex flex-col gap-2 items-center">
- *  <uix-button size="xs">Extra Small</uix-button>
- *  <uix-button size="sm">Small</uix-button>
- *  <uix-button size="md">Medium</uix-button>
- *  <uix-button size="lg">Large</uix-button>
- *  <uix-button size="xl">Extra Large</uix-button>
- * </div>
- * \`\`\`
- *
- * @example Disabled Button
- * \`\`\`html
- * <uix-button disabled>Cannot Click</uix-button>
- * \`\`\`
- *
- * @example With Click Handler
- * \`\`\`javascript
- * import { html } from "/npm/lit-html";
- *
- * export default {
- *   tag: "my-component",
- *
- *   handleClick() {
- *     alert("Button clicked!");
- *   },
- *
- *   render() {
- *     return html\`
- *       <uix-button
- *         primary
- *         @click=\${this.handleClick.bind(this)}
- *       >
- *         Click me
- *       </uix-button>
- *     \`;
- *   }
- * };
- * \`\`\`
- *
- * @example As Link
- * \`\`\`html
- * <uix-button href="/dashboard">Go to Dashboard</uix-button>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/rocket.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0m1 7v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/refresh-cw.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9a9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5m5 4a9 9 0 0 1-9 9a9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/layout/card.css":{content:`:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}
-`,mimeType:"text/css"},"/$app/uix/display/button.css":{content:`:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}
-`,mimeType:"text/css"},"/$app/admin/views/model-list.js":{content:`import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-import { keyed } from "/npm/lit-html/directives/keyed.js";
-import {
-  capitalize,
-  getDisplayColumns,
-  getModelSchema,
-  getSingularName,
-} from "../utils/model-utils.js";
-import { getModelActions, getPluginModals } from "../plugins.js";
-
-export default {
-  tag: "admin-model-list",
-  style: true,
-  dataQuery: true,
-  properties: {
-    rows: T.array(),
-    model: T.string(),
-    selectedRow: T.object(),
-    selectedColumns: T.array({ sync: "local", scope: "model" }),
-    viewMode: T.string({ defaultValue: "list", enum: ["list", "board"] }),
-    groupByField: T.string({ sync: "local", scope: "model", defaultValue: "" }),
-    modalOpen: T.boolean({ defaultValue: false }),
-    confirmDelete: T.boolean({ defaultValue: false }),
-    searchQuery: T.string({ defaultValue: "" }),
-    pluginModal: T.string({ defaultValue: "" }),
-  },
-
-  connected() {
-    if (!this.selectedColumns || this.selectedColumns.length === 0) {
-      this.selectedColumns = getDisplayColumns(this.model);
-    }
-  },
-
-  getColumns() {
-    const schema = getModelSchema(this.model);
-    return this.selectedColumns
-      .map((colName) => {
-        const field = schema.find((f) => f.name === colName);
-        return {
-          name: colName,
-          label: field?.label || capitalize(colName),
-          type: field?.type || "string",
-          sortable: true,
-        };
-      })
-      .filter(Boolean);
-  },
-
-  getGroupableFields() {
-    const schema = getModelSchema(this.model);
-    const groupable = schema.filter((f) => {
-      const type = f.type?.toLowerCase() || "";
-      return (
-        f.enum ||
-        type === "enum" ||
-        type === "belongs" ||
-        type === "string" ||
-        type === "boolean"
-      );
-    });
-    return groupable.sort((a, b) => {
-      const aScore = a.enum ? 0 : a.type === "belongs" ? 1 : 2;
-      const bScore = b.enum ? 0 : b.type === "belongs" ? 1 : 2;
-      return aScore - bScore;
-    });
-  },
-
-  openCreateForm() {
-    this.selectedRow = {};
-    this.modalOpen = true;
-  },
-
-  openEditForm(row) {
-    this.selectedRow = { ...row };
-    this.modalOpen = true;
-  },
-
-  closeModal() {
-    this.modalOpen = false;
-    this.selectedRow = null;
-    this.confirmDelete = false;
-  },
-
-  openPluginModal(name) {
-    this.pluginModal = name;
-  },
-
-  closePluginModal() {
-    this.pluginModal = "";
-  },
-
-  handlePluginAction(action) {
-    const context = {
-      model: this.model,
-      rows: this.rows,
-      openModal: (name) => this.openPluginModal(name),
-      refresh: () => this.dispatchEvent(new CustomEvent("refresh")),
-    };
-    action.handler(context);
-  },
-
-  async handleFormSubmit(e) {
-    const data = e.detail;
-
-    try {
-      let error, result;
-      if (data.id) {
-        [error, result] = await $APP.Model[this.model].edit(data);
-      } else {
-        [error, result] = await $APP.Model[this.model].add(data);
-      }
-
-      if (error) {
-        // Pass errors to form for display
-        const form = this.querySelector("admin-model-form uix-form");
-        form?.setErrors(error);
-        return;
-      }
-
-      this.closeModal();
-      this.dispatchEvent(new CustomEvent("refresh"));
-    } catch (error) {
-      console.error("Error saving:", error);
-      alert(\`Error: \${error.message}\`);
-    }
-  },
-
-  async handleDelete() {
-    if (!this.selectedRow?.id) return;
-
-    try {
-      await $APP.Model[this.model].remove(this.selectedRow.id);
-      this.closeModal();
-      this.dispatchEvent(new CustomEvent("refresh"));
-    } catch (error) {
-      console.error("Error deleting:", error);
-      alert(\`Error: \${error.message}\`);
-    }
-  },
-
-  toggleColumn(column) {
-    if (column === "id") return;
-    const current = [...(this.selectedColumns || [])];
-    const index = current.indexOf(column);
-    if (index === -1) {
-      current.push(column);
-    } else {
-      current.splice(index, 1);
-    }
-    this.selectedColumns = current;
-  },
-
-  filterRows(rows) {
-    if (!this.searchQuery) return rows;
-    const query = this.searchQuery.toLowerCase();
-    return rows.filter((row) =>
-      Object.values(row).some((val) =>
-        String(val).toLowerCase().includes(query),
-      ),
-    );
-  },
-
-  render() {
-    const { rows, model, selectedRow, modalOpen, confirmDelete } = this;
-    const modelName = getSingularName(model);
-    const schema = getModelSchema(model);
-    const columns = this.getColumns();
-    const filteredRows = this.filterRows(rows || []);
-
-    return html\`
-      <div class="admin-model-list">
-        <!-- Header -->
-        <div class="admin-model-list-header">
-          <div>
-            <h1 class="admin-model-list-title">\${capitalize(model)}</h1>
-            <p class="admin-model-list-count">\${filteredRows.length} records</p>
-          </div>
-
-          <div class="admin-model-list-actions">
-            <!-- Column Selector -->
-            <uix-dropdown>
-              <uix-button slot="trigger" ghost>
-                <uix-icon name="columns-3" size="18"></uix-icon>
-                Columns
-              </uix-button>
-              <div class="admin-dropdown-content">
-                \${schema.map(
-                  (field) => html\`
-                    <label class="admin-dropdown-item">
-                      <uix-checkbox
-                        ?checked=\${this.selectedColumns?.includes(field.name)}
-                        ?disabled=\${field.name === "id"}
-                        @change=\${() => this.toggleColumn(field.name)}
-                      ></uix-checkbox>
-                      <span>\${field.label || field.name}</span>
-                    </label>
-                  \`,
-                )}
-              </div>
-            </uix-dropdown>
-
-            <!-- Group By Field Selector (Board Mode) -->
-            \${
-              this.viewMode === "board"
-                ? html\`
-                  <uix-dropdown>
-                    <uix-button slot="trigger" ghost>
-                      <uix-icon name="layers" size="18"></uix-icon>
-                      \${
-                        this.groupByField
-                          ? capitalize(this.groupByField)
-                          : "No Grouping"
-                      }
-                    </uix-button>
-                    <div class="admin-dropdown-content">
-                      <button
-                        class="admin-dropdown-item \${!this.groupByField ? "active" : ""}"
-                        @click=\${() => (this.groupByField = "")}
-                      >
-                        <uix-icon name="layout-grid" size="16"></uix-icon>
-                        No Grouping
-                      </button>
-                      \${this.getGroupableFields().map(
-                        (field) => html\`
-                          <button
-                            class="admin-dropdown-item \${this.groupByField === field.name ? "active" : ""}"
-                            @click=\${() => (this.groupByField = field.name)}
-                          >
-                            <uix-icon
-                              name=\${field.enum ? "list-filter" : field.type === "belongs" ? "link" : "type"}
-                              size="16"
-                            ></uix-icon>
-                            \${field.label || capitalize(field.name)}
-                          </button>
-                        \`,
-                      )}
-                    </div>
-                  </uix-dropdown>
-                \`
-                : ""
-            }
-
-            <!-- View Mode Toggle -->
-            <div class="admin-view-toggle">
-              <uix-button
-                ghost
-                size="sm"
-                ?primary=\${this.viewMode === "list"}
-                @click=\${() => (this.viewMode = "list")}
-              >
-                <uix-icon name="list" size="18"></uix-icon>
-              </uix-button>
-              <uix-button
-                ghost
-                size="sm"
-                ?primary=\${this.viewMode === "board"}
-                @click=\${() => (this.viewMode = "board")}
-              >
-                <uix-icon name="kanban" size="18"></uix-icon>
-              </uix-button>
-            </div>
-
-            <!-- Import/Export -->
-            <admin-import .model=\${model}></admin-import>
-            <admin-export .model=\${model} .rows=\${rows}></admin-export>
-
-            <!-- Plugin Actions -->
-            \${getModelActions(model).map(
-              (action) => html\`
-                <uix-button ghost @click=\${() => this.handlePluginAction(action)}>
-                  <uix-icon name=\${action.icon || "plug"} size="18"></uix-icon>
-                  \${action.label}
-                </uix-button>
-              \`,
-            )}
-
-            <!-- New Button -->
-            <uix-button primary @click=\${this.openCreateForm}>
-              <uix-icon name="plus" size="20"></uix-icon>
-              New \${capitalize(modelName)}
-            </uix-button>
-          </div>
-        </div>
-
-        <!-- Search -->
-        <div class="admin-model-list-search">
-          <uix-input
-            w-full
-            type="search"
-            placeholder="Search..."
-            icon="search"
-            .value=\${this.searchQuery}
-            @input=\${(e) => (this.searchQuery = e.target.value)}
-          ></uix-input>
-        </div>
-
-        <!-- Content Area -->
-        \${
-          this.viewMode === "board"
-            ? html\`
-              <admin-board
-                .model=\${model}
-                .rows=\${filteredRows}
-                .groupByField=\${this.groupByField}
-                @select-item=\${(e) => this.openEditForm(e.detail)}
-                @new-item=\${(e) => {
-                  this.selectedRow = e.detail || {};
-                  this.modalOpen = true;
-                }}
-              ></admin-board>
-            \`
-            : html\`
-                <uix-data-table
-                  .data-query=\${{ model, key: "rows" }}
-                  .columns=\${columns}
-                  .selectRow=\${(row) => this.openEditForm(row)}
-                ></uix-data-table>
-            \`
-        }
- 
-        <!-- Edit/Create Modal -->
-        <uix-modal
-          ?open=\${modalOpen}
-          @modal-close=\${this.closeModal}
-        >
-          <div slot="header">
-            \${
-              selectedRow?.id
-                ? html\`Edit \${capitalize(modelName)} <span class="admin-modal-id">#\${selectedRow.id}</span>\`
-                : html\`New \${capitalize(modelName)}\`
-            }
-          </div>
-          \${
-            modalOpen
-              ? keyed(
-                  selectedRow,
-                  html\`
-                  <admin-model-form
-                    .model=\${model}
-                    .row=\${selectedRow}
-                    @form-submit=\${this.handleFormSubmit}
-                  ></admin-model-form>
-                \`,
-                )
-              : ""
-          }
-          <div slot="footer">
-            <uix-button ghost @click=\${this.closeModal}>
-              Cancel
-            </uix-button>
-            \${
-              selectedRow?.id
-                ? html\`
-                <uix-button danger ghost @click=\${() => (this.confirmDelete = true)}>
-                  <uix-icon name="trash" size="18"></uix-icon>
-                  Delete
-                </uix-button>
-              \`
-                : ""
-            }
-            <uix-button primary @click=\${() => this.querySelector("admin-model-form")?.submit()}>
-              <uix-icon name=\${selectedRow?.id ? "save" : "plus"} size="18"></uix-icon>
-              \${selectedRow?.id ? "Save" : "Create"}
-            </uix-button>
-          </div>
-        </uix-modal>
-
-        <!-- Delete Confirmation Modal -->
-        <uix-modal
-          ?open=\${confirmDelete}
-          @modal-close=\${() => (this.confirmDelete = false)}
-          size="sm"
-        >
-          <div slot="header">Delete \${capitalize(modelName)}?</div>
-          <div class="admin-delete-confirm">
-            <div class="admin-delete-icon">
-              <uix-icon name="alert-triangle" size="24"></uix-icon>
-            </div>
-            <div>
-              <p class="admin-delete-text">This action cannot be undone.</p>
-            </div>
-          </div>
-          <div slot="footer">
-            <uix-button ghost @click=\${() => (this.confirmDelete = false)}>
-              Cancel
-            </uix-button>
-            <uix-button danger @click=\${this.handleDelete}>
-              <uix-icon name="trash" size="18"></uix-icon>
-              Delete
-            </uix-button>
-          </div>
-        </uix-modal>
-
-        <!-- Plugin Modals -->
-        \${Object.entries(getPluginModals()).map(
-          ([name, config]) => html\`
-            <uix-modal
-              ?open=\${this.pluginModal === name}
-              @modal-close=\${() => this.closePluginModal()}
-              @close-modal=\${() => this.closePluginModal()}
-              @refresh=\${() => {
-                this.closePluginModal();
-                this.dispatchEvent(new CustomEvent("refresh"));
-              }}
-              size="lg"
-            >
-              <div slot="header">\${config.title || capitalize(name.replace(/-/g, " "))}</div>
-              \${this.pluginModal === name ? config.component({ model, context: this }) : ""}
-            </uix-modal>
-          \`,
-        )}
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/admin/views/model-list.css":{content:`.admin-model-list{padding:var(--admin-list-padding, 2rem)}.admin-model-list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--admin-list-header-margin, 1.5rem)}.admin-model-list-title{font-size:var(--admin-list-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0}.admin-model-list-count{color:var(--admin-list-count-color, #6b7280);margin:0}.admin-model-list-actions{display:flex;align-items:center;gap:var(--admin-list-actions-gap, 1rem)}.admin-view-toggle{display:flex;border:2px solid var(--admin-toggle-border, #000);border-radius:var(--admin-toggle-radius, .5rem);overflow:hidden}.admin-view-toggle uix-button{border-radius:0}.admin-dropdown-content{padding:var(--admin-dropdown-padding, .5rem);max-height:var(--admin-dropdown-max-height, 16rem);overflow-y:auto}.admin-dropdown-item{display:flex;align-items:center;gap:.5rem;width:100%;padding:var(--admin-dropdown-item-padding, .5rem .75rem);border:none;background:none;border-radius:var(--admin-dropdown-item-radius, .5rem);cursor:pointer;text-align:left;font-size:.875rem;transition:background-color .15s ease}.admin-dropdown-item:hover{background:var(--admin-dropdown-item-hover, #f3f4f6)}.admin-dropdown-item.active{background:var(--admin-dropdown-item-active, #f3f4f6);font-weight:700}.admin-model-list-search{margin-bottom:var(--admin-list-search-margin, 1.5rem);max-width:var(--admin-list-search-width, 28rem)}.admin-table-card{overflow:hidden}.admin-table-scroll{overflow-x:auto}.admin-table{width:100%;border-collapse:collapse}.admin-table thead{background:var(--admin-table-header-bg, #f3f4f6);border-bottom:3px solid var(--admin-table-border, #000)}.admin-table th{padding:var(--admin-table-cell-padding, .75rem 1rem);text-align:left;font-size:.875rem;font-weight:900;text-transform:uppercase;letter-spacing:.025em}.admin-table tbody tr{cursor:pointer;transition:background-color .15s ease;border-bottom:1px solid var(--admin-table-row-border, #e5e7eb)}.admin-table tbody tr:hover{background:var(--admin-table-row-hover, #f9fafb)}.admin-table td{padding:var(--admin-table-cell-padding, .75rem 1rem);font-size:.875rem}.admin-table-actions-col{text-align:right;width:1%;white-space:nowrap}.admin-table-empty{padding:var(--admin-table-empty-padding, 3rem);text-align:center;color:var(--admin-table-empty-color, #6b7280)}.admin-table-empty uix-icon{margin:0 auto 1rem;opacity:.5}.admin-table-empty-title{font-size:1.125rem;font-weight:500;margin:0 0 .25rem}.admin-table-empty-text{font-size:.875rem;margin:0}.admin-delete-confirm{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}.admin-delete-icon{padding:.75rem;background:var(--admin-delete-icon-bg, #fee2e2);border-radius:9999px;color:var(--admin-delete-icon-color, #dc2626)}.admin-delete-title{font-weight:900;font-size:1.125rem;margin:0}.admin-delete-text{color:var(--admin-delete-text-color, #6b7280);font-size:.875rem;margin:0}.admin-modal-id{font-weight:400;color:var(--text-muted, #6b7280);font-size:.875em}.admin-modal-footer{display:flex;gap:1rem}.admin-modal-footer uix-button{flex:1}
-`,mimeType:"text/css"},"/$app/uix/overlay/dropdown.js":{content:`import T from "/$app/types/index.js";
-
-export default {
-  style: true,
-  extends: "uix-popover-controller",
-  tag: "uix-dropdown",
-  properties: {
-    autoClose: T.boolean(true),
-  },
-
-  connected() {
-    this.setAttribute("role", "menu");
-    this.addEventListener("click", this._handleMenuClick);
-  },
-
-  disconnected() {
-    this.removeEventListener("click", this._handleMenuClick);
-  },
-
-  _handleMenuClick(e) {
-    if (!this.autoClose) return;
-
-    // Close dropdown when a menu item (link or button) is clicked
-    const target = e.target;
-    const link = target.closest("a, button");
-
-    // Don't close if it's a button that triggers another popover
-    if (link && !link.closest("[popovertarget]")) {
-      this._close();
-    }
-  },
-};
-
-/**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * UIX Dropdown Component
- * Shows dropdown menu using custom popover system.
- * Extends uix-popover-controller for positioning and state management.
- *
- * @extends uix-popover-controller
- * @slot - Default slot for dropdown menu items
- *
- * @property {string} position - Positioning relative to trigger (inherited from popover-controller)
- * @property {boolean} autoClose - Auto-close when menu item is clicked (default true)
- *
- * @example Basic Dropdown
- * \`\`\`html
- * <uix-button popovertarget="menu5">Toggle Menu</uix-button>
-<uix-dropdown id="menu5">
-    <div class="dropdown-header">Settings</div>
-    <a href="/profile">Profile</a>
-    <a href="/preferences">Preferences</a>
-    <hr>
-    <div class="dropdown-header">Account</div>
-    <a href="/logout">Logout</a>
-  </uix-dropdown>
-
- * \`\`\`
- *
- * @example Different Positions
- * \`\`\`html
- * <uix-button popovertarget="dropdown1">Bottom Menu</uix-button>
- * <uix-dropdown id="dropdown1" position="bottom">
-
- *     <uix-nav-item
- *        href="/item1"
- *        label="Item 1"></uix-nav-item>
- *     <uix-nav-item
- *        href="/item2"
- *        label="Item 2"></uix-nav-item>
- * </uix-dropdown>
- *
- * <uix-button popovertarget="dropdown2">Top Menu</uix-button>
- * <uix-dropdown id="dropdown2" position="top">
- *     <uix-nav-item
- *        href="/item1"
- *        label="Item 1"></uix-nav-item>
- *     <uix-nav-item
- *        href="/item2"
- *        label="Item 2"></uix-nav-item>
- * </uix-dropdown>
- *
- * <uix-button popovertarget="dropdown3">Right-Aligned Menu</uix-button>
- * <uix-dropdown id="dropdown3" position="right">
- *     <uix-nav-item
- *        href="/item1"
- *        label="Item 1"></uix-nav-item>
- *     <uix-nav-item
- *        href="/item2"
- *        label="Item 2"></uix-nav-item>
- * </uix-dropdown>
- * \`\`\`
- *
- * @example With Custom Content
- * \`\`\`html
- * <uix-button popovertarget="products-menu">
- *   Products <uix-icon name="chevron-down"></uix-icon>
- * </uix-button>
- * <uix-dropdown id="products-menu" position="bottom-left">
- *   <a href="/product1">Product 1</a>
- *   <a href="/product2">Product 2</a>
- *   <hr>
- *   <a href="/all-products">View All</a>
- * </uix-dropdown>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/form/checkbox.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-checkbox-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-checkbox",
-  properties: {
-    id: T.string(),
-    label: T.string(),
-    checked: T.boolean(false),
-    value: T.string(""),
-    name: T.string(""),
-    disabled: T.boolean(false),
-    required: T.boolean(false),
-    indeterminate: T.boolean(false),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    variant: T.string({
-      defaultValue: "primary",
-      enum: ["primary", "secondary", "success", "warning", "error"],
-    }),
-  },
-  style: true,
-  shadow: false,
-  formAssociated: true,
-
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._updateFormValue();
-    if (!this.id && !this._checkboxId) {
-      this._checkboxId = generateId();
-    }
-  },
-
-  get checkboxId() {
-    return this.id || this._checkboxId || (this._checkboxId = generateId());
-  },
-
-  updated({ changedProps }) {
-    if (changedProps.has("checked")) {
-      this._updateFormValue();
-    }
-    // Handle indeterminate state
-    if (changedProps.has("indeterminate")) {
-      const input =
-        this.shadowRoot?.querySelector("input") || this.querySelector("input");
-      if (input) {
-        input.indeterminate = this.indeterminate;
-      }
-    }
-  },
-
-  _updateFormValue() {
-    if (this._internals) {
-      this._internals.setFormValue(this.checked ? this.value || "on" : null);
-    }
-  },
-
-  handleChange(e) {
-    this.checked = e.target.checked;
-    this.indeterminate = false;
-    this._updateFormValue();
-    this.emit("change", { checked: this.checked, value: this.value });
-  },
-
-  render() {
-    const id = this.checkboxId;
-    return html\`
-      <input
-        type="checkbox"
-        id=\${id}
-        class="checkbox"
-        ?checked=\${this.checked}
-        .indeterminate=\${this.indeterminate}
-        value=\${this.value}
-        name=\${this.name}
-        ?disabled=\${this.disabled}
-        ?required=\${this.required}
-        @change=\${this.handleChange.bind(this)}
-      />
-      \${this.label ? html\`<uix-label inline for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-    \`;
-  },
-};
-
-/**
- * Checkbox Component
- *
- * @component
- * @category form
- * @tag uix-checkbox
- *
- * A checkbox input for boolean selections with label support.
- *
- * @example
- * // Basic checkbox
- * \`\`\`html
- * <uix-checkbox label="Accept terms and conditions"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Checked by default
- * \`\`\`html
- * <uix-checkbox checked label="Subscribe to newsletter"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox size="xs" label="Extra small"></uix-checkbox>
- *   <uix-checkbox size="sm" label="Small"></uix-checkbox>
- *   <uix-checkbox size="md" checked label="Medium"></uix-checkbox>
- *   <uix-checkbox size="lg" label="Large"></uix-checkbox>
- *   <uix-checkbox size="xl" label="Extra large"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // Color variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox variant="primary" checked label="Primary"></uix-checkbox>
- *   <uix-checkbox variant="secondary" checked label="Secondary"></uix-checkbox>
- *   <uix-checkbox variant="success" checked label="Success"></uix-checkbox>
- *   <uix-checkbox variant="warning" checked label="Warning"></uix-checkbox>
- *   <uix-checkbox variant="error" checked label="Error"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // Indeterminate state
- * \`\`\`html
- * <uix-checkbox indeterminate label="Select all"></uix-checkbox>
- * \`\`\`
- *
- * @example
- * // Disabled state
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-checkbox disabled label="Disabled unchecked"></uix-checkbox>
- *   <uix-checkbox checked disabled label="Disabled checked"></uix-checkbox>
- * </div>
- * \`\`\`
- *
- * @example
- * // With event handling
- * \`\`\`js
- * html\`<uix-checkbox
- *   .checked=\${this.agreed}
- *   @change=\${(e) => this.agreed = e.detail.checked}
- *   label="I agree to the terms"
- * ></uix-checkbox>\`
- * \`\`\`
- *
- * @example
- * // In a form
- * \`\`\`html
- * <form>
- *   <uix-checkbox name="newsletter" value="yes" label="Subscribe to newsletter"></uix-checkbox>
- *   <uix-checkbox name="terms" value="accepted" required label="Accept terms"></uix-checkbox>
- *   <button type="submit">Submit</button>
- * </form>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/admin/views/export.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-
-const convertToCSV = (data) => {
-  if (!data || data.length === 0) return "";
-
-  const headers = Object.keys(data[0]);
-  const rows = data.map((obj) =>
-    headers
-      .map((header) => {
-        const value = obj[header];
-        if (value === null || value === undefined) return '""';
-        if (typeof value === "object") return \`"\${JSON.stringify(value).replace(/"/g, '""')}"\`;
-        const str = String(value);
-        if (str.includes(",") || str.includes("\\n") || str.includes('"')) {
-          return \`"\${str.replace(/"/g, '""')}"\`;
-        }
-        return str;
-      })
-      .join(","),
-  );
-
-  return [headers.join(","), ...rows].join("\\n");
-};
-
-const downloadFile = (content, fileName, mimeType) => {
-  const blob = new Blob([content], { type: mimeType });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-};
-
-export default {
-  tag: "admin-export",
-  style: true,
-  properties: {
-    model: T.string(),
-    rows: T.array(),
-    exporting: T.boolean({ defaultValue: false }),
-  },
-
-  async exportData(format) {
-    this.exporting = true;
-
-    try {
-      let data = this.rows;
-      if (!data || data.length === 0) {
-        data = await $APP.Model[this.model].getAll();
-      }
-
-      if (!data || data.length === 0) {
-        alert("No data to export");
-        this.exporting = false;
-        return;
-      }
-
-      const timestamp = new Date().toISOString().split("T")[0];
-      const fileName = \`\${this.model}-\${timestamp}\`;
-
-      if (format === "CSV") {
-        const csvContent = convertToCSV(data);
-        downloadFile(csvContent, \`\${fileName}.csv\`, "text/csv;charset=utf-8");
-      } else if (format === "JSON") {
-        const jsonContent = JSON.stringify(data, null, 2);
-        downloadFile(jsonContent, \`\${fileName}.json\`, "application/json");
-      }
-    } catch (error) {
-      console.error("Export error:", error);
-      alert(\`Export failed: \${error.message}\`);
-    }
-
-    this.exporting = false;
-  },
-
-  render() {
-    return html\`
-      <uix-button popovertarget="export-\${this.model}" ghost ?disabled=\${this.exporting}>
-        <uix-icon name="download" size="18"></uix-icon>
-        \${this.exporting ? "Exporting..." : "Export"}
-      </uix-button>
-      <uix-dropdown id="export-\${this.model}">
-        <div class="admin-export-options">
-          \${["CSV", "JSON"].map(
-            (format) => html\`
-              <button
-                class="admin-export-option"
-                @click=\${() => this.exportData(format)}
-              >
-                \${format}
-              </button>
-            \`,
-          )}
-        </div>
-      </uix-dropdown>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/display/data-table.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-data-table",
-  style: true,
-  properties: {
-    "data-query": T.object(),
-    columns: T.array(),
-    rows: T.array(),
-    selectRow: T.function(),
-    emptyMessage: T.string({ defaultValue: "No data" }),
-    // Pagination state
-    page: T.number({ defaultValue: 1 }),
-    limit: T.number({ defaultValue: 10 }),
-    total: T.number({ defaultValue: 0 }),
-    showPagination: T.boolean({ defaultValue: true }),
-    // Sorting
-    sortBy: T.string(),
-    sortDir: T.string({ defaultValue: "asc" }),
-  },
-
-  handleDataLoaded(e) {
-    const { total, limit, offset } = e.detail;
-    this.total = total;
-    this.limit = limit;
-    this.offset = offset;
-    this.totalPages = Math.ceil(this.total / this.limit) || 1;
-  },
-
-  handlePageChange(e) {
-    const newPage = e.detail.page;
-    this.page = newPage;
-    // Update data-query to trigger re-fetch via uix-table
-    this["data-query"] = {
-      ...this["data-query"],
-      limit: this.limit,
-      offset: (newPage - 1) * this.limit,
-    };
-  },
-  render() {
-    return html\`
-      <uix-table
-        .data-query=\${{ ...this["data-query"], limit: this.limit }}
-        .columns=\${this.columns}
-        .selectRow=\${this.selectRow}
-        @dataLoaded=\${this.handleDataLoaded}
-      ></uix-table>
-      \${
-        this.showPagination && this.totalPages > 1
-          ? html\`
-            <uix-pagination
-              .current=\${this.page}
-              .total=\${this.totalPages}
-              @change=\${this.handlePageChange}
-            ></uix-pagination>
-          \`
-          : ""
-      }
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/admin/views/import.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-import $APP from "/$app.js";
-import { getModelSchema } from "../utils/model-utils.js";
-
-const readFile = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => resolve(event.target.result);
-    reader.onerror = (error) => reject(error);
-    reader.readAsText(file);
-  });
-};
-
-const parseCSV = (csvData) => {
-  const rows = csvData.trim().split("\\n");
-  if (rows.length === 0) return [];
-
-  const headers = rows[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-
-  return rows
-    .slice(1)
-    .map((row) => {
-      const values = [];
-      let current = "";
-      let inQuotes = false;
-
-      for (const char of row) {
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === "," && !inQuotes) {
-          values.push(current.trim());
-          current = "";
-        } else {
-          current += char;
-        }
-      }
-      values.push(current.trim());
-
-      return headers.reduce((object, header, index) => {
-        let value = values[index] || "";
-        value = value.replace(/^"|"$/g, "");
-        object[header] = value;
-        return object;
-      }, {});
-    })
-    .filter((row) => Object.values(row).some((value) => value));
-};
-
-export default {
-  tag: "admin-import",
-  style: true,
-  properties: {
-    model: T.string(),
-    modalOpen: T.boolean({ defaultValue: false }),
-    fileType: T.string({ defaultValue: "" }),
-    parsedData: T.array({ defaultValue: [] }),
-    importing: T.boolean({ defaultValue: false }),
-    csvFields: T.array({ defaultValue: [] }),
-    fieldMapping: T.object({ defaultValue: {} }),
-  },
-
-  async handleFileSelect(e, fileType) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      const content = await readFile(file);
-      let data = [];
-
-      if (fileType === "CSV") {
-        data = parseCSV(content);
-        if (data.length > 0) {
-          this.csvFields = Object.keys(data[0]);
-          const schema = getModelSchema(this.model);
-          const mapping = {};
-          schema.forEach((field) => {
-            const match = this.csvFields.find(
-              (csvField) => csvField.toLowerCase() === field.name.toLowerCase(),
-            );
-            if (match) {
-              mapping[field.name] = match;
-            }
-          });
-          this.fieldMapping = mapping;
-        }
-      } else if (fileType === "JSON") {
-        data = JSON.parse(content);
-        if (!Array.isArray(data)) {
-          data = [data];
-        }
-      }
-
-      this.parsedData = data;
-      this.fileType = fileType;
-      this.modalOpen = true;
-    } catch (error) {
-      console.error("Error parsing file:", error);
-      alert(\`Error parsing file: \${error.message}\`);
-    }
-
-    e.target.value = "";
-  },
-
-  updateMapping(modelField, csvField) {
-    this.fieldMapping = { ...this.fieldMapping, [modelField]: csvField };
-  },
-
-  async handleImport() {
-    this.importing = true;
-    let successCount = 0;
-    let errorCount = 0;
-
-    try {
-      const data =
-        this.fileType === "CSV"
-          ? this.parsedData.map((row) => this.mapCsvRow(row))
-          : this.parsedData;
-
-      for (const item of data) {
-        try {
-          await $APP.Model[this.model].add(item);
-          successCount++;
-        } catch (error) {
-          console.error("Error importing row:", error);
-          errorCount++;
-        }
-      }
-
-      alert(
-        \`Import complete! \${successCount} records imported\${errorCount > 0 ? \`, \${errorCount} failed\` : ""}.\`,
-      );
-      this.closeModal();
-    } catch (error) {
-      console.error("Import error:", error);
-      alert(\`Import failed: \${error.message}\`);
-    }
-
-    this.importing = false;
-  },
-
-  mapCsvRow(row) {
-    const result = {};
-    Object.entries(this.fieldMapping).forEach(([modelField, csvField]) => {
-      if (csvField && row[csvField] !== undefined) {
-        result[modelField] = row[csvField];
-      }
-    });
-    return result;
-  },
-
-  closeModal() {
-    this.modalOpen = false;
-    this.parsedData = [];
-    this.csvFields = [];
-    this.fieldMapping = {};
-    this.fileType = "";
-  },
-
-  render() {
-    const schema = getModelSchema(this.model);
-
-    return html\`
-      <!-- Import Dropdown -->
-      <uix-button popovertarget="import-\${this.model}" ghost>
-        <uix-icon name="upload" size="18"></uix-icon>
-        Import
-      </uix-button>
-      <uix-dropdown id="import-\${this.model}">
-        <div class="admin-import-options">
-          \${["CSV", "JSON"].map(
-            (type) => html\`
-              <label class="admin-import-option">
-                \${type}
-                <input
-                  type="file"
-                  accept=".\${type.toLowerCase()}"
-                  @change=\${(e) => this.handleFileSelect(e, type)}
-                  class="admin-import-file-input"
-                />
-              </label>
-            \`,
-          )}
-        </div>
-      </uix-dropdown>
-
-      <!-- Import Modal -->
-      <uix-modal
-        ?open=\${this.modalOpen}
-        @close=\${this.closeModal}
-        title="Import \${this.fileType} - \${this.parsedData.length} records"
-      >
-        \${this.modalOpen
-          ? html\`
-              <div class="admin-import-content">
-                \${this.fileType === "CSV" && this.csvFields.length > 0
-                  ? html\`
-                      <div class="admin-import-mapping">
-                        <h3 class="admin-import-mapping-title">Map CSV columns to model fields:</h3>
-                        <div class="admin-import-mapping-list">
-                          \${schema
-                            .filter((f) => f.name !== "id")
-                            .map(
-                              (field) => html\`
-                                <div class="admin-import-mapping-row">
-                                  <span class="admin-import-field-name">\${field.label || field.name}</span>
-                                  <span class="admin-import-arrow">\u2192</span>
-                                  <uix-select
-                                    .value=\${this.fieldMapping[field.name] || ""}
-                                    placeholder="-- Skip --"
-                                    .options=\${this.csvFields.map((csvField) => ({
-                                      value: csvField,
-                                      label: csvField,
-                                    }))}
-                                    @change=\${(e) =>
-                                      this.updateMapping(field.name, e.target.value)}
-                                  ></uix-select>
-                                </div>
-                              \`,
-                            )}
-                        </div>
-                      </div>
-                    \`
-                  : html\`
-                      <div class="admin-import-preview">
-                        <h3 class="admin-import-preview-title">Preview:</h3>
-                        <pre class="admin-import-preview-code">\${JSON.stringify(this.parsedData.slice(0, 3), null, 2)}</pre>
-                        \${this.parsedData.length > 3
-                          ? html\`<p class="admin-import-preview-more">
-                              ... and \${this.parsedData.length - 3} more records
-                            </p>\`
-                          : ""}
-                      </div>
-                    \`}
-              </div>
-
-              <div slot="footer" class="admin-import-footer">
-                <uix-button ghost @click=\${this.closeModal}>
-                  Cancel
-                </uix-button>
-                <uix-button
-                  primary
-                  @click=\${this.handleImport}
-                  ?disabled=\${this.importing}
-                >
-                  \${this.importing ? "Importing..." : \`Import \${this.parsedData.length} records\`}
-                </uix-button>
-              </div>
-            \`
-          : ""}
-      </uix-modal>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/uix/overlay/modal.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-modal",
-  properties: {
-    open: T.boolean(false),
-    closeOnEscape: T.boolean(true),
-    closeOnBackdropClick: T.boolean(true),
-    size: T.string({ defaultValue: "md", enum: ["sm", "md", "lg", "xl"] }),
-  },
-  style: true,
-  shadow: true,
-  firstUpdated() {
-    this.dialog = this.shadowRoot.querySelector("dialog");
-    this.dialog.addEventListener("close", () => {
-      this.open = false;
-      this.emit("modal-close", { returnValue: this.dialog.returnValue });
-    });
-    this.dialog.addEventListener("cancel", (e) => {
-      if (!this.closeOnEscape) {
-        e.preventDefault();
-      } else {
-        this.emit("modal-cancel");
-      }
-    });
-    this.dialog.addEventListener("click", (e) => {
-      if (this.closeOnBackdropClick && e.target === this.dialog) {
-        const rect = this.dialog.getBoundingClientRect();
-        const isInDialog =
-          rect.top <= e.clientY &&
-          e.clientY <= rect.top + rect.height &&
-          rect.left <= e.clientX &&
-          e.clientX <= rect.left + rect.width;
-
-        if (!isInDialog) this.close();
-      }
-    });
-
-    const closeLinks = this.querySelectorAll("[data-close]");
-    closeLinks.forEach((link) => {
-      link.addEventListener("click", this.close.bind(this));
-    });
-  },
-  updated({ changedProps }) {
-    if (changedProps.has("open") && this.dialog) {
-      if (this.open && !this.dialog.open) {
-        this.showModal();
-      } else if (!this.open && this.dialog.open) {
-        this.dialog.close();
-      }
-    }
-  },
-  showModal() {
-    if (this.dialog && !this.dialog.open) {
-      this.dialog.showModal();
-      this.open = true;
-      this.emit("modal-open");
-    }
-  },
-  show() {
-    if (this.dialog && !this.dialog.open) {
-      this.dialog.show();
-      this.open = true;
-      this.emit("modal-open");
-    }
-  },
-  close(returnValue) {
-    if (this.dialog?.open) {
-      this.dialog.close(returnValue);
-      this.open = false;
-    }
-  },
-  render() {
-    return html\`
-      <slot name="trigger" @click=\${this.showModal.bind(this)}></slot>
-      <dialog part="dialog">
-        <div part="header" class="modal-header">
-          <slot name="header"></slot>
-          <button
-            part="close-button"
-            class="modal-close-button"
-            @click=\${() => this.close()}
-            aria-label="Close"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <div part="body" class="modal-body">
-          <slot></slot>
-        </div>
-        <slot part="footer" class="modal-footer" name="footer"></slot>
-      </dialog>
-    \`;
-  },
-};
-
-/**
- * Modal Component
- *
- * @component
- * @category overlay
- * @tag uix-modal
- *
- * Modal dialog using native HTML dialog API with flexible trigger options
- *
- * @example
- * // Pattern 1: Modal with trigger button in slot
- * \`\`\`html
- * <uix-modal>
- *   <button slot="trigger">Open Modal</button>
- *   <h2 slot="header">Modal Title</h2>
- *   <p>Modal content goes here...</p>
- *   <div slot="footer">
- *     <uix-button data-close>Cancel</uix-button>
- *     <uix-button variant="primary">Confirm</uix-button>
- *   </div>
- * </uix-modal>
- * \`\`\`
- *
- * @example
- * // Pattern 2: Modal opened from external button
- * \`\`\`js
- * html\`<button @click=\${() => document.querySelector('#myModal').showModal()}>
- *   Open Modal
- * </button>
- *
- * <uix-modal id="myModal">
- *   <h2 slot="header">Delete Item</h2>
- *   <p>Are you sure you want to delete this item?</p>
- *   <div slot="footer">
- *     <uix-button @click=\${(e) => e.target.closest('uix-modal').close()}>
- *       Cancel
- *     </uix-button>
- *     <uix-button variant="danger" @click=\${this.handleDelete}>
- *       Delete
- *     </uix-button>
- *   </div>
- * </uix-modal>\`
- * \`\`\`
- *
- * @example
- *  Pattern 3: Controlled modal with open property
- * \`\`\`js
- * html\`<uix-modal
- *   .open=\${this.isModalOpen}
- *   @modal-close=\${() => this.isModalOpen = false}
- * >
- *   <h2 slot="header">Settings</h2>
- *   <p>Modal content...</p>
- *   <div slot="footer">
- *     <uix-button @click=\${() => this.isModalOpen = false}>Close</uix-button>
- *   </div>
- * </uix-modal>\`
- * \`\`\`
- *
- * @example
- * // With options
- * \`\`\`js
- * html\`<uix-modal
- *   .closeOnEscape=\${false}
- *   .closeOnBackdropClick=\${false}
- *   @modal-close=\${this.handleClose}
- * >
- *   <h2 slot="header">Important Notice</h2>
- *   <p>This modal cannot be closed by clicking outside or pressing Escape.</p>
- *   <div slot="footer">
- *     <uix-button @click=\${(e) => e.target.closest('uix-modal').close('confirmed')}>
- *       I Understand
- *     </uix-button>
- *   </div>
- * </uix-modal>\`
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/columns-3.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18m6-18v18"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/list.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/kanban.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5v11m6-11v6m6-6v14"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/instagram.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8A4 4 0 0 1 16 11.37m1.5-4.87h.01"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/trash.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/map-pin.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/plus.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/overlay/popover-controller.js":{content:`import T from "/$app/types/index.js";
-
-export default {
-  tag: "uix-popover-controller",
-  i18n: {},
-  properties: {
-    position: T.string("bottom-left"),
-    open: T.boolean(false),
-    offset: T.number(4),
-  },
-  style: true,
-
-  connected() {
-    this._triggerElement = null;
-    this._boundDocumentClick = this._handleDocumentClick.bind(this);
-
-    // Set initial state
-    if (!this.open) {
-      this.style.display = "none";
-    }
-  },
-
-  disconnected() {
-    this._removeDocumentListener();
-    this._stopPositionTracking();
-  },
-
-  _calculatePosition(triggerElement) {
-    if (!triggerElement) return { top: 0, left: 0 };
-
-    const triggerRect = triggerElement.getBoundingClientRect();
-    const popoverRect = this.getBoundingClientRect();
-    const offset = this.offset || 4;
-
-    let top = 0;
-    let left = 0;
-
-    const position = this.position || "bottom-left";
-
-    // Vertical positioning
-    if (position.includes("bottom")) {
-      top = triggerRect.bottom + offset;
-    } else if (position.includes("top")) {
-      top = triggerRect.top - popoverRect.height - offset;
-    } else {
-      // Default to bottom
-      top = triggerRect.bottom + offset;
-    }
-
-    // Horizontal positioning
-    if (
-      position.includes("left") ||
-      position === "bottom" ||
-      position === "top"
-    ) {
-      left = triggerRect.left;
-    } else if (position.includes("right")) {
-      left = triggerRect.right - popoverRect.width;
-    } else if (position === "left") {
-      left = triggerRect.left - popoverRect.width - offset;
-    } else if (position === "right") {
-      left = triggerRect.right + offset;
-    } else {
-      left = triggerRect.left;
-    }
-
-    // Keep within viewport
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    if (left + popoverRect.width > viewportWidth) {
-      left = viewportWidth - popoverRect.width - 8;
-    }
-    if (left < 8) {
-      left = 8;
-    }
-    if (top + popoverRect.height > viewportHeight) {
-      top = viewportHeight - popoverRect.height - 8;
-    }
-    if (top < 8) {
-      top = 8;
-    }
-
-    return { top, left };
-  },
-
-  _updatePosition() {
-    if (!this._triggerElement) return;
-
-    const pos = this._calculatePosition(this._triggerElement);
-    this.style.top = \`\${pos.top}px\`;
-    this.style.left = \`\${pos.left}px\`;
-  },
-
-  _open(triggerElement) {
-    if (this.open) return;
-
-    this._triggerElement = triggerElement;
-    this.open = true;
-    this.style.display = "";
-    this.setAttribute("data-open", "");
-
-    // Start position tracking loop
-    this._startPositionTracking();
-
-    this._addDocumentListener();
-
-    this.dispatchEvent(new CustomEvent("popover-open", { bubbles: true }));
-  },
-
-  _close() {
-    if (!this.open) return;
-
-    this.open = false;
-    this.style.display = "none";
-    this.removeAttribute("data-open");
-    this._removeDocumentListener();
-    this._stopPositionTracking();
-    this._triggerElement = null;
-
-    this.dispatchEvent(new CustomEvent("popover-close", { bubbles: true }));
-  },
-
-  toggle(triggerElement) {
-    if (this.open) {
-      this._close();
-    } else {
-      this._open(triggerElement);
-    }
-  },
-
-  _addDocumentListener() {
-    // Use capture phase to handle clicks before they bubble
-    document.addEventListener("click", this._boundDocumentClick, true);
-  },
-
-  _removeDocumentListener() {
-    document.removeEventListener("click", this._boundDocumentClick, true);
-  },
-
-  _startPositionTracking() {
-    // Use requestAnimationFrame to continuously update position
-    this._trackingFrame = null;
-
-    const track = () => {
-      if (this.open && this._triggerElement) {
-        this._updatePosition();
-        this._trackingFrame = requestAnimationFrame(track);
-      }
-    };
-
-    // Start tracking
-    this._trackingFrame = requestAnimationFrame(track);
-  },
-
-  _stopPositionTracking() {
-    if (this._trackingFrame) {
-      cancelAnimationFrame(this._trackingFrame);
-      this._trackingFrame = null;
-    }
-  },
-
-  _handleDocumentClick(e) {
-    // Don't close if clicking inside the popover
-    if (this.contains(e.target)) {
-      return;
-    }
-
-    // Don't close if clicking the trigger element or its shadow host
-    if (this._triggerElement) {
-      // Check if click is on the trigger element itself
-      if (this._triggerElement.contains(e.target)) {
-        return;
-      }
-
-      // Check if click is on the shadow host (uix-button/uix-link)
-      const shadowHost = this._triggerElement.getRootNode()?.host;
-      if (
-        shadowHost &&
-        (shadowHost === e.target || shadowHost.contains(e.target))
-      ) {
-        return;
-      }
-    }
-
-    // Close popover
-    this._close();
-  },
-};
-
-/**
- * Copyright (c) Alan Carlos Meira Leal
- *
- * UIX Popover Controller
- * Base component for popover-style overlays (dropdown, tooltip, etc.)
- * Handles positioning, open/close state, and click-outside behavior.
- *
- * @slot - Default slot for popover content
- *
- * @property {string} position - Positioning relative to trigger (top, bottom, left, right, top-left, top-right, bottom-left, bottom-right)
- * @property {boolean} open - Current open state
- * @property {number} offset - Distance in pixels from trigger (default 4)
- *
- * @fires popover-open - Fired when popover opens
- * @fires popover-close - Fired when popover closes
- *
- * @example Extending this component
- * \`\`\`javascript
- * export default {
- *   extends: "uix-popover-controller",
- *   // Add your custom behavior
- * }
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/admin/views/export.css":{content:`.admin-export-options{padding:var(--admin-export-options-padding, .25rem)}.admin-export-option{display:block;width:100%;padding:var(--admin-export-option-padding, .5rem 1rem);border:none;background:none;text-align:left;cursor:pointer;transition:background-color .15s ease}.admin-export-option:hover{background:var(--admin-export-option-hover, #f3f4f6)}.admin-export-option:first-child{border-radius:.5rem .5rem 0 0}.admin-export-option:last-child{border-radius:0 0 .5rem .5rem}
-`,mimeType:"text/css"},"/$app/uix/display/data-table.css":{content:`:where(.uix-data-table,uix-data-table){display:block;width:var(--data-table-width, 100%);uix-pagination{margin-top:var(--data-table-pagination-margin, 1rem);justify-content:var(--data-table-pagination-justify, flex-end)}}.uix-data-table__empty{padding:var(--data-table-empty-padding, 2rem);text-align:center;color:var(--data-table-empty-color, #6b7280)}
-`,mimeType:"text/css"},"/$app/uix/form/checkbox.css":{content:`:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}
-`,mimeType:"text/css"},"/$app/admin/views/import.css":{content:`.admin-import-options{padding:var(--admin-import-options-padding, .25rem)}.admin-import-option{display:block;padding:var(--admin-import-option-padding, .5rem 1rem);cursor:pointer;transition:background-color .15s ease}.admin-import-option:hover{background:var(--admin-import-option-hover, #f3f4f6)}.admin-import-option:first-child{border-radius:.5rem .5rem 0 0}.admin-import-option:last-child{border-radius:0 0 .5rem .5rem}.admin-import-file-input{display:none}.admin-import-content{margin-bottom:var(--admin-import-content-margin, 1rem)}.admin-import-mapping{margin-bottom:var(--admin-import-mapping-margin, 1.5rem)}.admin-import-mapping-title{font-weight:700;margin:0 0 1rem}.admin-import-mapping-list{display:flex;flex-direction:column;gap:var(--admin-import-mapping-gap, 1rem)}.admin-import-mapping-row{display:flex;align-items:center;gap:var(--admin-import-mapping-row-gap, 1rem)}.admin-import-field-name{width:var(--admin-import-field-name-width, 8rem);font-weight:500}.admin-import-arrow{color:var(--admin-import-arrow-color, #9ca3af)}.admin-import-mapping-row uix-select{flex:1}.admin-import-preview{margin-bottom:var(--admin-import-preview-margin, 1.5rem)}.admin-import-preview-title{font-weight:700;margin:0 0 .5rem}.admin-import-preview-code{padding:var(--admin-import-preview-code-padding, 1rem);background:var(--admin-import-preview-code-bg, #f3f4f6);border-radius:var(--admin-import-preview-code-radius, .75rem);font-size:.875rem;overflow-x:auto;max-height:var(--admin-import-preview-max-height, 16rem);margin:0}.admin-import-preview-more{font-size:.875rem;color:var(--admin-import-preview-more-color, #6b7280);margin:.5rem 0 0}.admin-import-footer{display:flex;justify-content:flex-end;gap:var(--admin-import-footer-gap, 1rem)}
-`,mimeType:"text/css"},"/$app/uix/overlay/modal.css":{content:`:where(.uix-modal,uix-modal){display:inline-block;&::part(dialog){background:var(--modal-background, #ffffff);border:var(--modal-border-width, 1px) solid var(--modal-border-color, #e5e7eb);border-radius:var(--modal-border-radius, .75rem);box-shadow:var(--modal-shadow, 0 25px 50px -12px rgb(0 0 0 / .25));padding:0;width:var(--modal-width, 90vw);max-width:var(--modal-max-width, 600px);color:var(--modal-color, #1a1a1a);&::backdrop{background:var(--modal-overlay, rgba(0, 0, 0, .5));backdrop-filter:blur(2px)}}&[size=sm]{--modal-max-width: 400px}&[size=md]{--modal-max-width: 600px}&[size=lg]{--modal-max-width: 800px}&[size=xl]{--modal-max-width: 1000px}@media (max-width: 639px){&::part(dialog){width:100%;max-width:100%;height:100%;max-height:100%;margin:0;border-radius:0;border:none;box-shadow:none}&::part(body){max-height:none;flex:1;overflow-y:auto}}&::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--modal-header-padding, 1.25rem 1.5rem);border-bottom:var(--modal-header-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-header-background, transparent);font-size:var(--modal-header-font-size, 1.125rem);font-weight:var(--modal-header-font-weight, 700);color:var(--modal-header-color, #1a1a1a);&:empty{display:none}}&::part(close-button){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:transparent;color:var(--modal-close-color, #6b7280);cursor:pointer;border-radius:.375rem;transition:background-color .15s,color .15s;flex-shrink:0;&:hover{background:var(--modal-close-hover-bg, #f3f4f6);color:var(--modal-close-hover-color, #1a1a1a)}}&::part(body){padding:var(--modal-body-padding, 1.5rem);color:var(--modal-body-color, #4b5563);font-size:var(--text-base, 1rem);line-height:1.5;overflow-y:auto;max-height:60vh}&::part(footer),[slot=footer]{padding:var(--modal-footer-padding, 1rem 1.5rem);border-top:var(--modal-footer-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-footer-background, #f9fafb);&:empty{display:none}}[slot=trigger]{cursor:pointer}[slot=footer]{display:flex;gap:.75rem;justify-content:flex-end;align-items:center}}
-`,mimeType:"text/css"},"/$app/uix/display/table.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const TypesRenderers = {
-  [String]: (content) => content,
-  [Boolean]: (content) =>
-    content ? html\`<uix-icon name="check"></uix-icon>\` : null,
-};
-
-export default {
-  tag: "uix-table",
-  style: true,
-  dataQuery: true,
-  properties: {
-    columns: T.array({ defaultValue: [] }),
-    rows: T.array({ defaultValue: [] }),
-    selectRow: T.function(),
-  },
-  render() {
-    return html\`
-      <table>
-        <thead>
-          <tr>
-            \${this.columns.map(
-              (column) => html\`
-                <th>\${column.name || column.label || column}</th>
-              \`,
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          \${this.rows?.map(
-            (row) => html\`
-              <tr
-                class=\${this.selectRow ? "clickable" : ""}
-                @click=\${this.selectRow ? (e) => this.selectRow(row, e) : null}
-              >
-                \${this.columns.map((column) => {
-                  const name = typeof column === "string" ? column : column.name;
-                  const columnType =
-                    typeof column === "string" ? "string" : column.type;
-                  return html\`
-                    <td>
-                      \${TypesRenderers[columnType]?.call(null, row[name]) ??
-                      row[name]}
-                    </td>
-                  \`;
-                })}
-              </tr>
-            \`,
-          )}
-        </tbody>
-      </table>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/upload.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m14-7l-5-5l-5 5m5-5v12"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/overlay/popover-controller.css":{content:`:where(.uix-popover-controller,uix-popover-controller){position:fixed;z-index:10000;display:none;&[data-open]{display:flex;flex-direction:column}}
-`,mimeType:"text/css"},"/$app/uix/overlay/dropdown.css":{content:`:where(.uix-dropdown,uix-dropdown){&[data-open]{display:flex;flex-direction:column;min-width:var(--dropdown-min-width, 200px);max-width:var(--dropdown-max-width, 400px);background:var(--color-surface-darker, #282828);color:var(--text-color, default);padding:var(--spacing-xs, .25rem);gap:2px}&[variant=elevated][data-open]{background:var(--color-surface-light, #3c3836)}&[variant=primary][data-open]{background:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&[variant=card][data-open]{background:var(--color-surface-dark, #32302f)}&[rounded][data-open]{border-radius:var(--radius-md, .375rem)}&[bordered][data-open]{border:1px solid var(--color-surface, #504945)}&[shadow][data-open]{box-shadow:0 8px 16px #0000004d,0 2px 4px #0003}>*{padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);color:inherit;text-decoration:none;display:block;border-radius:var(--radius-sm, .25rem);transition:background-color .15s ease,color .15s ease;cursor:pointer;white-space:nowrap;font-size:var(--text-sm, .875rem);line-height:1.5;&:hover{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) )}&:focus{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) );outline:2px solid var(--color-primary, #fabd2f);outline-offset:-2px}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&:disabled,&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}uix-icon{margin-right:var(--spacing-xs, .25rem);vertical-align:middle}>*{pointer-events:none}}>hr{border:none;border-top:1px solid var(--color-surface-dark, rgba(80, 73, 69, .5));margin:var(--spacing-xs, .25rem) 0;padding:0}>.dropdown-header,>[role=heading]{padding:var(--spacing-xs, .25rem) var(--spacing-md, .75rem);font-size:var(--text-xs, .75rem);font-weight:600;color:var(--text-muted, #a89984);text-transform:uppercase;letter-spacing:.05em;cursor:default;&:hover{background-color:transparent}}}
-`,mimeType:"text/css"},"/$app/uix/display/table.css":{content:`:where(.uix-table,uix-table){display:block;width:100%;table{width:100%;border-collapse:separate;border-spacing:0;border:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb);border-radius:var(--table-border-radius, .5rem);box-shadow:var(--table-shadow, none);overflow:hidden}thead{background-color:var(--table-header-background, #f9fafb)}th{padding:var(--table-cell-padding, 1rem);text-align:left;font-weight:var(--table-header-font-weight, 600);font-size:var(--table-header-font-size, .75rem);text-transform:var(--table-header-text-transform, uppercase);color:var(--table-header-color, #374151);letter-spacing:.05em;border-bottom:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb)}tbody tr{background-color:var(--table-row-background, #ffffff);transition:background-color .15s ease}tbody tr:hover{background-color:var(--table-row-hover-background, #f3f4f6)}tbody tr.clickable{cursor:pointer}td{padding:var(--table-cell-padding, 1rem);font-size:var(--table-cell-font-size, .875rem);color:var(--table-cell-color, #4b5563);border-bottom:1px solid var(--table-border-color, #e5e7eb)}tbody tr:last-child td{border-bottom:none}}
-`,mimeType:"text/css"},"/$app/uix/navigation/pagination.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-pagination",
-  properties: {
-    current: T.number({ defaultValue: 1 }),
-    total: T.number({ defaultValue: 1 }),
-    siblings: T.number({ defaultValue: 1 }), // Number of pages to show on each side of current
-    showFirst: T.boolean(true),
-    showLast: T.boolean(true),
-    showPrevNext: T.boolean(true),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["sm", "md", "lg"],
-    }),
-  },
-  style: true,
-  shadow: false,
-
-  goToPage(page) {
-    if (page < 1 || page > this.total || page === this.current) return;
-    this.current = page;
-    this.emit("change", { page: this.current });
-  },
-
-  next() {
-    this.goToPage(this.current + 1);
-  },
-
-  prev() {
-    this.goToPage(this.current - 1);
-  },
-
-  _getPageNumbers() {
-    const pages = [];
-    const leftSibling = Math.max(1, this.current - this.siblings);
-    const rightSibling = Math.min(this.total, this.current + this.siblings);
-
-    // Show first page
-    if (this.showFirst && leftSibling > 1) {
-      pages.push(1);
-      if (leftSibling > 2) {
-        pages.push("...");
-      }
-    }
-
-    // Show sibling pages
-    for (let i = leftSibling; i <= rightSibling; i++) {
-      pages.push(i);
-    }
-
-    // Show last page
-    if (this.showLast && rightSibling < this.total) {
-      if (rightSibling < this.total - 1) {
-        pages.push("...");
-      }
-      pages.push(this.total);
-    }
-
-    return pages;
-  },
-
-  render() {
-    const pages = this._getPageNumbers();
-    const hasPrev = this.current > 1;
-    const hasNext = this.current < this.total;
-
-    return html\`
-      <nav class="pagination" role="navigation" aria-label="Pagination">
-        <ul class="pagination-list">
-          \${
-            this.showPrevNext
-              ? html\`
-                <li>
-                  <button
-                    class="pagination-button prev"
-                    ?disabled=\${!hasPrev}
-                    @click=\${this.prev}
-                    aria-label="Previous page"
-                  >
-                    <uix-icon name="chevron-left"></uix-icon>
-                  </button>
-                </li>
-              \`
-              : ""
-          }
-
-          \${pages.map((page) =>
-            page === "..."
-              ? html\`<li><span class="pagination-ellipsis">\u2026</span></li>\`
-              : html\`
-                  <li>
-                    <button
-                      class="pagination-button \${page === this.current ? "active" : ""}"
-                      @click=\${() => this.goToPage(page)}
-                      aria-label="Page \${page}"
-                      aria-current=\${page === this.current ? "page" : "false"}
-                    >
-                      \${page}
-                    </button>
-                  </li>
-                \`,
-          )}
-
-          \${
-            this.showPrevNext
-              ? html\`
-                <li>
-                  <button
-                    class="pagination-button next"
-                    ?disabled=\${!hasNext}
-                    @click=\${this.next}
-                    aria-label="Next page"
-                  >
-                    <uix-icon name="chevron-right"></uix-icon>
-                  </button>
-                </li>
-              \`
-              : ""
-          }
-        </ul>
-      </nav>
-    \`;
-  },
-};
-
-/**
- * Pagination Component
- *
- * @component
- * @category navigation
- * @tag uix-pagination
- *
- * Pagination controls for navigating through pages of content.
- *
- * @example
- * // Basic pagination
- * \`\`\`html
- * <uix-pagination current="1" total="10"></uix-pagination>
- * \`\`\`
- *
- * @example
- * // Current page in middle
- * \`\`\`html
- * <uix-pagination current="5" total="10"></uix-pagination>
- * \`\`\`
- *
- * @example
- * // Many pages with ellipsis
- * \`\`\`html
- * <uix-pagination current="15" total="50"></uix-pagination>
- * \`\`\`
- *
- * @example
- * // More siblings (show more pages around current)
- * \`\`\`html
- * <uix-pagination current="10" total="20" siblings="2"></uix-pagination>
- * \`\`\`
- *
- * @example
- * // Without first/last
- * \`\`\`html
- * <uix-pagination
- *   current="5"
- *   total="10"
- *   show-first="false"
- *   show-last="false"
- * ></uix-pagination>
- * \`\`\`
- *
- * @example
- * // Without prev/next arrows
- * \`\`\`html
- * <uix-pagination
- *   current="5"
- *   total="10"
- *   show-prev-next="false"
- * ></uix-pagination>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 1rem;">
- *   <uix-pagination size="sm" current="3" total="7"></uix-pagination>
- *   <uix-pagination size="md" current="3" total="7"></uix-pagination>
- *   <uix-pagination size="lg" current="3" total="7"></uix-pagination>
- * </div>
- * \`\`\`
- *
- * @example
- * // With event handling
- * \`\`\`js
- * html\`<uix-pagination
- *   current="1"
- *   total="20"
- *   @change=\${(e) => this.loadPage(e.detail.page)}
- * ></uix-pagination>\`
- * \`\`\`
- *
- * @example
- * // Complete pagination example with data
- * \`\`\`js
- * html\`
- *   <div>
- *     <div class="data-grid">
- *       \${this.currentPageData.map(item => html\`<div>\${item.name}</div>\`)}
- *     </div>
- *
- *     <uix-pagination
- *       .current=\${this.currentPage}
- *       .total=\${Math.ceil(this.totalItems / this.itemsPerPage)}
- *       @change=\${(e) => {
- *         this.currentPage = e.detail.page;
- *         this.loadData();
- *       }}
- *     ></uix-pagination>
- *
- *     <p>
- *       Showing \${(this.currentPage - 1) * this.itemsPerPage + 1} to
- *       \${Math.min(this.currentPage * this.itemsPerPage, this.totalItems)} of
- *       \${this.totalItems} items
- *     </p>
- *   </div>
- * \`
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/pagination.css":{content:`:where(.uix-pagination,uix-pagination){display:block;.pagination{display:flex;justify-content:center;padding:var(--pagination-padding, .75rem 0)}.pagination-list{display:flex;align-items:center;gap:var(--pagination-gap, .25rem);list-style:none;margin:0;padding:0}.pagination-button{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);padding:var(--pagination-button-padding, .5rem);border:var(--pagination-border-width, 1px) solid var(--pagination-border-color, var(--color-primary, #fabd2f));border-radius:var(--pagination-border-radius, .5rem);background-color:var(--pagination-background, #ffffff);color:var(--pagination-color, var(--color-primary, #1a1a1a));font-size:var(--pagination-font-size, .875rem);font-weight:var(--pagination-font-weight, 500);box-shadow:var(--pagination-shadow, none);cursor:pointer;transition:all .15s ease;&:hover:not(:disabled):not(.active){background-color:var(--pagination-hover-background, #f5f5f5);border-color:var(--pagination-hover-border-color, var(--color-primary, #fabd2f));box-shadow:var(--pagination-hover-shadow, none);transform:var(--pagination-hover-transform, none)}&.active{background-color:var(--pagination-active-background, var(--color-primary, #fabd2f));border-color:var(--pagination-active-border-color, #000000);color:var(--pagination-active-color, #000000);box-shadow:var(--pagination-active-shadow, none)}&:disabled{opacity:.5;cursor:not-allowed}&.prev,&.next{font-weight:var(--pagination-nav-font-weight, 700)}}.pagination-ellipsis{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);color:var(--pagination-ellipsis-color, #6b7280);font-size:var(--pagination-font-size, .875rem)}&[size=sm]{--pagination-button-size: 2rem;--pagination-font-size: .75rem;--pagination-button-padding: .375rem;--pagination-gap: .125rem}&[size=lg]{--pagination-button-size: 3rem;--pagination-font-size: 1rem;--pagination-button-padding: .625rem;--pagination-gap: .375rem}}
-`,mimeType:"text/css"},"/$app/bundler/views/ui.js":{content:`import Bundler from "/$app/bundler/index.js";
-import T from "/$app/types/index.js";
-import $APP from "/$app.js";
-import { html } from "/npm/lit-html";
-
-$APP.define("credentials-manager", {
-  dataQuery: true,
-  properties: {
-    row: T.object(),
-  },
-  render() {
-    if (!this.row)
-      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">GitHub Credentials</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="Owner"
-            .value=\${this.row.owner}
-            @change=\${(e) => (this.row.owner = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Repository"
-            .value=\${this.row.repo}
-            @change=\${(e) => (this.row.repo = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Branch"
-            .value=\${this.row.branch}
-            @change=\${(e) => (this.row.branch = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="GitHub Token"
-            type="password"
-            .value=\${this.row.token}
-            @change=\${(e) => (this.row.token = e.target.value)}
-          ></uix-input>
-        </div>
-        <div slot="footer">
-          <uix-button
-            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row })}
-            label="Save Credentials"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("cloudflare-credentials-manager", {
-  dataQuery: true,
-  properties: {
-    row: T.object(),
-  },
-  render() {
-    if (!this.row)
-      return html\`<div class="bundler-loading">Loading credentials...</div>\`;
-    if (!this.row.cloudflare) this.row.cloudflare = {};
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">Cloudflare Credentials</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="Account ID"
-            .value=\${this.row.cloudflare.accountId}
-            @change=\${(e) => (this.row.cloudflare.accountId = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Pages Project Name"
-            .value=\${this.row.cloudflare.projectName}
-            @change=\${(e) => (this.row.cloudflare.projectName = e.target.value)}
-          ></uix-input>
-          <uix-input
-            class="bundler-full-width"
-            label="API Token"
-            type="password"
-            .value=\${this.row.cloudflare.apiToken}
-            @change=\${(e) => (this.row.cloudflare.apiToken = e.target.value)}
-          ></uix-input>
-        </div>
-        <p class="bundler-help-text">
-          The bundler will automatically create a Cloudflare Pages project if one with the given name doesn't exist.
-        </p>
-        <div slot="footer">
-          <uix-button
-            @click=\${() => $APP.Model.bundler_credentials.edit({ ...this.row, cloudflare: this.row.cloudflare })}
-            label="Save Cloudflare Credentials"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("release-creator", {
-  properties: {
-    version: T.string(\`v\${new Date().toISOString().slice(0, 10)}\`),
-    notes: T.string(""),
-    deployMode: T.string("spa"),
-    deployTarget: T.string("localhost"),
-    isDeploying: T.boolean(false),
-  },
-
-  getTargetOptions() {
-    const targets = Bundler.getTargets();
-    console.log(targets);
-    return targets.map((t) => ({
-      value: t.name,
-      label: t.label,
-    }));
-  },
-
-  getModeOptions() {
-    // When cloudflare target is selected, only worker mode makes sense
-    if (this.deployTarget === "cloudflare") {
-      return [{ value: "worker", label: "Cloudflare Workers" }];
-    }
-    return [
-      { value: "spa", label: "SPA" },
-      { value: "ssg", label: "SSG" },
-      { value: "hybrid", label: "Hybrid" },
-    ];
-  },
-
-  needsCredentials() {
-    // ZIP, TAR.GZ, and localhost don't need credentials
-    return !["zip", "targz", "localhost"].includes(this.deployTarget);
-  },
-
-  async handleDeploy() {
-    if (this.isDeploying) return;
-
-    this.isDeploying = true;
-    const credentials = await $APP.Model.bundler_credentials.get("singleton");
-
-    // Validate credentials for targets that need them
-    if (this.needsCredentials()) {
-      if (this.deployTarget === "cloudflare") {
-        if (
-          !credentials?.cloudflare?.apiToken ||
-          !credentials?.cloudflare?.accountId ||
-          !credentials?.cloudflare?.projectName
-        ) {
-          alert(
-            "Please provide your Cloudflare Account ID, API Token, and a Project Name before deploying.",
-          );
-          this.isDeploying = false;
-          return;
-        }
-      } else if (this.deployTarget === "github") {
-        if (!credentials || !credentials.token) {
-          alert("Please provide a GitHub token before deploying.");
-          this.isDeploying = false;
-          return;
-        }
-      }
-    }
-    const release = {
-      version: this.version,
-      notes: this.notes,
-      status: "pending",
-      deployedAt: Date.now(),
-      deployType: this.deployMode,
-      deployTarget: this.deployTarget,
-    };
-    try {
-      const [error, newRelease] =
-        await $APP.Model.bundler_releases.add(release);
-      const result = await Bundler.deploy({
-        ...credentials,
-        mode: this.deployMode,
-        target: this.deployTarget,
-        version: this.version,
-      });
-      await $APP.Model.bundler_releases.edit({
-        ...newRelease,
-        status: "success",
-        result,
-      });
-
-      const targetLabel =
-        Bundler.getTargets().find((t) => t.name === this.deployTarget)?.label ||
-        this.deployTarget;
-      alert(\`Deployment to \${targetLabel} successful!\`);
-    } catch (error) {
-      console.error(\`Deployment failed:\`, { error });
-      console.trace();
-      alert(\`Deployment failed: \${error.message}\`);
-      if (release?._id) {
-        await $APP.Model.bundler_releases.add({
-          ...release,
-          status: "failed",
-          error: error.message,
-        });
-      }
-    } finally {
-      this.isDeploying = false;
-    }
-  },
-
-  render() {
-    const targetOptions = this.getTargetOptions();
-    const modeOptions = this.getModeOptions();
-
-    // Auto-switch to worker mode when cloudflare is selected
-    if (this.deployTarget === "cloudflare" && this.deployMode !== "worker") {
-      this.deployMode = "worker";
-    }
-    // Switch away from worker mode when not cloudflare
-    if (this.deployTarget !== "cloudflare" && this.deployMode === "worker") {
-      this.deployMode = "hybrid";
-    }
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">New Release</h2>
-        <div class="bundler-form">
-          <uix-input
-            label="Version"
-            .value=\${this.version}
-            @change=\${(e) => (this.version = e.target.value)}
-          ></uix-input>
-          <uix-textarea
-            label="Release Notes"
-            .value=\${this.notes}
-            @change=\${(e) => (this.notes = e.target.value)}
-          ></uix-textarea>
-          <uix-checkbox
-            ?checked=\${!!$APP.settings.obfuscate}
-            @change=\${(e) => ($APP.settings.obfuscate = e.target.checked)}
-            label="Obfuscate"
-          ></uix-checkbox>
-        </div>
-        <div class="bundler-deploy-row">
-          <uix-select
-            label="Build Mode"
-            value=\${this.deployMode}
-            .options=\${modeOptions}
-            @change=\${(e) => (this.deployMode = e.target.value)}
-          >
-          </uix-select>
-          <uix-select
-            label="Deploy Target"
-            value=\${this.deployTarget}
-            .options=\${targetOptions}
-            @change=\${(e) => (this.deployTarget = e.target.value)}
-          >
-          </uix-select>
-          <uix-button
-            @click=\${() => this.handleDeploy()}
-            label=\${this.isDeploying ? \`Deploying...\` : "Deploy"}
-            ?disabled=\${this.isDeploying}
-          ></uix-button>
-        </div>
-        \${
-          !this.needsCredentials()
-            ? html\`<p class="bundler-help-text">This target downloads directly to your browser - no credentials needed.</p>\`
-            : ""
-        }
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("release-history", {
-  dataQuery: true,
-  properties: {
-    rows: T.array(),
-    limit: T.number(0),
-  },
-  render() {
-    let sortedRows = this.rows?.length
-      ? [...this.rows].sort(
-          (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
-        )
-      : [];
-
-    if (this.limit > 0) {
-      sortedRows = sortedRows.slice(0, this.limit);
-    }
-
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">Release History</h2>
-        <div class="bundler-releases">
-          \${
-            sortedRows.length > 0
-              ? sortedRows.map(
-                  (release) => html\`
-                  <div class="bundler-release bundler-release-\${release.status}">
-                    <div class="bundler-release-row">
-                      <span class="bundler-release-version">\${release.version}</span>
-                      <span class="bundler-release-status">\${release.status}</span>
-                      \${
-                        release.deployType
-                          ? html\`<span class="bundler-release-type">\${release.deployType.toUpperCase()}</span>\`
-                          : ""
-                      }
-                      \${
-                        release.deployTarget
-                          ? html\`<span class="bundler-release-target">\${release.deployTarget}</span>\`
-                          : ""
-                      }
-                      <span class="bundler-release-date">\${new Date(release.deployedAt).toLocaleString()}</span>
-                    </div>
-                    \${
-                      release.notes
-                        ? html\`<p class="bundler-release-notes">\${release.notes}</p>\`
-                        : ""
-                    }
-                  </div>
-                \`,
-                )
-              : html\`<p class="bundler-empty">No releases yet.</p>\`
-          }
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-$APP.define("settings-editor", {
-  properties: {
-    _settings: T.object(null),
-  },
-  connected() {
-    this._settings = $APP.settings;
-  },
-  async handleSave() {
-    try {
-      await $APP.settings.set(this._settings);
-      alert("Settings saved successfully!");
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      alert("Error saving settings. Check the console for details.");
-    }
-  },
-  render() {
-    if (!this._settings) {
-      return html\`<div class="bundler-loading">Loading settings...</div>\`;
-    }
-    return html\`
-      <uix-card shadow="none" borderWidth="0">
-        <h2 slot="header">App Settings</h2>
-        <div class="bundler-form-grid">
-          <uix-input
-            label="App Name"
-            .value=\${this._settings.name}
-            @change=\${(e) => (this._settings.name = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Short Name"
-            .value=\${this._settings.short_name}
-            @change=\${(e) => (this._settings.short_name = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Emoji Icon"
-            .value=\${this._settings.emojiIcon}
-            @change=\${(e) => (this._settings.emojiIcon = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Icon"
-            .value=\${this._settings.icon}
-            @change=\${(e) => (this._settings.icon = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Start URL"
-            .value=\${this._settings.url}
-            @change=\${(e) => (this._settings.url = e.target.value)}
-          ></uix-input>
-          <uix-input
-            label="Theme Color"
-            type="color"
-            .value=\${this._settings.theme_color}
-            @change=\${(e) => (this._settings.theme_color = e.target.value)}
-          ></uix-input>
-          <uix-input
-            class="bundler-full-width"
-            label="Open Graph Image URL"
-            .value=\${this._settings.og_image}
-            @change=\${(e) => (this._settings.og_image = e.target.value)}
-          ></uix-input>
-          <uix-textarea
-            class="bundler-full-width"
-            label="Description"
-            .value=\${this._settings.description}
-            @change=\${(e) => (this._settings.description = e.target.value)}
-          ></uix-textarea>
-        </div>
-        <div slot="footer">
-          <uix-button
-            @click=\${this.handleSave.bind(this)}
-            label="Save Settings"
-          ></uix-button>
-        </div>
-      </uix-card>
-    \`;
-  },
-});
-
-export default {
-  tag: "bundler-ui",
-  style: true,
-  properties: {
-    activeTab: T.number(0),
-    releaseStats: T.object({
-      defaultValue: {
-        total: 0,
-        success: 0,
-        failed: 0,
-        pending: 0,
-        lastDeploy: null,
-      },
-    }),
-    releases: T.array(),
-  },
-
-  async connected() {
-    await this.loadStats();
-  },
-
-  async loadStats() {
-    try {
-      const releases = await $APP.Model.bundler_releases.getAll();
-      this.releases = releases || [];
-      this.releaseStats = {
-        total: this.releases.length,
-        success: this.releases.filter((r) => r.status === "success").length,
-        failed: this.releases.filter((r) => r.status === "failed").length,
-        pending: this.releases.filter((r) => r.status === "pending").length,
-        lastDeploy:
-          this.releases.length > 0
-            ? [...this.releases].sort(
-                (a, b) => new Date(b.deployedAt) - new Date(a.deployedAt),
-              )[0]?.deployedAt
-            : null,
-      };
-    } catch (error) {
-      console.error("Failed to load release stats:", error);
-    }
-  },
-
-  formatDate(date) {
-    if (!date) return "Never";
-    return new Date(date).toLocaleDateString();
-  },
-
-  render() {
-    return html\`
-      <div class="bundler-ui">
-        <h1 class="bundler-page-title">Release Manager</h1>
-        <uix-tabs .activeTab=\${this.activeTab} @tab-change=\${(e) => (this.activeTab = e.detail)}>
-          <button slot="tab"><uix-icon name="layout-dashboard"></uix-icon> Dashboard</button>
-          <button slot="tab"><uix-icon name="settings"></uix-icon> Settings</button>
-          <button slot="tab"><uix-icon name="rocket"></uix-icon> Deploy</button>
-          <button slot="tab"><uix-icon name="key"></uix-icon> Credentials</button>
-
-          <div slot="panel">\${this.renderDashboard()}</div>
-          <div slot="panel">\${this.renderSettings()}</div>
-          <div slot="panel">\${this.renderDeploy()}</div>
-          <div slot="panel">\${this.renderCredentials()}</div>
-        </uix-tabs>
-      </div>
-    \`;
-  },
-
-  renderDashboard() {
-    return html\`
-      <div class="bundler-dashboard">
-        <div class="bundler-stats-grid">
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Total Releases" value=\${this.releaseStats.total} centered>
-              <uix-icon slot="figure" name="package" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Successful" value=\${this.releaseStats.success} variant="success" centered>
-              <uix-icon slot="figure" name="circle-check" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Failed" value=\${this.releaseStats.failed} variant="danger" centered>
-              <uix-icon slot="figure" name="circle-x" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-          <uix-card shadow="none" borderWidth="0">
-            <uix-stat title="Last Deploy" value=\${this.formatDate(this.releaseStats.lastDeploy)} centered>
-              <uix-icon slot="figure" name="clock" size="xl"></uix-icon>
-            </uix-stat>
-          </uix-card>
-        </div>
-
-        <uix-card shadow="none" borderWidth="0">
-          <h3 slot="header">Quick Actions</h3>
-          <div class="bundler-quick-actions">
-            <uix-button @click=\${() => (this.activeTab = 2)}>
-              <uix-icon name="rocket"></uix-icon> Deploy Now
-            </uix-button>
-            <uix-button @click=\${() => (this.activeTab = 1)}>
-              <uix-icon name="settings"></uix-icon> Settings
-            </uix-button>
-            <uix-button @click=\${() => this.loadStats()}>
-              <uix-icon name="refresh-cw"></uix-icon> Refresh
-            </uix-button>
-          </div>
-        </uix-card>
-
-        <release-history
-          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
-        ></release-history>
-      </div>
-    \`;
-  },
-
-  renderSettings() {
-    return html\`
-      <div class="bundler-tab-content">
-        <settings-editor></settings-editor>
-      </div>
-    \`;
-  },
-
-  renderDeploy() {
-    return html\`
-      <div class="bundler-tab-content bundler-deploy-content">
-        <release-creator></release-creator>
-        <release-history
-          .data-query=\${{ model: "bundler_releases", order: "-deployedAt", key: "rows", limit: 10 }}
-        ></release-history>
-      </div>
-    \`;
-  },
-
-  renderCredentials() {
-    return html\`
-      <div class="bundler-tab-content bundler-credentials-content">
-        <credentials-manager
-          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
-        ></credentials-manager>
-        <cloudflare-credentials-manager
-          .data-query=\${{ model: "bundler_credentials", id: "singleton", key: "row" }}
-        ></cloudflare-credentials-manager>
-      </div>
-    \`;
-  },
-};
-`,mimeType:"text/javascript"},"/$app/bundler/views/ui.css":{content:`.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}
-`,mimeType:"text/css"},"/$app/uix/navigation/tabs.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-export default {
-  tag: "uix-tabs",
-  properties: {
-    activeTab: T.number(0),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "pills", "underline"],
-    }),
-    vertical: T.boolean(),
-  },
-  style: true,
-  shadow: true,
-
-  firstUpdated() {
-    const slot = this.shadowRoot.querySelector("slot[name=panel]");
-    slot.addEventListener("slotchange", () => {
-      this.updateActivePanels();
-    });
-  },
-
-  updateActivePanels() {
-    const panelSlot = this.shadowRoot.querySelector("slot[name=panel]");
-    const tabSlot = this.shadowRoot.querySelector("slot[name=tab]");
-
-    if (!panelSlot) return;
-
-    const panels = panelSlot.assignedNodes({ flatten: true });
-    const tabs = tabSlot?.assignedElements() || [];
-
-    // Update panel visibility
-    if (panels.length > 1) {
-      panels.forEach((panel, index) => {
-        if (index === this.activeTab) {
-          panel.removeAttribute("hide");
-        } else {
-          panel.setAttribute("hide", "");
-        }
-      });
-    }
-
-    // Update tab active state
-    tabs.forEach((tab, index) => {
-      if (index === this.activeTab) {
-        tab.setAttribute("active", "");
-      } else {
-        tab.removeAttribute("active");
-      }
-    });
-  },
-
-  selectTab(e) {
-    const clickedElement = e.target;
-    const slot = clickedElement.assignedSlot;
-    if (slot && slot.name === "tab") {
-      const tabs = slot.assignedElements();
-      const index = tabs.indexOf(clickedElement);
-      this.activeTab = index;
-      this.updateActivePanels();
-      this.emit("tab-change", index);
-    }
-  },
-
-  render() {
-    return html\`
-        <div
-          part="tab-list"
-          role="tablist"
-          aria-orientation=\${this.vertical ? "vertical" : "horizontal"}
-        >
-          <slot name="tab" part="tab" @click=\${this.selectTab.bind(this)}></slot>
-        </div>
-        <slot part="tab-panel" name="panel" part="panel"></slot>
-     
-    \`;
-  },
-};
-
-/**
- * Tabs Component
- *
- * @component
- * @category navigation
- * @tag uix-tabs
- *
- * Accessible tabs with keyboard navigation and flexible content
- *
- * @example
- * // Pattern 1: Static tabs with multiple panels (each panel rendered separately)
- * \`\`\`html
- * <uix-tabs activeTab=2>
- *   <button slot="tab">Profile</button>
- *   <button slot="tab">Settings</button>
- *   <button slot="tab">Account</button>
- *
- *   <div slot="panel">Profile content...</div>
- *   <div slot="panel">Settings content...</div>
- *   <div slot="panel">Account content...</div>
- * </uix-tabs>
- * \`\`\`
- *
- * @example
- * // Pattern 2: Dynamic tabs with single panel (content switches based on active tab)
- * \`\`\`js
- * html\`<uix-tabs>
- *   \${sections.map(section => html\`
- *     <button slot="tab">
- *       <uix-icon name=\${section.icon}></uix-icon>
- *       \${section.label}
- *     </button>
- *   \`)}
- *   <div slot="panel">
- *     \${sections[this.activeTab].render()}
- *   </div>
- * </uix-tabs>\`
- * \`\`\`
- * @example
- * // With variants
- *
- * \`\`\`html
- * <uix-tabs variant="pills">
- *   <button slot="tab">Tab 1</button>
- *   <button slot="tab">Tab 2</button>
- *   <div slot="panel">Panel 1</div>
- *   <div slot="panel">Panel 2</div>
- * </uix-tabs>
- * \`\`\`
- *
- * @example
- * // Vertical orientation
- * \`\`\`html
- * <uix-tabs vertical variant="underline">
- *   <button slot="tab">Navigation</button>
- *   <button slot="tab">Content</button>
- *   <div slot="panel">Nav content</div>
- *   <div slot="panel">Main content</div>
- * </uix-tabs>
- * \`\`\`
- * @example
- * // Controlled with property binding
- * \`\`\`js
- * html\`<uix-tabs .activeTab=\${this.currentTab} @tab-change=\${this.handleTabChange}>
- *   <button slot="tab">First</button>
- *   <button slot="tab">Second</button>
- *   <div slot="panel">First panel</div>
- *   <div slot="panel">Second panel</div>
- * </uix-tabs>\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/display/stat.js":{content:`import T from "/$app/types/index.js";
-import { html, nothing } from "/npm/lit-html";
-
-export default {
-  tag: "uix-stat",
-  properties: {
-    title: T.string(""),
-    value: T.any(""),
-    desc: T.string(""),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["sm", "md", "lg"],
-    }),
-    variant: T.string({
-      defaultValue: "default",
-      enum: [
-        "default",
-        "primary",
-        "secondary",
-        "success",
-        "danger",
-        "warning",
-        "info",
-      ],
-    }),
-    centered: T.boolean(false),
-  },
-  style: true,
-  shadow: true,
-
-  render() {
-    return html\`
-      <div part="figure">
-        <slot name="figure"></slot>
-      </div>
-      <div part="body">
-        \${this.title ? html\`<div part="title">\${this.title}</div>\` : nothing}
-        \${this.value !== "" ? html\`<div part="value">\${this.value}</div>\` : nothing}
-        <div part="desc">
-          \${this.desc ? this.desc : html\`<slot></slot>\`}
-        </div>
-      </div>
-    \`;
-  },
-};
-
-/**
- * Stat Component
- *
- * @component
- * @category display
- * @tag uix-stat
- *
- * Display statistics with title, value, and description in a clean format.
- * Supports icons/figures and works great when grouped with uix-join.
- *
- * @slot default - Description content below the value
- * @slot figure - Icon, avatar, or image to display alongside the stat
- *
- * @part figure - Container for the figure slot
- * @part body - Container for title, value, and description
- * @part title - The stat title/label
- * @part value - The main stat value (hero element)
- * @part desc - Description text below the value
- *
- * @example
- * // Basic stat
- * \`\`\`html
- * <uix-stat title="Total Users" value="1,234"></uix-stat>
- * \`\`\`
- *
- * @example
- * // With description
- * \`\`\`html
- * <uix-stat title="Downloads" value="31K" desc="Jan 1st - Feb 1st"></uix-stat>
- * \`\`\`
- *
- * @example
- * // With icon figure
- * \`\`\`html
- * <uix-stat title="Total Likes" value="25.6K" variant="primary">
- *   <uix-icon slot="figure" name="heart" size="lg"></uix-icon>
- *   21% more than last month
- * </uix-stat>
- * \`\`\`
- *
- * @example
- * // With colored variants
- * \`\`\`html
- * <uix-stat title="Active" value="85" variant="success">\u2191 12%</uix-stat>
- * <uix-stat title="Errors" value="3" variant="danger">\u2193 5%</uix-stat>
- * \`\`\`
- *
- * @example
- * // Grouped stats with uix-join
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Downloads" value="31K">Jan 1st - Feb 1st</uix-stat>
- *   <uix-stat title="New Users" value="4,200">\u2191 400 (22%)</uix-stat>
- *   <uix-stat title="New Registers" value="1,200">\u2193 90 (14%)</uix-stat>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // Stats with icons grouped
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Total Likes" value="25.6K" variant="primary">
- *     <uix-icon slot="figure" name="heart"></uix-icon>
- *     21% more than last month
- *   </uix-stat>
- *   <uix-stat title="Page Views" value="2.6M" variant="secondary">
- *     <uix-icon slot="figure" name="zap"></uix-icon>
- *     21% more than last month
- *   </uix-stat>
- * </uix-join>
- * \`\`\`
- *
- * @example
- * // Centered stats
- * \`\`\`html
- * <uix-join>
- *   <uix-stat title="Passed" value="85" variant="success" centered></uix-stat>
- *   <uix-stat title="Failed" value="3" variant="danger" centered></uix-stat>
- *   <uix-stat title="Pending" value="12" variant="warning" centered></uix-stat>
- * </uix-join>
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/icon-lucide/lucide/key.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15.5 7.5l2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2l-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-check.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12l2 2l4-4"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/circle-x.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9l-6 6m0-6l6 6"/></g></svg>',mimeType:"image/svg+xml"},"/$app/icon-lucide/lucide/clock.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></svg>',mimeType:"image/svg+xml"},"/$app/uix/form/textarea.js":{content:`import T from "/$app/types/index.js";
-import { html } from "/npm/lit-html";
-
-const generateId = () => \`uix-textarea-\${Math.random().toString(36).slice(2, 9)}\`;
-
-export default {
-  tag: "uix-textarea",
-  properties: {
-    label: T.string(),
-    id: T.string(),
-    value: T.string(""),
-    placeholder: T.string(""),
-    rows: T.number({ defaultValue: 4 }),
-    cols: T.number({ defaultValue: 50 }),
-    size: T.string({
-      defaultValue: "md",
-      enum: ["xs", "sm", "md", "lg", "xl"],
-    }),
-    disabled: T.boolean(false),
-    readonly: T.boolean(false),
-    required: T.boolean(false),
-    maxlength: T.number({ defaultValue: null }),
-    minlength: T.number({ defaultValue: null }),
-    resize: T.string({
-      defaultValue: "vertical",
-      enum: ["none", "both", "horizontal", "vertical"],
-    }),
-    error: T.boolean(false),
-    fullWidth: T.boolean(false),
-    variant: T.string({
-      defaultValue: "default",
-      enum: ["default", "primary", "secondary", "success", "warning", "error"],
-    }),
-    name: T.string(),
-  },
-  style: true,
-  shadow: false,
-  formAssociated: true,
-
-  connected() {
-    if (!this._internals) {
-      this._internals = this.attachInternals();
-    }
-    this._internals.setFormValue(this.value);
-    if (!this.id && !this._textareaId) {
-      this._textareaId = generateId();
-    }
-  },
-
-  get textareaId() {
-    return this.id || this._textareaId || (this._textareaId = generateId());
-  },
-
-  handleInput(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("input", { value: this.value });
-  },
-
-  handleChange(e) {
-    this.value = e.target.value;
-    this._internals?.setFormValue(this.value);
-    this.emit("change", { value: this.value });
-  },
-
-  render() {
-    const id = this.textareaId;
-    const attrs = {};
-    if (this.maxlength !== null) attrs.maxlength = this.maxlength;
-    if (this.minlength !== null) attrs.minlength = this.minlength;
-
-    return html\`
-      \${this.label ? html\`<uix-label for=\${id} text=\${this.label} ?required=\${this.required}></uix-label>\` : ""}
-      <textarea
-        id=\${id}
-        class="textarea"
-        name=\${this.name}
-        value=\${this.value}
-        placeholder=\${this.placeholder}
-        rows=\${this.rows}
-        cols=\${this.cols}
-        ?disabled=\${this.disabled}
-        ?readonly=\${this.readonly}
-        ?required=\${this.required}
-        @input=\${this.handleInput.bind(this)}
-        @change=\${this.handleChange.bind(this)}
-      ></textarea>
-    \`;
-  },
-};
-
-/**
- * Textarea Component
- *
- * @component
- * @category form
- * @tag uix-textarea
- *
- * Multi-line text input field with size variants and resize options.
- *
- * @example
- * // Basic textarea
- * \`\`\`html
- * <uix-textarea placeholder="Enter your message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // With custom rows
- * \`\`\`html
- * <uix-textarea rows="8" placeholder="Long message..."></uix-textarea>
- * \`\`\`
- *
- * @example
- * // Size variants
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea size="xs" placeholder="Extra small" rows="2"></uix-textarea>
- *   <uix-textarea size="sm" placeholder="Small" rows="3"></uix-textarea>
- *   <uix-textarea size="md" placeholder="Medium" rows="4"></uix-textarea>
- *   <uix-textarea size="lg" placeholder="Large" rows="5"></uix-textarea>
- *   <uix-textarea size="xl" placeholder="Extra large" rows="6"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // Resize options
- * \`\`\`html
- * <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
- *   <uix-textarea resize="none" placeholder="No resize"></uix-textarea>
- *   <uix-textarea resize="vertical" placeholder="Vertical resize"></uix-textarea>
- *   <uix-textarea resize="horizontal" placeholder="Horizontal resize"></uix-textarea>
- *   <uix-textarea resize="both" placeholder="Both resize"></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With character limit
- * \`\`\`html
- * <uix-textarea maxlength="200" placeholder="Max 200 characters"></uix-textarea>
- * \`\`\`
- *
- * @example
- * // States
- * \`\`\`html
- * <div style="display: flex; flex-direction: column; gap: 0.5rem;">
- *   <uix-textarea placeholder="Normal"></uix-textarea>
- *   <uix-textarea placeholder="Disabled" disabled></uix-textarea>
- *   <uix-textarea placeholder="Readonly" value="Read only text" readonly></uix-textarea>
- *   <uix-textarea placeholder="Required" required></uix-textarea>
- * </div>
- * \`\`\`
- *
- * @example
- * // With binding
- * \`\`\`js
- * html\`<uix-textarea
- *   .value=\${this.message}
- *   @input=\${(e) => this.message = e.detail.value}
- *   placeholder="Type your message..."
- * ></uix-textarea>\`
- * \`\`\`
- */
-`,mimeType:"text/javascript"},"/$app/uix/form/label.js":{content:`import T from "/$app/types/index.js";
+`,mimeType:"text/css"},"/views/auth-modal.css":{content:`uix-modal::part(dialog){border:4px solid black;border-radius:1.5rem;box-shadow:8px 8px #ffffff80;max-width:28rem;padding:0;overflow:hidden}uix-modal::part(header){background:var(--color-primary);color:#000;border-bottom:3px solid black;padding:1.5rem}uix-modal::part(body){padding:0}
+`,mimeType:"text/css"},"/$app/uix/form/label.js":{content:`import T from "/$app/types/index.js";
 import { html } from "/npm/lit-html";
 
 export default {
@@ -28106,9 +28106,8 @@ export default {
  * <uix-input id="email" required></uix-input>
  * \`\`\`
  */
-`,mimeType:"text/javascript"},"/$app/uix/navigation/tabs.css":{content:`:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-`,mimeType:"text/css"},"/$app/uix/display/stat.css":{content:`:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}
-`,mimeType:"text/css"},"/$app/uix/form/textarea.css":{content:`:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}
+`,mimeType:"text/javascript"},"/$app/uix/layout/container.css":{content:`:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}
+`,mimeType:"text/css"},"/$app/icon-lucide/lucide/chevron-down.svg":{content:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg>',mimeType:"image/svg+xml"},"/$app/uix/layout/card.css":{content:`:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}
 `,mimeType:"text/css"},"/$app/uix/form/label.css":{content:`:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}
 `,mimeType:"text/css"},"/lit-html":{content:`export*from"/lit-html@3.3.1/es2022/lit-html.mjs";
 `,mimeType:"application/javascript"},"/lit-html@3.3.1/es2022/lit-html.mjs":{content:`var M=globalThis,b=M.trustedTypes,P=b?b.createPolicy("lit-html",{createHTML:e=>e}):void 0,w="$lit$",d=\`lit$\${Math.random().toFixed(9).slice(2)}$\`,S="?"+d,X=\`<\${S}>\`,c=document,f=()=>c.createComment(""),y=e=>e===null||typeof e!="object"&&typeof e!="function",I=Array.isArray,R=e=>I(e)||typeof e?.[Symbol.iterator]=="function",E=\`[ 	
@@ -28222,5 +28221,5 @@ lit-html/directives/unsafe-html.js:
 `,mimeType:"application/javascript"},"/@lezer/lr@%5E1.0.0?target=es2022":{content:`import"/@lezer/common@^1.0.0?target=es2022";import"/node/process.mjs";export*from"/@lezer/lr@1.4.5/es2022/lr.mjs";
 `,mimeType:"application/javascript"},"/@lezer/common@%5E1.2.0?target=es2022":{content:`export*from"/@lezer/common@1.4.0/es2022/common.mjs";
 `,mimeType:"application/javascript"},"/@lezer/lr@1.4.5/es2022/lr.mjs":{content:'import v from"/node/process.mjs";import{Parser as G,NodeProp as P,NodeSet as j,NodeType as U,DefaultBufferLength as W,Tree as b,IterMode as H}from"/@lezer/common@^1.0.0?target=es2022";var N=class T{constructor(t,e,i,n,r,h,o,a,c,l=0,p){this.p=t,this.stack=e,this.state=i,this.reducePos=n,this.pos=r,this.score=h,this.buffer=o,this.bufferBase=a,this.curContext=c,this.lookAhead=l,this.parent=p}toString(){return`[${this.stack.filter((t,e)=>e%3==0).concat(this.state)}]@${this.pos}${this.score?"!"+this.score:""}`}static start(t,e,i=0){let n=t.parser.context;return new T(t,[],e,i,i,0,[],0,n?new R(n,n.start):null,0,null)}get context(){return this.curContext?this.curContext.context:null}pushState(t,e){this.stack.push(this.state,e,this.bufferBase+this.buffer.length),this.state=t}reduce(t){var e;let i=t>>19,n=t&65535,{parser:r}=this.p,h=this.reducePos<this.pos-25&&this.setLookAhead(this.pos),o=r.dynamicPrecedence(n);if(o&&(this.score+=o),i==0){this.pushState(r.getGoto(this.state,n,!0),this.reducePos),n<r.minRepeatTerm&&this.storeNode(n,this.reducePos,this.reducePos,h?8:4,!0),this.reduceContext(n,this.reducePos);return}let a=this.stack.length-(i-1)*3-(t&262144?6:0),c=a?this.stack[a-2]:this.p.ranges[0].from,l=this.reducePos-c;l>=2e3&&!(!((e=this.p.parser.nodeSet.types[n])===null||e===void 0)&&e.isAnonymous)&&(c==this.p.lastBigReductionStart?(this.p.bigReductionCount++,this.p.lastBigReductionSize=l):this.p.lastBigReductionSize<l&&(this.p.bigReductionCount=1,this.p.lastBigReductionStart=c,this.p.lastBigReductionSize=l));let p=a?this.stack[a-1]:0,u=this.bufferBase+this.buffer.length-p;if(n<r.minRepeatTerm||t&131072){let f=r.stateFlag(this.state,1)?this.pos:this.reducePos;this.storeNode(n,c,f,u+4,!0)}if(t&262144)this.state=this.stack[a];else{let f=this.stack[a-3];this.state=r.getGoto(f,n,!0)}for(;this.stack.length>a;)this.stack.pop();this.reduceContext(n,c)}storeNode(t,e,i,n=4,r=!1){if(t==0&&(!this.stack.length||this.stack[this.stack.length-1]<this.buffer.length+this.bufferBase)){let h=this,o=this.buffer.length;if(o==0&&h.parent&&(o=h.bufferBase-h.parent.bufferBase,h=h.parent),o>0&&h.buffer[o-4]==0&&h.buffer[o-1]>-1){if(e==i)return;if(h.buffer[o-2]>=e){h.buffer[o-2]=i;return}}}if(!r||this.pos==i)this.buffer.push(t,e,i,n);else{let h=this.buffer.length;if(h>0&&(this.buffer[h-4]!=0||this.buffer[h-1]<0)){let o=!1;for(let a=h;a>0&&this.buffer[a-2]>i;a-=4)if(this.buffer[a-1]>=0){o=!0;break}if(o)for(;h>0&&this.buffer[h-2]>i;)this.buffer[h]=this.buffer[h-4],this.buffer[h+1]=this.buffer[h-3],this.buffer[h+2]=this.buffer[h-2],this.buffer[h+3]=this.buffer[h-1],h-=4,n>4&&(n-=4)}this.buffer[h]=t,this.buffer[h+1]=e,this.buffer[h+2]=i,this.buffer[h+3]=n}}shift(t,e,i,n){if(t&131072)this.pushState(t&65535,this.pos);else if(t&262144)this.pos=n,this.shiftContext(e,i),e<=this.p.parser.maxNode&&this.buffer.push(e,i,n,4);else{let r=t,{parser:h}=this.p;(n>this.pos||e<=h.maxNode)&&(this.pos=n,h.stateFlag(r,1)||(this.reducePos=n)),this.pushState(r,i),this.shiftContext(e,i),e<=h.maxNode&&this.buffer.push(e,i,n,4)}}apply(t,e,i,n){t&65536?this.reduce(t):this.shift(t,e,i,n)}useNode(t,e){let i=this.p.reused.length-1;(i<0||this.p.reused[i]!=t)&&(this.p.reused.push(t),i++);let n=this.pos;this.reducePos=this.pos=n+t.length,this.pushState(e,n),this.buffer.push(i,n,this.reducePos,-1),this.curContext&&this.updateContext(this.curContext.tracker.reuse(this.curContext.context,t,this,this.p.stream.reset(this.pos-t.length)))}split(){let t=this,e=t.buffer.length;for(;e>0&&t.buffer[e-2]>t.reducePos;)e-=4;let i=t.buffer.slice(e),n=t.bufferBase+e;for(;t&&n==t.bufferBase;)t=t.parent;return new T(this.p,this.stack.slice(),this.state,this.reducePos,this.pos,this.score,i,n,this.curContext,this.lookAhead,t)}recoverByDelete(t,e){let i=t<=this.p.parser.maxNode;i&&this.storeNode(t,this.pos,e,4),this.storeNode(0,this.pos,e,i?8:4),this.pos=this.reducePos=e,this.score-=190}canShift(t){for(let e=new q(this);;){let i=this.p.parser.stateSlot(e.state,4)||this.p.parser.hasAction(e.state,t);if(i==0)return!1;if(!(i&65536))return!0;e.reduce(i)}}recoverByInsert(t){if(this.stack.length>=300)return[];let e=this.p.parser.nextStates(this.state);if(e.length>8||this.stack.length>=120){let n=[];for(let r=0,h;r<e.length;r+=2)(h=e[r+1])!=this.state&&this.p.parser.hasAction(h,t)&&n.push(e[r],h);if(this.stack.length<120)for(let r=0;n.length<8&&r<e.length;r+=2){let h=e[r+1];n.some((o,a)=>a&1&&o==h)||n.push(e[r],h)}e=n}let i=[];for(let n=0;n<e.length&&i.length<4;n+=2){let r=e[n+1];if(r==this.state)continue;let h=this.split();h.pushState(r,this.pos),h.storeNode(0,h.pos,h.pos,4,!0),h.shiftContext(e[n],this.pos),h.reducePos=this.pos,h.score-=200,i.push(h)}return i}forceReduce(){let{parser:t}=this.p,e=t.stateSlot(this.state,5);if(!(e&65536))return!1;if(!t.validAction(this.state,e)){let i=e>>19,n=e&65535,r=this.stack.length-i*3;if(r<0||t.getGoto(this.stack[r],n,!1)<0){let h=this.findForcedReduction();if(h==null)return!1;e=h}this.storeNode(0,this.pos,this.pos,4,!0),this.score-=100}return this.reducePos=this.pos,this.reduce(e),!0}findForcedReduction(){let{parser:t}=this.p,e=[],i=(n,r)=>{if(!e.includes(n))return e.push(n),t.allActions(n,h=>{if(!(h&393216))if(h&65536){let o=(h>>19)-r;if(o>1){let a=h&65535,c=this.stack.length-o*3;if(c>=0&&t.getGoto(this.stack[c],a,!1)>=0)return o<<19|65536|a}}else{let o=i(h,r+1);if(o!=null)return o}})};return i(this.state,0)}forceAll(){for(;!this.p.parser.stateFlag(this.state,2);)if(!this.forceReduce()){this.storeNode(0,this.pos,this.pos,4,!0);break}return this}get deadEnd(){if(this.stack.length!=3)return!1;let{parser:t}=this.p;return t.data[t.stateSlot(this.state,1)]==65535&&!t.stateSlot(this.state,4)}restart(){this.storeNode(0,this.pos,this.pos,4,!0),this.state=this.stack[0],this.stack.length=0}sameState(t){if(this.state!=t.state||this.stack.length!=t.stack.length)return!1;for(let e=0;e<this.stack.length;e+=3)if(this.stack[e]!=t.stack[e])return!1;return!0}get parser(){return this.p.parser}dialectEnabled(t){return this.p.parser.dialect.flags[t]}shiftContext(t,e){this.curContext&&this.updateContext(this.curContext.tracker.shift(this.curContext.context,t,this,this.p.stream.reset(e)))}reduceContext(t,e){this.curContext&&this.updateContext(this.curContext.tracker.reduce(this.curContext.context,t,this,this.p.stream.reset(e)))}emitContext(){let t=this.buffer.length-1;(t<0||this.buffer[t]!=-3)&&this.buffer.push(this.curContext.hash,this.pos,this.pos,-3)}emitLookAhead(){let t=this.buffer.length-1;(t<0||this.buffer[t]!=-4)&&this.buffer.push(this.lookAhead,this.pos,this.pos,-4)}updateContext(t){if(t!=this.curContext.context){let e=new R(this.curContext.tracker,t);e.hash!=this.curContext.hash&&this.emitContext(),this.curContext=e}}setLookAhead(t){return t<=this.lookAhead?!1:(this.emitLookAhead(),this.lookAhead=t,!0)}close(){this.curContext&&this.curContext.tracker.strict&&this.emitContext(),this.lookAhead>0&&this.emitLookAhead()}},R=class{constructor(s,t){this.tracker=s,this.context=t,this.hash=s.strict?s.hash(t):0}},q=class{constructor(s){this.start=s,this.state=s.state,this.stack=s.stack,this.base=this.stack.length}reduce(s){let t=s&65535,e=s>>19;e==0?(this.stack==this.start.stack&&(this.stack=this.stack.slice()),this.stack.push(this.state,0,0),this.base+=3):this.base-=(e-1)*3;let i=this.start.p.parser.getGoto(this.stack[this.base-3],t,!0);this.state=i}},J=class y{constructor(t,e,i){this.stack=t,this.pos=e,this.index=i,this.buffer=t.buffer,this.index==0&&this.maybeNext()}static create(t,e=t.bufferBase+t.buffer.length){return new y(t,e,e-t.bufferBase)}maybeNext(){let t=this.stack.parent;t!=null&&(this.index=this.stack.bufferBase-t.bufferBase,this.stack=t,this.buffer=t.buffer)}get id(){return this.buffer[this.index-4]}get start(){return this.buffer[this.index-3]}get end(){return this.buffer[this.index-2]}get size(){return this.buffer[this.index-1]}next(){this.index-=4,this.pos-=4,this.index==0&&this.maybeNext()}fork(){return new y(this.stack,this.pos,this.index)}};function x(s,t=Uint16Array){if(typeof s!="string")return s;let e=null;for(let i=0,n=0;i<s.length;){let r=0;for(;;){let h=s.charCodeAt(i++),o=!1;if(h==126){r=65535;break}h>=92&&h--,h>=34&&h--;let a=h-32;if(a>=46&&(a-=46,o=!0),r+=a,o)break;r*=46}e?e[n++]=r:e=new t(r)}return e}var S=class{constructor(){this.start=-1,this.value=-1,this.end=-1,this.extended=-1,this.lookAhead=0,this.mask=0,this.context=0}},z=new S,I=class{constructor(s,t){this.input=s,this.ranges=t,this.chunk="",this.chunkOff=0,this.chunk2="",this.chunk2Pos=0,this.next=-1,this.token=z,this.rangeIndex=0,this.pos=this.chunkPos=t[0].from,this.range=t[0],this.end=t[t.length-1].to,this.readNext()}resolveOffset(s,t){let e=this.range,i=this.rangeIndex,n=this.pos+s;for(;n<e.from;){if(!i)return null;let r=this.ranges[--i];n-=e.from-r.to,e=r}for(;t<0?n>e.to:n>=e.to;){if(i==this.ranges.length-1)return null;let r=this.ranges[++i];n+=r.from-e.to,e=r}return n}clipPos(s){if(s>=this.range.from&&s<this.range.to)return s;for(let t of this.ranges)if(t.to>s)return Math.max(s,t.from);return this.end}peek(s){let t=this.chunkOff+s,e,i;if(t>=0&&t<this.chunk.length)e=this.pos+s,i=this.chunk.charCodeAt(t);else{let n=this.resolveOffset(s,1);if(n==null)return-1;if(e=n,e>=this.chunk2Pos&&e<this.chunk2Pos+this.chunk2.length)i=this.chunk2.charCodeAt(e-this.chunk2Pos);else{let r=this.rangeIndex,h=this.range;for(;h.to<=e;)h=this.ranges[++r];this.chunk2=this.input.chunk(this.chunk2Pos=e),e+this.chunk2.length>h.to&&(this.chunk2=this.chunk2.slice(0,h.to-e)),i=this.chunk2.charCodeAt(0)}}return e>=this.token.lookAhead&&(this.token.lookAhead=e+1),i}acceptToken(s,t=0){let e=t?this.resolveOffset(t,-1):this.pos;if(e==null||e<this.token.start)throw new RangeError("Token end out of bounds");this.token.value=s,this.token.end=e}acceptTokenTo(s,t){this.token.value=s,this.token.end=t}getChunk(){if(this.pos>=this.chunk2Pos&&this.pos<this.chunk2Pos+this.chunk2.length){let{chunk:s,chunkPos:t}=this;this.chunk=this.chunk2,this.chunkPos=this.chunk2Pos,this.chunk2=s,this.chunk2Pos=t,this.chunkOff=this.pos-this.chunkPos}else{this.chunk2=this.chunk,this.chunk2Pos=this.chunkPos;let s=this.input.chunk(this.pos),t=this.pos+s.length;this.chunk=t>this.range.to?s.slice(0,this.range.to-this.pos):s,this.chunkPos=this.pos,this.chunkOff=0}}readNext(){return this.chunkOff>=this.chunk.length&&(this.getChunk(),this.chunkOff==this.chunk.length)?this.next=-1:this.next=this.chunk.charCodeAt(this.chunkOff)}advance(s=1){for(this.chunkOff+=s;this.pos+s>=this.range.to;){if(this.rangeIndex==this.ranges.length-1)return this.setDone();s-=this.range.to-this.pos,this.range=this.ranges[++this.rangeIndex],this.pos=this.range.from}return this.pos+=s,this.pos>=this.token.lookAhead&&(this.token.lookAhead=this.pos+1),this.readNext()}setDone(){return this.pos=this.chunkPos=this.end,this.range=this.ranges[this.rangeIndex=this.ranges.length-1],this.chunk="",this.next=-1}reset(s,t){if(t?(this.token=t,t.start=s,t.lookAhead=s+1,t.value=t.extended=-1):this.token=z,this.pos!=s){if(this.pos=s,s==this.end)return this.setDone(),this;for(;s<this.range.from;)this.range=this.ranges[--this.rangeIndex];for(;s>=this.range.to;)this.range=this.ranges[++this.rangeIndex];s>=this.chunkPos&&s<this.chunkPos+this.chunk.length?this.chunkOff=s-this.chunkPos:(this.chunk="",this.chunkOff=0),this.readNext()}return this}read(s,t){if(s>=this.chunkPos&&t<=this.chunkPos+this.chunk.length)return this.chunk.slice(s-this.chunkPos,t-this.chunkPos);if(s>=this.chunk2Pos&&t<=this.chunk2Pos+this.chunk2.length)return this.chunk2.slice(s-this.chunk2Pos,t-this.chunk2Pos);if(s>=this.range.from&&t<=this.range.to)return this.input.read(s,t);let e="";for(let i of this.ranges){if(i.from>=t)break;i.to>s&&(e+=this.input.read(Math.max(i.from,s),Math.min(i.to,t)))}return e}},m=class{constructor(s,t){this.data=s,this.id=t}token(s,t){let{parser:e}=t.p;D(this.data,s,t,this.id,e.data,e.tokenPrecTable)}};m.prototype.contextual=m.prototype.fallback=m.prototype.extend=!1;var B=class{constructor(s,t,e){this.precTable=t,this.elseToken=e,this.data=typeof s=="string"?x(s):s}token(s,t){let e=s.pos,i=0;for(;;){let n=s.next<0,r=s.resolveOffset(1,1);if(D(this.data,s,t,0,this.data,this.precTable),s.token.value>-1)break;if(this.elseToken==null)return;if(n||i++,r==null)break;s.reset(r,s.token)}i&&(s.reset(e,s.token),s.acceptToken(this.elseToken,i))}};B.prototype.contextual=m.prototype.fallback=m.prototype.extend=!1;var K=class{constructor(s,t={}){this.token=s,this.contextual=!!t.contextual,this.fallback=!!t.fallback,this.extend=!!t.extend}};function D(s,t,e,i,n,r){let h=0,o=1<<i,{dialect:a}=e.p.parser;t:for(;o&s[h];){let c=s[h+1];for(let f=h+3;f<c;f+=2)if((s[f+1]&o)>0){let k=s[f];if(a.allows(k)&&(t.token.value==-1||t.token.value==k||Q(k,t.token.value,n,r))){t.acceptToken(k);break}}let l=t.next,p=0,u=s[h+2];if(t.next<0&&u>p&&s[c+u*3-3]==65535){h=s[c+u*3-1];continue t}for(;p<u;){let f=p+u>>1,k=c+f+(f<<1),$=s[k],E=s[k+1]||65536;if(l<$)u=f;else if(l>=E)p=f+1;else{h=s[k+2],t.advance();continue t}}break}}function O(s,t,e){for(let i=t,n;(n=s[i])!=65535;i++)if(n==e)return i-t;return-1}function Q(s,t,e,i){let n=O(e,i,t);return n<0||O(e,i,s)<n}var d=typeof v<"u"&&v.env&&/\\bparse\\b/.test(v.env.LOG),A=null;function F(s,t,e){let i=s.cursor(H.IncludeAnonymous);for(i.moveTo(t);;)if(!(e<0?i.childBefore(t):i.childAfter(t)))for(;;){if((e<0?i.to<t:i.from>t)&&!i.type.isError)return e<0?Math.max(0,Math.min(i.to-1,t-25)):Math.min(s.length,Math.max(i.from+1,t+25));if(e<0?i.prevSibling():i.nextSibling())break;if(!i.parent())return e<0?0:s.length}}var V=class{constructor(s,t){this.fragments=s,this.nodeSet=t,this.i=0,this.fragment=null,this.safeFrom=-1,this.safeTo=-1,this.trees=[],this.start=[],this.index=[],this.nextFragment()}nextFragment(){let s=this.fragment=this.i==this.fragments.length?null:this.fragments[this.i++];if(s){for(this.safeFrom=s.openStart?F(s.tree,s.from+s.offset,1)-s.offset:s.from,this.safeTo=s.openEnd?F(s.tree,s.to+s.offset,-1)-s.offset:s.to;this.trees.length;)this.trees.pop(),this.start.pop(),this.index.pop();this.trees.push(s.tree),this.start.push(-s.offset),this.index.push(0),this.nextStart=this.safeFrom}else this.nextStart=1e9}nodeAt(s){if(s<this.nextStart)return null;for(;this.fragment&&this.safeTo<=s;)this.nextFragment();if(!this.fragment)return null;for(;;){let t=this.trees.length-1;if(t<0)return this.nextFragment(),null;let e=this.trees[t],i=this.index[t];if(i==e.children.length){this.trees.pop(),this.start.pop(),this.index.pop();continue}let n=e.children[i],r=this.start[t]+e.positions[i];if(r>s)return this.nextStart=r,null;if(n instanceof b){if(r==s){if(r<this.safeFrom)return null;let h=r+n.length;if(h<=this.safeTo){let o=n.prop(P.lookAhead);if(!o||h+o<this.fragment.to)return n}}this.index[t]++,r+n.length>=Math.max(this.safeFrom,s)&&(this.trees.push(n),this.start.push(r),this.index.push(0))}else this.index[t]++,this.nextStart=r+n.length}}},X=class{constructor(s,t){this.stream=t,this.tokens=[],this.mainToken=null,this.actions=[],this.tokens=s.tokenizers.map(e=>new S)}getActions(s){let t=0,e=null,{parser:i}=s.p,{tokenizers:n}=i,r=i.stateSlot(s.state,3),h=s.curContext?s.curContext.hash:0,o=0;for(let a=0;a<n.length;a++){if(!(1<<a&r))continue;let c=n[a],l=this.tokens[a];if(!(e&&!c.fallback)&&((c.contextual||l.start!=s.pos||l.mask!=r||l.context!=h)&&(this.updateCachedToken(l,c,s),l.mask=r,l.context=h),l.lookAhead>l.end+25&&(o=Math.max(l.lookAhead,o)),l.value!=0)){let p=t;if(l.extended>-1&&(t=this.addActions(s,l.extended,l.end,t)),t=this.addActions(s,l.value,l.end,t),!c.extend&&(e=l,t>p))break}}for(;this.actions.length>t;)this.actions.pop();return o&&s.setLookAhead(o),!e&&s.pos==this.stream.end&&(e=new S,e.value=s.p.parser.eofTerm,e.start=e.end=s.pos,t=this.addActions(s,e.value,e.end,t)),this.mainToken=e,this.actions}getMainToken(s){if(this.mainToken)return this.mainToken;let t=new S,{pos:e,p:i}=s;return t.start=e,t.end=Math.min(e+1,i.stream.end),t.value=e==i.stream.end?i.parser.eofTerm:0,t}updateCachedToken(s,t,e){let i=this.stream.clipPos(e.pos);if(t.token(this.stream.reset(i,s),e),s.value>-1){let{parser:n}=e.p;for(let r=0;r<n.specialized.length;r++)if(n.specialized[r]==s.value){let h=n.specializers[r](this.stream.read(s.start,s.end),e);if(h>=0&&e.p.parser.dialect.allows(h>>1)){h&1?s.extended=h>>1:s.value=h>>1;break}}}else s.value=0,s.end=this.stream.clipPos(i+1)}putAction(s,t,e,i){for(let n=0;n<i;n+=3)if(this.actions[n]==s)return i;return this.actions[i++]=s,this.actions[i++]=t,this.actions[i++]=e,i}addActions(s,t,e,i){let{state:n}=s,{parser:r}=s.p,{data:h}=r;for(let o=0;o<2;o++)for(let a=r.stateSlot(n,o?2:1);;a+=3){if(h[a]==65535)if(h[a+1]==1)a=g(h,a+2);else{i==0&&h[a+1]==2&&(i=this.putAction(g(h,a+2),t,e,i));break}h[a]==t&&(i=this.putAction(g(h,a+1),t,e,i))}return i}},Y=class{constructor(s,t,e,i){this.parser=s,this.input=t,this.ranges=i,this.recovering=0,this.nextStackID=9812,this.minStackPos=0,this.reused=[],this.stoppedAt=null,this.lastBigReductionStart=-1,this.lastBigReductionSize=0,this.bigReductionCount=0,this.stream=new I(t,i),this.tokens=new X(s,this.stream),this.topTerm=s.top[1];let{from:n}=i[0];this.stacks=[N.start(this,s.top[0],n)],this.fragments=e.length&&this.stream.end-n>s.bufferLength*4?new V(e,s.nodeSet):null}get parsedPos(){return this.minStackPos}advance(){let s=this.stacks,t=this.minStackPos,e=this.stacks=[],i,n;if(this.bigReductionCount>300&&s.length==1){let[r]=s;for(;r.forceReduce()&&r.stack.length&&r.stack[r.stack.length-2]>=this.lastBigReductionStart;);this.bigReductionCount=this.lastBigReductionSize=0}for(let r=0;r<s.length;r++){let h=s[r];for(;;){if(this.tokens.mainToken=null,h.pos>t)e.push(h);else{if(this.advanceStack(h,e,s))continue;{i||(i=[],n=[]),i.push(h);let o=this.tokens.getMainToken(h);n.push(o.value,o.end)}}break}}if(!e.length){let r=i&&et(i);if(r)return d&&console.log("Finish with "+this.stackID(r)),this.stackToTree(r);if(this.parser.strict)throw d&&i&&console.log("Stuck with token "+(this.tokens.mainToken?this.parser.getName(this.tokens.mainToken.value):"none")),new SyntaxError("No parse at "+t);this.recovering||(this.recovering=5)}if(this.recovering&&i){let r=this.stoppedAt!=null&&i[0].pos>this.stoppedAt?i[0]:this.runRecovery(i,n,e);if(r)return d&&console.log("Force-finish "+this.stackID(r)),this.stackToTree(r.forceAll())}if(this.recovering){let r=this.recovering==1?1:this.recovering*3;if(e.length>r)for(e.sort((h,o)=>o.score-h.score);e.length>r;)e.pop();e.some(h=>h.reducePos>t)&&this.recovering--}else if(e.length>1){t:for(let r=0;r<e.length-1;r++){let h=e[r];for(let o=r+1;o<e.length;o++){let a=e[o];if(h.sameState(a)||h.buffer.length>500&&a.buffer.length>500)if((h.score-a.score||h.buffer.length-a.buffer.length)>0)e.splice(o--,1);else{e.splice(r--,1);continue t}}}e.length>12&&(e.sort((r,h)=>h.score-r.score),e.splice(12,e.length-12))}this.minStackPos=e[0].pos;for(let r=1;r<e.length;r++)e[r].pos<this.minStackPos&&(this.minStackPos=e[r].pos);return null}stopAt(s){if(this.stoppedAt!=null&&this.stoppedAt<s)throw new RangeError("Can\'t move stoppedAt forward");this.stoppedAt=s}advanceStack(s,t,e){let i=s.pos,{parser:n}=this,r=d?this.stackID(s)+" -> ":"";if(this.stoppedAt!=null&&i>this.stoppedAt)return s.forceReduce()?s:null;if(this.fragments){let a=s.curContext&&s.curContext.tracker.strict,c=a?s.curContext.hash:0;for(let l=this.fragments.nodeAt(i);l;){let p=this.parser.nodeSet.types[l.type.id]==l.type?n.getGoto(s.state,l.type.id):-1;if(p>-1&&l.length&&(!a||(l.prop(P.contextHash)||0)==c))return s.useNode(l,p),d&&console.log(r+this.stackID(s)+` (via reuse of ${n.getName(l.type.id)})`),!0;if(!(l instanceof b)||l.children.length==0||l.positions[0]>0)break;let u=l.children[0];if(u instanceof b&&l.positions[0]==0)l=u;else break}}let h=n.stateSlot(s.state,4);if(h>0)return s.reduce(h),d&&console.log(r+this.stackID(s)+` (via always-reduce ${n.getName(h&65535)})`),!0;if(s.stack.length>=8400)for(;s.stack.length>6e3&&s.forceReduce(););let o=this.tokens.getActions(s);for(let a=0;a<o.length;){let c=o[a++],l=o[a++],p=o[a++],u=a==o.length||!e,f=u?s:s.split(),k=this.tokens.mainToken;if(f.apply(c,l,k?k.start:f.pos,p),d&&console.log(r+this.stackID(f)+` (via ${c&65536?`reduce of ${n.getName(c&65535)}`:"shift"} for ${n.getName(l)} @ ${i}${f==s?"":", split"})`),u)return!0;f.pos>i?t.push(f):e.push(f)}return!1}advanceFully(s,t){let e=s.pos;for(;;){if(!this.advanceStack(s,null,null))return!1;if(s.pos>e)return L(s,t),!0}}runRecovery(s,t,e){let i=null,n=!1;for(let r=0;r<s.length;r++){let h=s[r],o=t[r<<1],a=t[(r<<1)+1],c=d?this.stackID(h)+" -> ":"";if(h.deadEnd&&(n||(n=!0,h.restart(),d&&console.log(c+this.stackID(h)+" (restarted)"),this.advanceFully(h,e))))continue;let l=h.split(),p=c;for(let u=0;u<10&&l.forceReduce()&&(d&&console.log(p+this.stackID(l)+" (via force-reduce)"),!this.advanceFully(l,e));u++)d&&(p=this.stackID(l)+" -> ");for(let u of h.recoverByInsert(o))d&&console.log(c+this.stackID(u)+" (via recover-insert)"),this.advanceFully(u,e);this.stream.end>h.pos?(a==h.pos&&(a++,o=0),h.recoverByDelete(o,a),d&&console.log(c+this.stackID(h)+` (via recover-delete ${this.parser.getName(o)})`),L(h,e)):(!i||i.score<h.score)&&(i=h)}return i}stackToTree(s){return s.close(),b.build({buffer:J.create(s),nodeSet:this.parser.nodeSet,topID:this.topTerm,maxBufferLength:this.parser.bufferLength,reused:this.reused,start:this.ranges[0].from,length:s.pos-this.ranges[0].from,minRepeatType:this.parser.minRepeatTerm})}stackID(s){let t=(A||(A=new WeakMap)).get(s);return t||A.set(s,t=String.fromCodePoint(this.nextStackID++)),t+s}};function L(s,t){for(let e=0;e<t.length;e++){let i=t[e];if(i.pos==s.pos&&i.sameState(s)){t[e].score<s.score&&(t[e]=s);return}}t.push(s)}var Z=class{constructor(s,t,e){this.source=s,this.flags=t,this.disabled=e}allows(s){return!this.disabled||this.disabled[s]==0}},C=s=>s,_=class{constructor(s){this.start=s.start,this.shift=s.shift||C,this.reduce=s.reduce||C,this.reuse=s.reuse||C,this.hash=s.hash||(()=>0),this.strict=s.strict!==!1}},tt=class w extends G{constructor(t){if(super(),this.wrappers=[],t.version!=14)throw new RangeError(`Parser version (${t.version}) doesn\'t match runtime version (14)`);let e=t.nodeNames.split(" ");this.minRepeatTerm=e.length;for(let o=0;o<t.repeatNodeCount;o++)e.push("");let i=Object.keys(t.topRules).map(o=>t.topRules[o][1]),n=[];for(let o=0;o<e.length;o++)n.push([]);function r(o,a,c){n[o].push([a,a.deserialize(String(c))])}if(t.nodeProps)for(let o of t.nodeProps){let a=o[0];typeof a=="string"&&(a=P[a]);for(let c=1;c<o.length;){let l=o[c++];if(l>=0)r(l,a,o[c++]);else{let p=o[c+-l];for(let u=-l;u>0;u--)r(o[c++],a,p);c++}}}this.nodeSet=new j(e.map((o,a)=>U.define({name:a>=this.minRepeatTerm?void 0:o,id:a,props:n[a],top:i.indexOf(a)>-1,error:a==0,skipped:t.skippedNodes&&t.skippedNodes.indexOf(a)>-1}))),t.propSources&&(this.nodeSet=this.nodeSet.extend(...t.propSources)),this.strict=!1,this.bufferLength=W;let h=x(t.tokenData);this.context=t.context,this.specializerSpecs=t.specialized||[],this.specialized=new Uint16Array(this.specializerSpecs.length);for(let o=0;o<this.specializerSpecs.length;o++)this.specialized[o]=this.specializerSpecs[o].term;this.specializers=this.specializerSpecs.map(M),this.states=x(t.states,Uint32Array),this.data=x(t.stateData),this.goto=x(t.goto),this.maxTerm=t.maxTerm,this.tokenizers=t.tokenizers.map(o=>typeof o=="number"?new m(h,o):o),this.topRules=t.topRules,this.dialects=t.dialects||{},this.dynamicPrecedences=t.dynamicPrecedences||null,this.tokenPrecTable=t.tokenPrec,this.termNames=t.termNames||null,this.maxNode=this.nodeSet.types.length-1,this.dialect=this.parseDialect(),this.top=this.topRules[Object.keys(this.topRules)[0]]}createParse(t,e,i){let n=new Y(this,t,e,i);for(let r of this.wrappers)n=r(n,t,e,i);return n}getGoto(t,e,i=!1){let n=this.goto;if(e>=n[0])return-1;for(let r=n[e+1];;){let h=n[r++],o=h&1,a=n[r++];if(o&&i)return a;for(let c=r+(h>>1);r<c;r++)if(n[r]==t)return a;if(o)return-1}}hasAction(t,e){let i=this.data;for(let n=0;n<2;n++)for(let r=this.stateSlot(t,n?2:1),h;;r+=3){if((h=i[r])==65535)if(i[r+1]==1)h=i[r=g(i,r+2)];else{if(i[r+1]==2)return g(i,r+2);break}if(h==e||h==0)return g(i,r+1)}return 0}stateSlot(t,e){return this.states[t*6+e]}stateFlag(t,e){return(this.stateSlot(t,0)&e)>0}validAction(t,e){return!!this.allActions(t,i=>i==e?!0:null)}allActions(t,e){let i=this.stateSlot(t,4),n=i?e(i):void 0;for(let r=this.stateSlot(t,1);n==null;r+=3){if(this.data[r]==65535)if(this.data[r+1]==1)r=g(this.data,r+2);else break;n=e(g(this.data,r+1))}return n}nextStates(t){let e=[];for(let i=this.stateSlot(t,1);;i+=3){if(this.data[i]==65535)if(this.data[i+1]==1)i=g(this.data,i+2);else break;if(!(this.data[i+2]&1)){let n=this.data[i+1];e.some((r,h)=>h&1&&r==n)||e.push(this.data[i],n)}}return e}configure(t){let e=Object.assign(Object.create(w.prototype),this);if(t.props&&(e.nodeSet=this.nodeSet.extend(...t.props)),t.top){let i=this.topRules[t.top];if(!i)throw new RangeError(`Invalid top rule name ${t.top}`);e.top=i}return t.tokenizers&&(e.tokenizers=this.tokenizers.map(i=>{let n=t.tokenizers.find(r=>r.from==i);return n?n.to:i})),t.specializers&&(e.specializers=this.specializers.slice(),e.specializerSpecs=this.specializerSpecs.map((i,n)=>{let r=t.specializers.find(o=>o.from==i.external);if(!r)return i;let h=Object.assign(Object.assign({},i),{external:r.to});return e.specializers[n]=M(h),h})),t.contextTracker&&(e.context=t.contextTracker),t.dialect&&(e.dialect=this.parseDialect(t.dialect)),t.strict!=null&&(e.strict=t.strict),t.wrap&&(e.wrappers=e.wrappers.concat(t.wrap)),t.bufferLength!=null&&(e.bufferLength=t.bufferLength),e}hasWrappers(){return this.wrappers.length>0}getName(t){return this.termNames?this.termNames[t]:String(t<=this.maxNode&&this.nodeSet.types[t].name||t)}get eofTerm(){return this.maxNode+1}get topNode(){return this.nodeSet.types[this.top[1]]}dynamicPrecedence(t){let e=this.dynamicPrecedences;return e==null?0:e[t]||0}parseDialect(t){let e=Object.keys(this.dialects),i=e.map(()=>!1);if(t)for(let r of t.split(" ")){let h=e.indexOf(r);h>=0&&(i[h]=!0)}let n=null;for(let r=0;r<e.length;r++)if(!i[r])for(let h=this.dialects[e[r]],o;(o=this.data[h++])!=65535;)(n||(n=new Uint8Array(this.maxTerm+1)))[o]=1;return new Z(t,i,n)}static deserialize(t){return new w(t)}};function g(s,t){return s[t]|s[t+1]<<16}function et(s){let t=null;for(let e of s){let i=e.p.stoppedAt;(e.pos==e.p.stream.end||i!=null&&e.pos>i)&&e.p.parser.stateFlag(e.state,2)&&(!t||t.score<e.score)&&(t=e)}return t}function M(s){if(s.external){let t=s.extend?1:0;return(e,i)=>s.external(e,i)<<1|t}return s.get}export{_ as ContextTracker,K as ExternalTokenizer,I as InputStream,tt as LRParser,B as LocalTokenGroup,N as Stack};\n',mimeType:"application/javascript"},"/node/process.mjs":{content:'function r(t){return new Error(`[unenv] ${t} is not implemented yet!`)}function a(t){return Object.assign(()=>{throw r(t)},{__unenv__:!0})}import{EventEmitter as g}from"/node/events.mjs";import{ReadStream as _,WriteStream as p}from"/node/tty.mjs";var v="22.14.0",f=class m extends g{env;hrtime;nextTick;constructor(e){super(),this.env=e.env,this.hrtime=e.hrtime,this.nextTick=e.nextTick;for(let s of[...Object.getOwnPropertyNames(m.prototype),...Object.getOwnPropertyNames(g.prototype)]){let i=this[s];typeof i=="function"&&(this[s]=i.bind(this))}}emitWarning(e,s,i){console.warn(`${i?`[${i}] `:""}${s?`${s}: `:""}${e}`)}emit(...e){return super.emit(...e)}listeners(e){return super.listeners(e)}#t;#s;#r;get stdin(){return this.#t??=new _(0)}get stdout(){return this.#s??=new p(1)}get stderr(){return this.#r??=new p(2)}#e="/";chdir(e){this.#e=e}cwd(){return this.#e}arch="";platform="";argv=[];argv0="";execArgv=[];execPath="";title="";pid=200;ppid=100;get version(){return`v${v}`}get versions(){return{node:v}}get allowedNodeEnvironmentFlags(){return new Set}get sourceMapsEnabled(){return!1}get debugPort(){return 0}get throwDeprecation(){return!1}get traceDeprecation(){return!1}get features(){return{}}get release(){return{}}get connected(){return!1}get config(){return{}}get moduleLoadList(){return[]}constrainedMemory(){return 0}availableMemory(){return 0}uptime(){return 0}resourceUsage(){return{}}ref(){}unref(){}umask(){throw r("process.umask")}getBuiltinModule(){}getActiveResourcesInfo(){throw r("process.getActiveResourcesInfo")}exit(){throw r("process.exit")}reallyExit(){throw r("process.reallyExit")}kill(){throw r("process.kill")}abort(){throw r("process.abort")}dlopen(){throw r("process.dlopen")}setSourceMapsEnabled(){throw r("process.setSourceMapsEnabled")}loadEnvFile(){throw r("process.loadEnvFile")}disconnect(){throw r("process.disconnect")}cpuUsage(){throw r("process.cpuUsage")}setUncaughtExceptionCaptureCallback(){throw r("process.setUncaughtExceptionCaptureCallback")}hasUncaughtExceptionCaptureCallback(){throw r("process.hasUncaughtExceptionCaptureCallback")}initgroups(){throw r("process.initgroups")}openStdin(){throw r("process.openStdin")}assert(){throw r("process.assert")}binding(){throw r("process.binding")}permission={has:a("process.permission.has")};report={directory:"",filename:"",signal:"SIGUSR2",compact:!1,reportOnFatalError:!1,reportOnSignal:!1,reportOnUncaughtException:!1,getReport:a("process.report.getReport"),writeReport:a("process.report.writeReport")};finalization={register:a("process.finalization.register"),unregister:a("process.finalization.unregister"),registerBeforeExit:a("process.finalization.registerBeforeExit")};memoryUsage=Object.assign(()=>({arrayBuffers:0,rss:0,external:0,heapTotal:0,heapUsed:0}),{rss:()=>0});mainModule=void 0;domain=void 0;send=void 0;exitCode=void 0;channel=void 0;getegid=void 0;geteuid=void 0;getgid=void 0;getgroups=void 0;getuid=void 0;setegid=void 0;seteuid=void 0;setgid=void 0;setgroups=void 0;setuid=void 0;_events=void 0;_eventsCount=void 0;_exiting=void 0;_maxListeners=void 0;_debugEnd=void 0;_debugProcess=void 0;_fatalException=void 0;_getActiveHandles=void 0;_getActiveRequests=void 0;_kill=void 0;_preload_modules=void 0;_rawDebug=void 0;_startProfilerIdleNotifier=void 0;_stopProfilerIdleNotifier=void 0;_tickCallback=void 0;_disconnect=void 0;_handleQueue=void 0;_pendingMessage=void 0;_channel=void 0;_send=void 0;_linkedBinding=void 0},u=Object.create(null),b=globalThis.process,o=t=>globalThis.__env__||b?.env||(t?u:globalThis),x=new Proxy(u,{get(t,e){return o()[e]??u[e]},has(t,e){let s=o();return e in s||e in u},set(t,e,s){let i=o(!0);return i[e]=s,!0},deleteProperty(t,e){let s=o(!0);return delete s[e],!0},ownKeys(){let t=o();return Object.keys(t)},getOwnPropertyDescriptor(t,e){let s=o();if(e in s)return{value:s[e],writable:!0,enumerable:!0,configurable:!0}}}),w=Object.assign(function(t){let e=Date.now(),s=Math.trunc(e/1e3),i=e%1e3*1e6;if(t){let d=s-t[0],n=i-t[0];return n<0&&(d=d-1,n=1e9+n),[d,n]}return[s,i]},{bigint:function(){return BigInt(Date.now()*1e6)}}),E=globalThis.queueMicrotask?(t,...e)=>{globalThis.queueMicrotask(t.bind(void 0,...e))}:k();function k(){let t=[],e=!1,s,i=-1;function d(){!e||!s||(e=!1,s.length>0?t=[...s,...t]:i=-1,t.length>0&&n())}function n(){if(e)return;let c=setTimeout(d);e=!0;let l=t.length;for(;l;){for(s=t,t=[];++i<l;)s&&s[i]();i=-1,l=t.length}s=void 0,e=!1,clearTimeout(c)}return(c,...l)=>{t.push(c.bind(void 0,...l)),t.length===1&&!e&&setTimeout(n)}}var h=new f({env:x,hrtime:w,nextTick:E}),M=h,{abort:C,addListener:y,allowedNodeEnvironmentFlags:L,hasUncaughtExceptionCaptureCallback:U,setUncaughtExceptionCaptureCallback:P,loadEnvFile:A,sourceMapsEnabled:O,arch:T,argv:S,argv0:N,chdir:R,config:I,connected:B,constrainedMemory:D,availableMemory:F,cpuUsage:j,cwd:$,debugPort:z,dlopen:q,disconnect:W,emit:H,emitWarning:Q,env:G,eventNames:K,execArgv:J,execPath:V,exit:X,finalization:Y,features:Z,getBuiltinModule:ee,getActiveResourcesInfo:te,getMaxListeners:se,hrtime:re,kill:ie,listeners:ne,listenerCount:ae,memoryUsage:oe,nextTick:de,on:le,off:ue,once:ce,pid:ge,platform:pe,ppid:ve,prependListener:he,prependOnceListener:me,rawListeners:_e,release:fe,removeAllListeners:be,removeListener:xe,report:we,resourceUsage:Ee,setMaxListeners:ke,setSourceMapsEnabled:Me,stderr:Ce,stdin:ye,stdout:Le,title:Ue,umask:Pe,uptime:Ae,version:Oe,versions:Te,domain:Se,initgroups:Ne,moduleLoadList:Re,reallyExit:Ie,openStdin:Be,assert:De,binding:Fe,send:je,exitCode:$e,channel:ze,getegid:qe,geteuid:We,getgid:He,getgroups:Qe,getuid:Ge,setegid:Ke,seteuid:Je,setgid:Ve,setgroups:Xe,setuid:Ye,permission:Ze,mainModule:et,ref:tt,unref:st,_events:rt,_eventsCount:it,_exiting:nt,_maxListeners:at,_debugEnd:ot,_debugProcess:dt,_fatalException:lt,_getActiveHandles:ut,_getActiveRequests:ct,_kill:gt,_preload_modules:pt,_rawDebug:vt,_startProfilerIdleNotifier:ht,_stopProfilerIdleNotifier:mt,_tickCallback:_t,_disconnect:ft,_handleQueue:bt,_pendingMessage:xt,_channel:wt,_send:Et,_linkedBinding:kt}=h;export{wt as _channel,ot as _debugEnd,dt as _debugProcess,ft as _disconnect,rt as _events,it as _eventsCount,nt as _exiting,lt as _fatalException,ut as _getActiveHandles,ct as _getActiveRequests,bt as _handleQueue,gt as _kill,kt as _linkedBinding,at as _maxListeners,xt as _pendingMessage,pt as _preload_modules,vt as _rawDebug,Et as _send,ht as _startProfilerIdleNotifier,mt as _stopProfilerIdleNotifier,_t as _tickCallback,C as abort,y as addListener,L as allowedNodeEnvironmentFlags,T as arch,S as argv,N as argv0,De as assert,F as availableMemory,Fe as binding,ze as channel,R as chdir,I as config,B as connected,D as constrainedMemory,j as cpuUsage,$ as cwd,z as debugPort,M as default,W as disconnect,q as dlopen,Se as domain,H as emit,Q as emitWarning,G as env,K as eventNames,J as execArgv,V as execPath,X as exit,$e as exitCode,Z as features,Y as finalization,te as getActiveResourcesInfo,ee as getBuiltinModule,se as getMaxListeners,qe as getegid,We as geteuid,He as getgid,Qe as getgroups,Ge as getuid,U as hasUncaughtExceptionCaptureCallback,re as hrtime,Ne as initgroups,ie as kill,ae as listenerCount,ne as listeners,A as loadEnvFile,et as mainModule,oe as memoryUsage,Re as moduleLoadList,de as nextTick,ue as off,le as on,ce as once,Be as openStdin,Ze as permission,ge as pid,pe as platform,ve as ppid,he as prependListener,me as prependOnceListener,_e as rawListeners,Ie as reallyExit,tt as ref,fe as release,be as removeAllListeners,xe as removeListener,we as report,Ee as resourceUsage,je as send,ke as setMaxListeners,Me as setSourceMapsEnabled,P as setUncaughtExceptionCaptureCallback,Ke as setegid,Je as seteuid,Ve as setgid,Xe as setgroups,Ye as setuid,O as sourceMapsEnabled,Ce as stderr,ye as stdin,Le as stdout,Ue as title,Pe as umask,st as unref,Ae as uptime,Oe as version,Te as versions};\n',mimeType:"application/javascript"},"/node/tty.mjs":{content:`var s=class{fd;isRaw=!1;isTTY=!1;constructor(r){this.fd=r}setRawMode(r){return this.isRaw=r,this}},o=class{fd;columns=80;rows=24;isTTY=!1;constructor(r){this.fd=r}clearLine(r,e){return e&&e(),!1}clearScreenDown(r){return r&&r(),!1}cursorTo(r,e,t){return t&&typeof t=="function"&&t(),!1}moveCursor(r,e,t){return t&&t(),!1}getColorDepth(r){return 1}hasColors(r,e){return!1}getWindowSize(){return[this.columns,this.rows]}write(r,e,t){r instanceof Uint8Array&&(r=new TextDecoder().decode(r));try{console.log(r)}catch{}return t&&typeof t=="function"&&t(),!1}},n=function(){return!1},a={ReadStream:s,WriteStream:o,isatty:n};export{s as ReadStream,o as WriteStream,a as default,n as isatty};
-`,mimeType:"application/javascript"},"/node/events.mjs":{content:'function oe(e){return new Error(`[unenv] ${e} is not implemented yet!`)}function A(e){return Object.assign(()=>{throw oe(e)},{__unenv__:!0})}import{AsyncResource as le}from"/node/async_hooks.mjs";var d=10,ue=Object.getPrototypeOf(Object.getPrototypeOf(async function*(){}).prototype),N=(e,t)=>e,y=Error,ae=Error,f=Error,w=Error,ce=Error,M=Symbol.for("nodejs.rejection"),h=Symbol.for("kCapture"),S=Symbol.for("events.errorMonitor"),E=Symbol.for("shapeMode"),b=Symbol.for("events.maxEventTargetListeners"),he=Symbol.for("kEnhanceStackBeforeInspector"),fe=Symbol.for("nodejs.watermarkData"),j=Symbol.for("kEventEmitter"),v=Symbol.for("kAsyncResource"),ve=Symbol.for("kFirstEventParam"),k=Symbol.for("kResistStopPropagation"),K=Symbol.for("events.maxEventTargetListenersWarned"),C=class _{_events=void 0;_eventsCount=0;_maxListeners=d;[h]=!1;[E]=!1;static captureRejectionSymbol=M;static errorMonitor=S;static kMaxEventTargetListeners=b;static kMaxEventTargetListenersWarned=K;static usingDomains=!1;static get on(){return z}static get once(){return B}static get getEventListeners(){return G}static get getMaxListeners(){return U}static get addAbortListener(){return P}static get EventEmitterAsyncResource(){return q}static get EventEmitter(){return _}static setMaxListeners(t=d,...n){if(n.length===0)d=t;else for(let r of n)if(Q(r))r[b]=t,r[K]=!1;else if(typeof r.setMaxListeners=="function")r.setMaxListeners(t);else throw new f("eventTargets",["EventEmitter","EventTarget"],r)}static listenerCount(t,n){if(typeof t.listenerCount=="function")return t.listenerCount(n);_.prototype.listenerCount.call(t,n)}static init(){throw new Error("EventEmitter.init() is not implemented.")}static get captureRejections(){return this[h]}static set captureRejections(t){this[h]=t}static get defaultMaxListeners(){return d}static set defaultMaxListeners(t){d=t}constructor(t){this._events===void 0||this._events===Object.getPrototypeOf(this)._events?(this._events={__proto__:null},this._eventsCount=0,this[E]=!1):this[E]=!0,this._maxListeners=this._maxListeners||void 0,t?.captureRejections?this[h]=!!t.captureRejections:this[h]=_.prototype[h]}setMaxListeners(t){return this._maxListeners=t,this}getMaxListeners(){return T(this)}emit(t,...n){let r=t==="error",i=this._events;if(i!==void 0)r&&i[S]!==void 0&&this.emit(S,...n),r=r&&i.error===void 0;else if(!r)return!1;if(r){let s;if(n.length>0&&(s=n[0]),s instanceof Error){try{let c={};Error.captureStackTrace?.(c,_.prototype.emit),Object.defineProperty(s,he,{__proto__:null,value:Function.prototype.bind(de,this,s,c),configurable:!0})}catch{}throw s}let u;try{u=N(s)}catch{u=s}let a=new ae(u);throw a.context=s,a}let o=i[t];if(o===void 0)return!1;if(typeof o=="function"){let s=o.apply(this,n);s!=null&&V(this,s,t,n)}else{let s=o.length,u=I(o);for(let a=0;a<s;++a){let c=u[a].apply(this,n);c!=null&&V(this,c,t,n)}}return!0}addListener(t,n){return Y(this,t,n,!1),this}on(t,n){return this.addListener(t,n)}prependListener(t,n){return Y(this,t,n,!0),this}once(t,n){return this.on(t,Z(this,t,n)),this}prependOnceListener(t,n){return this.prependListener(t,Z(this,t,n)),this}removeListener(t,n){let r=this._events;if(r===void 0)return this;let i=r[t];if(i===void 0)return this;if(i===n||i.listener===n)this._eventsCount-=1,this[E]?r[t]=void 0:this._eventsCount===0?this._events={__proto__:null}:(delete r[t],r.removeListener&&this.emit("removeListener",t,i.listener||n));else if(typeof i!="function"){let o=-1;for(let s=i.length-1;s>=0;s--)if(i[s]===n||i[s].listener===n){o=s;break}if(o<0)return this;o===0?i.shift():_e(i,o),i.length===1&&(r[t]=i[0]),r.removeListener!==void 0&&this.emit("removeListener",t,n)}return this}off(t,n){return this.removeListener(t,n)}removeAllListeners(t){let n=this._events;if(n===void 0)return this;if(n.removeListener===void 0)return arguments.length===0?(this._events={__proto__:null},this._eventsCount=0):n[t]!==void 0&&(--this._eventsCount===0?this._events={__proto__:null}:delete n[t]),this[E]=!1,this;if(arguments.length===0){for(let i of Reflect.ownKeys(n))i!=="removeListener"&&this.removeAllListeners(i);return this.removeAllListeners("removeListener"),this._events={__proto__:null},this._eventsCount=0,this[E]=!1,this}let r=n[t];if(typeof r=="function")this.removeListener(t,r);else if(r!==void 0)for(let i=r.length-1;i>=0;i--)this.removeListener(t,r[i]);return this}listeners(t){return ee(this,t,!0)}rawListeners(t){return ee(this,t,!1)}eventNames(){return this._eventsCount>0?Reflect.ownKeys(this._events):[]}listenerCount(t,n){let r=this._events;if(r!==void 0){let i=r[t];if(typeof i=="function")return n!=null?n===i||n===i.listener?1:0:1;if(i!==void 0){if(n!=null){let o=0;for(let s=0,u=i.length;s<u;s++)(i[s]===n||i[s].listener===n)&&o++;return o}return i.length}}return 0}},q=class extends C{constructor(e){let t;typeof e=="string"?(t=e,e=void 0):t=e?.name||new.target.name,super(e),this[v]=new me(this,t,e)}emit(e,...t){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");let{asyncResource:n}=this;return Array.prototype.unshift(t,super.emit,this,e),Reflect.apply(n.runInAsyncScope,n,t)}emitDestroy(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");this.asyncResource.emitDestroy()}get asyncId(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this.asyncResource.asyncId()}get triggerAsyncId(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this.asyncResource.triggerAsyncId()}get asyncResource(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this[v]}},me=class extends le{constructor(e,t,n){super(t,n),this[j]=e}get eventEmitter(){if(this[j]===void 0)throw new y("EventEmitterReferencingAsyncResource");return this[j]}},z=function(e,t,n={}){let r=n.signal;if(r?.aborted)throw new w(void 0,{cause:r?.reason});let i=n.highWaterMark??n.highWatermark??Number.MAX_SAFE_INTEGER,o=n.lowWaterMark??n.lowWatermark??1,s=new J,u=new J,a=!1,c=null,m=!1,p=0,te=Object.setPrototypeOf({next(){if(p){let l=s.shift();return p--,a&&p<o&&(e.resume?.(),a=!1),Promise.resolve(F(l,!1))}if(c){let l=Promise.reject(c);return c=null,l}return m?L():new Promise(function(l,se){u.push({resolve:l,reject:se})})},return(){return L()},throw(l){if(!l||!(l instanceof Error))throw new f("EventEmitter.AsyncIterator","Error",l);R(l)},[Symbol.asyncIterator](){return this},[fe]:{get size(){return p},get low(){return o},get high(){return i},get isPaused(){return a}}},ue),{addEventListener:x,removeAll:ne}=ge();x(e,t,n[ve]?D:function(...l){return D(l)}),t!=="error"&&typeof e.on=="function"&&x(e,"error",R);let $=n?.close;if($?.length)for(let l of $)x(e,l,L);let re=r?P(r,ie):null;return te;function ie(){R(new w(void 0,{cause:r?.reason}))}function D(l){u.isEmpty()?(p++,!a&&p>i&&(a=!0,e.pause?.()),s.push(l)):u.shift().resolve(F(l,!1))}function R(l){u.isEmpty()?c=l:u.shift().reject(l),L()}function L(){re?.[Symbol.dispose](),ne(),m=!0;let l=F(void 0,!0);for(;!u.isEmpty();)u.shift().resolve(l);return Promise.resolve(l)}},B=async function(e,t,n={}){let r=n?.signal;if(r?.aborted)throw new w(void 0,{cause:r?.reason});return new Promise((i,o)=>{let s=m=>{typeof e.removeListener=="function"&&e.removeListener(t,u),r!=null&&g(r,"abort",c),o(m)},u=(...m)=>{typeof e.removeListener=="function"&&e.removeListener("error",s),r!=null&&g(r,"abort",c),i(m)},a={__proto__:null,once:!0,[k]:!0};W(e,t,u,a),t!=="error"&&typeof e.once=="function"&&e.once("error",s);function c(){g(e,t,u),g(e,"error",s),o(new w(void 0,{cause:r?.reason}))}r!=null&&W(r,"abort",c,{__proto__:null,once:!0,[k]:!0})})},P=function(e,t){if(e===void 0)throw new f("signal","AbortSignal",e);let n;return e.aborted?queueMicrotask(()=>t()):(e.addEventListener("abort",t,{__proto__:null,once:!0,[k]:!0}),n=()=>{e.removeEventListener("abort",t)}),{__proto__:null,[Symbol.dispose](){n?.()}}},G=function(e,t){if(typeof e.listeners=="function")return e.listeners(t);if(Q(e)){let n=e[kEvents].get(t),r=[],i=n?.next;for(;i?.listener!==void 0;){let o=i.listener?.deref?i.listener.deref():i.listener;r.push(o),i=i.next}return r}throw new f("emitter",["EventEmitter","EventTarget"],e)},U=function(e){if(typeof e?.getMaxListeners=="function")return T(e);if(e?.[b])return e[b];throw new f("emitter",["EventEmitter","EventTarget"],e)},X=2048,O=X-1,H=class{bottom;top;list;next;constructor(){this.bottom=0,this.top=0,this.list=new Array(X),this.next=null}isEmpty(){return this.top===this.bottom}isFull(){return(this.top+1&O)===this.bottom}push(e){this.list[this.top]=e,this.top=this.top+1&O}shift(){let e=this.list[this.bottom];return e===void 0?null:(this.list[this.bottom]=void 0,this.bottom=this.bottom+1&O,e)}},J=class{head;tail;constructor(){this.head=this.tail=new H}isEmpty(){return this.head.isEmpty()}push(e){this.head.isFull()&&(this.head=this.head.next=new H),this.head.push(e)}shift(){let e=this.tail,t=e.shift();return e.isEmpty()&&e.next!==null&&(this.tail=e.next,e.next=null),t}};function Q(e){return typeof e?.addEventListener=="function"}function V(e,t,n,r){if(e[h])try{let i=t.then;typeof i=="function"&&i.call(t,void 0,function(o){setTimeout(pe,0,e,o,n,r)})}catch(i){e.emit("error",i)}}function pe(e,t,n,r){if(typeof e[M]=="function")e[M](t,n,...r);else{let i=e[h];try{e[h]=!1,e.emit("error",t)}finally{e[h]=i}}}function T(e){return e._maxListeners===void 0?d:e._maxListeners}function de(e,t){let n="";try{let{name:o}=this.constructor;o!=="EventEmitter"&&(n=` on ${o} instance`)}catch{}let r=`\nEmitted \'error\' event${n} at:\n`,i=(t.stack||"").split(`\n`).slice(1);return e.stack+r+i.join(`\n`)}function Y(e,t,n,r){let i,o,s;if(o=e._events,o===void 0?(o=e._events={__proto__:null},e._eventsCount=0):(o.newListener!==void 0&&(e.emit("newListener",t,n.listener??n),o=e._events),s=o[t]),s===void 0)o[t]=n,++e._eventsCount;else if(typeof s=="function"?s=o[t]=r?[n,s]:[s,n]:r?s.unshift(n):s.push(n),i=T(e),i>0&&s.length>i&&!s.warned){s.warned=!0;let u=new ce(`Possible EventEmitter memory leak detected. ${s.length} ${String(t)} listeners added to ${N(e,{depth:-1})}. MaxListeners is ${i}. Use emitter.setMaxListeners() to increase limit`,{name:"MaxListenersExceededWarning",emitter:e,type:t,count:s.length});console.warn(u)}return e}function ye(){if(!this.fired)return this.target.removeListener(this.type,this.wrapFn),this.fired=!0,arguments.length===0?this.listener.call(this.target):this.listener.apply(this.target,arguments)}function Z(e,t,n){let r={fired:!1,wrapFn:void 0,target:e,type:t,listener:n},i=ye.bind(r);return i.listener=n,r.wrapFn=i,i}function ee(e,t,n){let r=e._events;if(r===void 0)return[];let i=r[t];return i===void 0?[]:typeof i=="function"?n?[i.listener||i]:[i]:n?Ee(i):I(i)}function I(e){switch(e.length){case 2:return[e[0],e[1]];case 3:return[e[0],e[1],e[2]];case 4:return[e[0],e[1],e[2],e[3]];case 5:return[e[0],e[1],e[2],e[3],e[4]];case 6:return[e[0],e[1],e[2],e[3],e[4],e[5]]}return Array.prototype.slice.call(e)}function Ee(e){let t=I(e);for(let n=0;n<t.length;++n){let r=t[n].listener;typeof r=="function"&&(t[n]=r)}return t}function F(e,t){return{value:e,done:t}}function g(e,t,n,r){if(typeof e.removeListener=="function")e.removeListener(t,n);else if(typeof e.removeEventListener=="function")e.removeEventListener(t,n,r);else throw new f("emitter","EventEmitter",e)}function W(e,t,n,r){if(typeof e.on=="function")r?.once?e.once(t,n):e.on(t,n);else if(typeof e.addEventListener=="function")e.addEventListener(t,n,r);else throw new f("emitter","EventEmitter",e)}function ge(){let e=[];return{addEventListener(t,n,r,i){W(t,n,r,i),Array.prototype.push(e,[t,n,r,i])},removeAll(){for(;e.length>0;)Reflect.apply(g,void 0,e.pop())}}}function _e(e,t){for(;t+1<e.length;t++)e[t]=e[t+1];e.pop()}var Le=!1,we=Symbol.for("nodejs.rejection"),be=!1,xe=Symbol.for("events.errorMonitor"),Re=10,Ae=A("node:events.setMaxListeners"),Me=A("node:events.listenerCount"),Se=A("node:events.init"),je=C;export{C as EventEmitter,q as EventEmitterAsyncResource,P as addAbortListener,we as captureRejectionSymbol,be as captureRejections,je as default,Re as defaultMaxListeners,xe as errorMonitor,G as getEventListeners,U as getMaxListeners,Se as init,Me as listenerCount,z as on,B as once,Ae as setMaxListeners,Le as usingDomains};\n',mimeType:"application/javascript"},"/node/async_hooks.mjs":{content:'var A=class{__unenv__=!0;_currentStore;_enterStore;_enabled=!0;getStore(){return this._currentStore??this._enterStore}disable(){this._enabled=!1}enable(){this._enabled=!0}enterWith(e){this._enterStore=e}run(e,t,...r){this._currentStore=e;let n=t(...r);return this._currentStore=void 0,n}exit(e,...t){let r=this._currentStore;this._currentStore=void 0;let n=e(...t);return this._currentStore=r,n}static snapshot(){throw new Error("[unenv] `AsyncLocalStorage.snapshot` is not implemented!")}},c=globalThis.AsyncLocalStorage||A,i=Symbol("init"),T=Symbol("before"),P=Symbol("after"),u=Symbol("destroy"),I=Symbol("promiseResolve"),l=class{__unenv__=!0;_enabled=!1;_callbacks={};constructor(e={}){this._callbacks=e}enable(){return this._enabled=!0,this}disable(){return this._enabled=!1,this}get[i](){return this._callbacks.init}get[T](){return this._callbacks.before}get[P](){return this._callbacks.after}get[u](){return this._callbacks.destroy}get[I](){return this._callbacks.promiseResolve}},S=function(e){return new l(e)},s=function(){return 0},R=function(){return Object.create(null)},o=function(){return 0},a=Object.assign(Object.create(null),{NONE:0,DIRHANDLE:1,DNSCHANNEL:2,ELDHISTOGRAM:3,FILEHANDLE:4,FILEHANDLECLOSEREQ:5,BLOBREADER:6,FSEVENTWRAP:7,FSREQCALLBACK:8,FSREQPROMISE:9,GETADDRINFOREQWRAP:10,GETNAMEINFOREQWRAP:11,HEAPSNAPSHOT:12,HTTP2SESSION:13,HTTP2STREAM:14,HTTP2PING:15,HTTP2SETTINGS:16,HTTPINCOMINGMESSAGE:17,HTTPCLIENTREQUEST:18,JSSTREAM:19,JSUDPWRAP:20,MESSAGEPORT:21,PIPECONNECTWRAP:22,PIPESERVERWRAP:23,PIPEWRAP:24,PROCESSWRAP:25,PROMISE:26,QUERYWRAP:27,QUIC_ENDPOINT:28,QUIC_LOGSTREAM:29,QUIC_PACKET:30,QUIC_SESSION:31,QUIC_STREAM:32,QUIC_UDP:33,SHUTDOWNWRAP:34,SIGNALWRAP:35,STATWATCHER:36,STREAMPIPE:37,TCPCONNECTWRAP:38,TCPSERVERWRAP:39,TCPWRAP:40,TTYWRAP:41,UDPSENDWRAP:42,UDPWRAP:43,SIGINTWATCHDOG:44,WORKER:45,WORKERHEAPSNAPSHOT:46,WRITEWRAP:47,ZLIB:48,CHECKPRIMEREQUEST:49,PBKDF2REQUEST:50,KEYPAIRGENREQUEST:51,KEYGENREQUEST:52,KEYEXPORTREQUEST:53,CIPHERREQUEST:54,DERIVEBITSREQUEST:55,HASHREQUEST:56,RANDOMBYTESREQUEST:57,RANDOMPRIMEREQUEST:58,SCRYPTREQUEST:59,SIGNREQUEST:60,TLSWRAP:61,VERIFYREQUEST:62}),_=100,y=class{__unenv__=!0;type;_asyncId;_triggerAsyncId;constructor(e,t=s()){this.type=e,this._asyncId=-1*_++,this._triggerAsyncId=typeof t=="number"?t:t?.triggerAsyncId}static bind(e,t,r){return new E(t??"anonymous").bind(e)}bind(e,t){let r=(...n)=>this.runInAsyncScope(e,t,...n);return r.asyncResource=this,r}runInAsyncScope(e,t,...r){return e.apply(t,r)}emitDestroy(){return this}asyncId(){return this._asyncId}triggerAsyncId(){return this._triggerAsyncId}},E=globalThis.AsyncResource||y,N={asyncWrapProviders:a,AsyncLocalStorage:c,AsyncResource:E,createHook:S,executionAsyncId:s,executionAsyncResource:R,triggerAsyncId:o};export{c as AsyncLocalStorage,E as AsyncResource,a as asyncWrapProviders,S as createHook,N as default,s as executionAsyncId,R as executionAsyncResource,o as triggerAsyncId};\n',mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m16\\.24{margin:calc(var(--spacing) * 16.24)}.m18{margin:calc(var(--spacing) * 18)}.m21{margin:calc(var(--spacing) * 21)}.m3{margin:calc(var(--spacing) * 3)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.grid{display:grid}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.list-item{display:list-item}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}.columns-3{columns:3}.table{display:table}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%;--admin-header-height: 4rem;--sidebar-header-min-height: var(--admin-header-height);--sidebar-header-padding: 0 1rem;--navbar-height: var(--admin-header-height);--admin-header-border: 3px;--sidebar-header-border-width: var(--admin-header-border);--navbar-border-color: var(--color-border, #e5e7eb);--sidebar-header-background: var(--color-surface-dark, #f3f4f6);--navbar-background: var(--color-surface-dark, #f3f4f6)}.admin-main uix-navbar::part(container){border-bottom-width:var(--admin-header-border)}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto;padding:1.5rem}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}:where(.uix-showcase){display:flex;width:100%}:where(.uix-text,uix-text){span,p,div{margin:0;color:var(--text-color);font-family:inherit}&[size=xs]{span,p,div{font-size:var(--text-xs, .75rem)}}&[size=sm]{span,p,div{font-size:var(--text-sm, .875rem)}}&[size=base]{span,p,div{font-size:var(--text-base, 1rem)}}&[size=lg]{span,p,div{font-size:var(--text-lg, 1.125rem)}}&[size=xl]{span,p,div{font-size:var(--text-xl, 1.25rem)}}&[size="2xl"]{span,p,div{font-size:var(--text-2xl, 1.5rem)}}&[size="3xl"]{span,p,div{font-size:var(--text-3xl, 1.875rem)}}&[weight=normal]{span,p,div{font-weight:var(--font-normal, 400)}}&[weight=medium]{span,p,div{font-weight:var(--font-medium, 500)}}&[weight=semibold]{span,p,div{font-weight:var(--font-semibold, 600)}}&[weight=bold]{span,p,div{font-weight:var(--font-bold, 700)}}&[muted]{span,p,div{opacity:.6}}&[mono]{span,p,div{font-family:monospace}}&[align=left]{span,p,div{text-align:left}}&[align=center]{span,p,div{text-align:center}}&[align=right]{span,p,div{text-align:right}}&[color=primary]{span,p,div{color:var(--color-primary)}}&[color=secondary]{span,p,div{color:var(--color-secondary)}}&[color=success]{span,p,div{color:var(--color-success)}}&[color=danger]{span,p,div{color:var(--color-danger)}}&[color=warning]{span,p,div{color:var(--color-warning)}}&[color=info]{span,p,div{color:var(--color-info)}}&[color=muted]{span,p,div{opacity:.6}}&[color=inverse]{span,p,div{color:var(--color-inverse)}}&[transform=capitalize]{span,p,div{text-transform:capitalize}}&[transform=uppercase]{span,p,div{text-transform:uppercase}}&[transform=lowercase]{span,p,div{text-transform:lowercase}}&[transform=none]{span,p,div{text-transform:none}}}:where(.uix-flex,uix-flex){display:flex;flex-direction:var(--flex-direction, row);gap:var(--flex-gap);align-items:var(--flex-align, stretch);justify-content:var(--flex-justify, flex-start);flex-wrap:var(--flex-wrap, nowrap);box-sizing:border-box;&[direction=row]{--flex-direction: row}&[direction=column]{--flex-direction: column}&[direction=row-reverse]{--flex-direction: row-reverse}&[direction=column-reverse]{--flex-direction: column-reverse}&[gap=none]{--flex-gap: 0}&[gap=xs]{--flex-gap: var(--spacing-xs, .25rem)}&[gap=sm]{--flex-gap: var(--spacing-sm, .5rem)}&[gap=md]{--flex-gap: var(--spacing-md, .75rem)}&[gap=lg]{--flex-gap: var(--spacing-lg, 1rem)}&[gap=xl]{--flex-gap: var(--spacing-xl, 1.5rem)}&[gap="2xl"]{--flex-gap: var(--spacing-2xl, 2rem)}&[gap="3xl"]{--flex-gap: var(--spacing-3xl, 3rem)}&[align=start]{--flex-align: flex-start}&[align=center]{--flex-align: center}&[align=end]{--flex-align: flex-end}&[align=stretch]{--flex-align: stretch}&[align=baseline]{--flex-align: baseline}&[justify=start]{--flex-justify: flex-start}&[justify=center]{--flex-justify: center}&[justify=end]{--flex-justify: flex-end}&[justify=space-between]{--flex-justify: space-between}&[justify=space-around]{--flex-justify: space-around}&[justify=space-evenly]{--flex-justify: space-evenly}&[wrap=wrap]{--flex-wrap: wrap}&[wrap=nowrap]{--flex-wrap: nowrap}&[wrap=wrap-reverse]{--flex-wrap: wrap-reverse}>[flex-1]{flex:1 1 0%}>[flex-auto]{flex:1 1 auto}>[flex-initial]{flex:0 1 auto}>[flex-none]{flex:none}>[flex-grow]{flex-grow:1}>[flex-grow="0"]{flex-grow:0}>[flex-shrink]{flex-shrink:1}>[flex-shrink="0"]{flex-shrink:0}>[flex-basis=auto]{flex-basis:auto}>[flex-basis="0"]{flex-basis:0}>[align-self=start]{align-self:flex-start}>[align-self=center]{align-self:center}>[align-self=end]{align-self:flex-end}>[align-self=stretch]{align-self:stretch}>[w-full]{width:100%}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-accordion,uix-accordion){display:flex;width:100%;--accordion-border-radius: var(--radius-md, .375rem);--accordion-padding: .25rem .5rem;--accordion-gap: 0;--accordion-background: transparent;--accordion-border-color: transparent;--accordion-header-background: transparent;--accordion-header-color: var(--color-surface-lighter);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-color-hover: var(--color-inverse);--accordion-header-background-active: var(--color-surface-darker);--accordion-header-color-active: var(--color-inverse);--accordion-panel-background: transparent;--accordion-panel-color: var(--color-surface-lighter);--accordion-transition: background-color .2s ease, color .2s ease, border-color .2s ease;&::part(container){display:flex;flex-direction:column;width:100%;gap:var(--accordion-gap);background:var(--accordion-background);border:1px solid var(--accordion-border-color);border-radius:var(--accordion-border-radius);overflow:hidden}>*:nth-child(odd){display:flex;width:100%;text-align:left;cursor:pointer;user-select:none;padding:var(--accordion-padding);font-size:var(--text-base, 1rem);font-weight:var(--font-medium, 500);background:var(--accordion-header-background);border:none;border-top:1px solid var(--header-border-top);transition:var(--accordion-transition);&:hover{background:var(--accordion-header-background-hover)}&[active][activeBg]{background:var(--accordion-header-background-active)}}>*:nth-child(1){border-top:none}>*:nth-child(2n){background:var(--accordion-panel-background);color:var(--accordion-panel-color);font-size:var(--text-sm, .875rem);line-height:var(--leading-relaxed, 1.6);transition:var(--accordion-transition);>*{padding-left:40px;padding-block:.5rem}&[hide]{display:none}}&[variant=bordered]{--accordion-border-color: var(--color-surface-dark);--header-border-top: var(--color-surface-dark);--accordion-header-background-hover: var(--color-surface-dark);--accordion-header-background-active: var(--color-surface-darker);&::part(container){border-width:2px}>*:nth-child(odd){border-top-width:1px}}&[variant=filled]{--accordion-background: var(--color-surface-lighter);--accordion-border-color: transparent;--header-border-top: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: var(--color-surface);--accordion-header-background-hover: var(--color-surface);>*:nth-child(odd)[active]{box-shadow:0 1px 2px #0003}}&[variant=flush]{--accordion-background: transparent;--accordion-border-color: transparent;--accordion-padding: 0;--header-border-top: transparent;--accordion-header-background: transparent;--accordion-header-background-hover: var(--color-surface-light);--accordion-header-background-active: var(--color-surface);--accordion-panel-background: transparent;&::part(container){border:none;padding:0}>*:nth-child(odd){border-top:none}}&[variant=separated]{--accordion-gap: var(--spacing-sm, .5rem);--accordion-border-color: transparent;--header-border-top: transparent;&::part(container){border:none;padding:var(--spacing-sm, .5rem)}>*:nth-child(odd){border:1px solid var(--color-surface-dark);border-radius:var(--accordion-border-radius)}>*:nth-child(2n){border:1px solid var(--color-surface-dark);border-top:none;border-radius:0 0 var(--accordion-border-radius) var(--accordion-border-radius)}}&:not([rounded]){--accordion-border-radius: 0;&::part(container){border-radius:0}}}:where(.uix-nav-item,uix-nav-item){--nav-item-padding-y: .5rem;--nav-item-padding-x: .75rem;--nav-item-gap: .75rem;--nav-item-font-size: var(--text-sm, .875rem);--nav-item-line-height: var(--leading-tight, 1.25rem);--nav-item-border-radius: 0;--nav-item-color: var(--text-color, inherit);--nav-item-background: transparent;--nav-item-hover-background: var(--color-surface-dark, rgba(0, 0, 0, .05));--nav-item-hover-color: var(--text-color, inherit);--nav-item-active-background: var(--color-primary, rgba(0, 0, 0, .1));--nav-item-active-color: var(--color-surface-darker, inherit);--nav-item-disabled-opacity: .5;--nav-item-indicator-width: 2px;--nav-item-indicator-color: var(--color-primary, currentColor);--nav-item-indicator-length: 50%;--nav-item-badge-background: var(--color-surface-darker);--nav-item-badge-color: var(--text-color, #fff);--nav-item-badge-padding: .2rem .4rem;--nav-item-badge-font-size: var(--text-xs, .6rem);--nav-item-badge-border-radius: var(--radius-md);all:unset;display:flex;align-items:center;gap:var(--nav-item-gap);padding:var(--nav-item-padding-y) var(--nav-item-padding-x);font-size:var(--nav-item-font-size);line-height:var(--nav-item-line-height);color:var(--nav-item-color);background-color:var(--nav-item-background);border-radius:var(--nav-item-border-radius);cursor:pointer;transition:background-color .15s ease-in-out;width:100%;text-decoration:none;box-sizing:border-box;button{display:flex;justify-content:space-between;width:100%}&[rounded]{--nav-item-border-radius: var(--radius-md, .375rem)}&:not([prevent-collapse]){&:hover:not(:disabled){background-color:var(--nav-item-hover-background)}button{cursor:pointer}}&[size=sm]{--nav-item-padding-y: .375rem;--nav-item-padding-x: .5rem;--nav-item-gap: .5rem;--nav-item-font-size: var(--text-sm, .8125rem);--nav-item-line-height: var(--leading-tight, 1.125rem)}&[size=lg]{--nav-item-padding-y: .625rem;--nav-item-padding-x: 1rem;--nav-item-gap: 1rem;--nav-item-font-size: var(--text-base, 1rem);--nav-item-line-height: var(--leading-normal, 1.5rem)}&[active][activeBg]{background-color:var(--nav-item-active-background);color:var(--nav-item-active-color);font-weight:var(--font-semibold, 600)}&[active]:not([activeBg]){background-color:transparent;color:var(--link-active-color);font-weight:var(--font-semibold, 600)}&:disabled{opacity:var(--nav-item-disabled-opacity);cursor:not-allowed}.uix-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0}.label{flex:1;display:flex;flex-direction:row;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:inline-flex;align-items:center;justify-content:center;padding:var(--nav-item-badge-padding);font-size:var(--nav-item-badge-font-size);font-weight:var(--font-semibold, 600);line-height:1;color:var(--nav-item-badge-color);background-color:var(--nav-item-badge-background);border-radius:var(--nav-item-badge-border-radius);flex-shrink:0}&[header] button{position:relative;&:before{content:"";display:inline-block;width:.5em;height:.5em;margin-top:5px;margin-left:.5rem;margin-right:1rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s ease;flex-shrink:0;vertical-align:middle}}&[header][active] button:before{transform:rotate(45deg);margin-top:3px}&[iconOnly]{justify-content:center;padding:var(--nav-item-padding-y);.nav-item-icon{margin:0}}&[indicatorPosition]:not([indicatorPosition=none])[active]{background-color:transparent}&[indicatorPosition=left]{position:relative;&[active]:before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 var(--radius-md, 4px) var(--radius-md, 4px) 0}}&[indicatorPosition=right]{position:relative;&[active]:before{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:var(--nav-item-indicator-width);height:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) 0 0 var(--radius-md, 4px)}}&[indicatorPosition=top]{position:relative;&[active]:before{content:"";position:absolute;top:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:0 0 var(--radius-md, 4px) var(--radius-md, 4px)}}&[indicatorPosition=bottom]{position:relative;&[active]:before{content:"";position:absolute;bottom:0;left:50%;transform:translate(-50%);height:var(--nav-item-indicator-width);width:var(--nav-item-indicator-length);background-color:var(--nav-item-indicator-color);border-radius:var(--radius-md, 4px) var(--radius-md, 4px) 0 0}}&:not([prevent-collapse]):hover:not(:disabled):not([active]){color:var(--nav-item-hover-color)}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-split-pane,uix-split-pane){display:flex;width:100%;height:100%;overflow:hidden;>[slot]{width:100%}&::part(primary),&::part(secondary){width:100%;display:flex;overflow:auto;background:var( --split-pane-panel-bg, var(--color-surface-darker, #282828) );flex-shrink:0;flex-grow:0}&::part(primary){min-width:0;min-height:0}&::part(secondary){flex:1;min-width:0;min-height:0}&::part(divider){display:flex;align-items:center;justify-content:center;background:var( --split-pane-divider-bg, var(--color-surface, #504945) );flex-shrink:0;position:relative;z-index:10;transition:background .15s ease}&[direction=horizontal],&:not([direction]){flex-direction:row;&::part(divider){width:var(--divider-size, 4px);cursor:default;&:before{width:var(--divider-size, 4px);height:48px}}}&[direction=vertical]{flex-direction:column;&::part(divider){height:var(--divider-size, 4px);cursor:default;&:before{width:48px;height:var(--divider-size, 4px)}}}&[resizable]{&::part(divider):hover{background:var( --split-pane-divider-hover-bg, var(--color-primary, #fabd2f) )}&::part(divider):active{background:var( --split-pane-divider-active-bg, var(--color-primary, #fabd2f) )}&::part(divider):before{content:"";position:absolute;background:var(--color-surface-light, #3c3836);border-radius:var(--radius-full, 9999px);opacity:0;transition:opacity .2s ease}&::part(divider):hover:before{opacity:1}&[direction=horizontal]::part(divider),&:not([direction])::part(divider){cursor:col-resize}&[direction=vertical]::part(divider){cursor:row-resize}}&[dragging]{user-select:none;&[direction=horizontal],&:not([direction]){cursor:col-resize;*{cursor:col-resize!important}}&[direction=vertical]{cursor:row-resize;*{cursor:row-resize!important}}}}@media (pointer: coarse){:where(.uix-split-pane,uix-split-pane){&[direction=horizontal]::part(divider),&:not([direction])::part(divider){width:calc(var(--divider-size, 4px) * 2);margin-left:calc(var(--divider-size, 4px) * -.5);margin-right:calc(var(--divider-size, 4px) * -.5)}&[direction=vertical]::part(divider){height:calc(var(--divider-size, 4px) * 2);margin-top:calc(var(--divider-size, 4px) * -.5);margin-bottom:calc(var(--divider-size, 4px) * -.5)}}}.admin-dashboard{padding:var(--admin-dashboard-padding, 2rem)}.admin-dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%}.admin-dashboard-header{margin-bottom:var(--admin-dashboard-header-margin, 2rem)}.admin-dashboard-title{font-size:var(--admin-dashboard-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0 0 .5rem}.admin-dashboard-subtitle{color:var(--admin-dashboard-subtitle-color, #6b7280);margin:0}.admin-dashboard-summary{margin-bottom:var(--admin-dashboard-section-margin, 2rem);background:var(--admin-dashboard-summary-bg, #000)!important;color:var(--admin-dashboard-summary-color, #fff)}.admin-dashboard-summary-content{display:flex;align-items:center;justify-content:space-between}.admin-dashboard-stat-right{text-align:right}.admin-dashboard-stat-label{font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--admin-dashboard-stat-label-color, #9ca3af);margin:0}.admin-dashboard-stat-value{font-size:var(--admin-dashboard-stat-size, 2.25rem);font-weight:900;margin:0}.admin-dashboard-section{margin-bottom:var(--admin-dashboard-section-margin, 2rem)}.admin-dashboard-section-title{font-size:var(--admin-dashboard-section-title-size, 1.25rem);font-weight:900;text-transform:uppercase;margin:0 0 1rem}.admin-dashboard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--admin-dashboard-grid-gap, 1rem)}.admin-dashboard-model-card{cursor:pointer}.admin-dashboard-model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.admin-dashboard-model-header uix-icon{color:var(--admin-dashboard-model-icon-color, #9ca3af)}.admin-dashboard-model-count{font-size:var(--admin-dashboard-model-count-size, 1.875rem);font-weight:900}.admin-dashboard-model-name{font-weight:700;font-size:1.125rem;text-transform:capitalize;margin:0}.admin-dashboard-model-label{font-size:.875rem;color:var(--admin-dashboard-model-label-color, #6b7280);margin:0}.admin-dashboard-actions{display:flex;flex-wrap:wrap;gap:var(--admin-dashboard-actions-gap, 1rem)}.admin-action-deploy{--button-background-color: var(--admin-action-deploy-bg, #fde047);--button-color: var(--admin-action-deploy-color, #000)}.admin-action-theme{--button-background-color: var(--admin-action-theme-bg, #f9a8d4);--button-color: var(--admin-action-theme-color, #000)}.admin-action-refresh{--button-background-color: var(--admin-action-refresh-bg, #86efac);--button-color: var(--admin-action-refresh-color, #000)}:where(.uix-spinner,uix-spinner){display:inline-flex;align-items:center;justify-content:center;--spinner-color: var(--color-primary);--spinner-size: 2rem;width:var(--spinner-size);height:var(--spinner-size);position:relative;&[primary]{--spinner-color: var(--color-primary)}&[secondary]{--spinner-color: var(--color-secondary)}&[success]{--spinner-color: var(--color-success)}&[danger]{--spinner-color: var(--color-danger)}&[warning]{--spinner-color: var(--color-warning)}&[info]{--spinner-color: var(--color-info)}&[size=xs]{--spinner-size: 1rem}&[size=sm]{--spinner-size: 1.5rem}&[size=md]{--spinner-size: 2rem}&[size=lg]{--spinner-size: 3rem}&[size=xl]{--spinner-size: 4rem}&[variant=circular]:before{content:"";display:block;width:100%;height:100%;border:calc(var(--spinner-size) / 8) solid var(--color-surface-darker);border-top-color:var(--spinner-color);border-radius:50%;animation:spinner-circular .8s linear infinite}&[variant=dots]{gap:calc(var(--spinner-size) / 6)}&[variant=dots] .dot{display:block;width:calc(var(--spinner-size) / 4);height:calc(var(--spinner-size) / 4);background-color:var(--spinner-color);border-radius:50%;animation:spinner-dots 1.4s ease-in-out infinite}&[variant=dots] .dot:nth-child(1){animation-delay:-.32s}&[variant=dots] .dot:nth-child(2){animation-delay:-.16s}&[variant=dots] .dot:nth-child(3){animation-delay:0s}&[variant=bars]{gap:calc(var(--spinner-size) / 8)}&[variant=bars] .bar{display:block;width:calc(var(--spinner-size) / 6);height:100%;background-color:var(--spinner-color);border-radius:calc(var(--spinner-size) / 12);animation:spinner-bars 1.2s ease-in-out infinite}&[variant=bars] .bar:nth-child(1){animation-delay:-.24s}&[variant=bars] .bar:nth-child(2){animation-delay:-.12s}&[variant=bars] .bar:nth-child(3){animation-delay:0s}}@keyframes spinner-circular{0%{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes spinner-dots{0%,80%,to{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}@keyframes spinner-bars{0%,40%,to{transform:scaleY(.4);opacity:.5}20%{transform:scaleY(1);opacity:1}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}.admin-model-list{padding:var(--admin-list-padding, 2rem)}.admin-model-list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--admin-list-header-margin, 1.5rem)}.admin-model-list-title{font-size:var(--admin-list-title-size, 1.875rem);font-weight:900;text-transform:uppercase;margin:0}.admin-model-list-count{color:var(--admin-list-count-color, #6b7280);margin:0}.admin-model-list-actions{display:flex;align-items:center;gap:var(--admin-list-actions-gap, 1rem)}.admin-view-toggle{display:flex;border:2px solid var(--admin-toggle-border, #000);border-radius:var(--admin-toggle-radius, .5rem);overflow:hidden}.admin-view-toggle uix-button{border-radius:0}.admin-dropdown-content{padding:var(--admin-dropdown-padding, .5rem);max-height:var(--admin-dropdown-max-height, 16rem);overflow-y:auto}.admin-dropdown-item{display:flex;align-items:center;gap:.5rem;width:100%;padding:var(--admin-dropdown-item-padding, .5rem .75rem);border:none;background:none;border-radius:var(--admin-dropdown-item-radius, .5rem);cursor:pointer;text-align:left;font-size:.875rem;transition:background-color .15s ease}.admin-dropdown-item:hover{background:var(--admin-dropdown-item-hover, #f3f4f6)}.admin-dropdown-item.active{background:var(--admin-dropdown-item-active, #f3f4f6);font-weight:700}.admin-model-list-search{margin-bottom:var(--admin-list-search-margin, 1.5rem);max-width:var(--admin-list-search-width, 28rem)}.admin-table-card{overflow:hidden}.admin-table-scroll{overflow-x:auto}.admin-table{width:100%;border-collapse:collapse}.admin-table thead{background:var(--admin-table-header-bg, #f3f4f6);border-bottom:3px solid var(--admin-table-border, #000)}.admin-table th{padding:var(--admin-table-cell-padding, .75rem 1rem);text-align:left;font-size:.875rem;font-weight:900;text-transform:uppercase;letter-spacing:.025em}.admin-table tbody tr{cursor:pointer;transition:background-color .15s ease;border-bottom:1px solid var(--admin-table-row-border, #e5e7eb)}.admin-table tbody tr:hover{background:var(--admin-table-row-hover, #f9fafb)}.admin-table td{padding:var(--admin-table-cell-padding, .75rem 1rem);font-size:.875rem}.admin-table-actions-col{text-align:right;width:1%;white-space:nowrap}.admin-table-empty{padding:var(--admin-table-empty-padding, 3rem);text-align:center;color:var(--admin-table-empty-color, #6b7280)}.admin-table-empty uix-icon{margin:0 auto 1rem;opacity:.5}.admin-table-empty-title{font-size:1.125rem;font-weight:500;margin:0 0 .25rem}.admin-table-empty-text{font-size:.875rem;margin:0}.admin-delete-confirm{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}.admin-delete-icon{padding:.75rem;background:var(--admin-delete-icon-bg, #fee2e2);border-radius:9999px;color:var(--admin-delete-icon-color, #dc2626)}.admin-delete-title{font-weight:900;font-size:1.125rem;margin:0}.admin-delete-text{color:var(--admin-delete-text-color, #6b7280);font-size:.875rem;margin:0}.admin-modal-id{font-weight:400;color:var(--text-muted, #6b7280);font-size:.875em}.admin-modal-footer{display:flex;gap:1rem}.admin-modal-footer uix-button{flex:1}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}.admin-export-options{padding:var(--admin-export-options-padding, .25rem)}.admin-export-option{display:block;width:100%;padding:var(--admin-export-option-padding, .5rem 1rem);border:none;background:none;text-align:left;cursor:pointer;transition:background-color .15s ease}.admin-export-option:hover{background:var(--admin-export-option-hover, #f3f4f6)}.admin-export-option:first-child{border-radius:.5rem .5rem 0 0}.admin-export-option:last-child{border-radius:0 0 .5rem .5rem}:where(.uix-data-table,uix-data-table){display:block;width:var(--data-table-width, 100%);uix-pagination{margin-top:var(--data-table-pagination-margin, 1rem);justify-content:var(--data-table-pagination-justify, flex-end)}}.uix-data-table__empty{padding:var(--data-table-empty-padding, 2rem);text-align:center;color:var(--data-table-empty-color, #6b7280)}.admin-import-options{padding:var(--admin-import-options-padding, .25rem)}.admin-import-option{display:block;padding:var(--admin-import-option-padding, .5rem 1rem);cursor:pointer;transition:background-color .15s ease}.admin-import-option:hover{background:var(--admin-import-option-hover, #f3f4f6)}.admin-import-option:first-child{border-radius:.5rem .5rem 0 0}.admin-import-option:last-child{border-radius:0 0 .5rem .5rem}.admin-import-file-input{display:none}.admin-import-content{margin-bottom:var(--admin-import-content-margin, 1rem)}.admin-import-mapping{margin-bottom:var(--admin-import-mapping-margin, 1.5rem)}.admin-import-mapping-title{font-weight:700;margin:0 0 1rem}.admin-import-mapping-list{display:flex;flex-direction:column;gap:var(--admin-import-mapping-gap, 1rem)}.admin-import-mapping-row{display:flex;align-items:center;gap:var(--admin-import-mapping-row-gap, 1rem)}.admin-import-field-name{width:var(--admin-import-field-name-width, 8rem);font-weight:500}.admin-import-arrow{color:var(--admin-import-arrow-color, #9ca3af)}.admin-import-mapping-row uix-select{flex:1}.admin-import-preview{margin-bottom:var(--admin-import-preview-margin, 1.5rem)}.admin-import-preview-title{font-weight:700;margin:0 0 .5rem}.admin-import-preview-code{padding:var(--admin-import-preview-code-padding, 1rem);background:var(--admin-import-preview-code-bg, #f3f4f6);border-radius:var(--admin-import-preview-code-radius, .75rem);font-size:.875rem;overflow-x:auto;max-height:var(--admin-import-preview-max-height, 16rem);margin:0}.admin-import-preview-more{font-size:.875rem;color:var(--admin-import-preview-more-color, #6b7280);margin:.5rem 0 0}.admin-import-footer{display:flex;justify-content:flex-end;gap:var(--admin-import-footer-gap, 1rem)}:where(.uix-modal,uix-modal){display:inline-block;&::part(dialog){background:var(--modal-background, #ffffff);border:var(--modal-border-width, 1px) solid var(--modal-border-color, #e5e7eb);border-radius:var(--modal-border-radius, .75rem);box-shadow:var(--modal-shadow, 0 25px 50px -12px rgb(0 0 0 / .25));padding:0;width:var(--modal-width, 90vw);max-width:var(--modal-max-width, 600px);color:var(--modal-color, #1a1a1a);&::backdrop{background:var(--modal-overlay, rgba(0, 0, 0, .5));backdrop-filter:blur(2px)}}&[size=sm]{--modal-max-width: 400px}&[size=md]{--modal-max-width: 600px}&[size=lg]{--modal-max-width: 800px}&[size=xl]{--modal-max-width: 1000px}@media (max-width: 639px){&::part(dialog){width:100%;max-width:100%;height:100%;max-height:100%;margin:0;border-radius:0;border:none;box-shadow:none}&::part(body){max-height:none;flex:1;overflow-y:auto}}&::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--modal-header-padding, 1.25rem 1.5rem);border-bottom:var(--modal-header-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-header-background, transparent);font-size:var(--modal-header-font-size, 1.125rem);font-weight:var(--modal-header-font-weight, 700);color:var(--modal-header-color, #1a1a1a);&:empty{display:none}}&::part(close-button){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:transparent;color:var(--modal-close-color, #6b7280);cursor:pointer;border-radius:.375rem;transition:background-color .15s,color .15s;flex-shrink:0;&:hover{background:var(--modal-close-hover-bg, #f3f4f6);color:var(--modal-close-hover-color, #1a1a1a)}}&::part(body){padding:var(--modal-body-padding, 1.5rem);color:var(--modal-body-color, #4b5563);font-size:var(--text-base, 1rem);line-height:1.5;overflow-y:auto;max-height:60vh}&::part(footer),[slot=footer]{padding:var(--modal-footer-padding, 1rem 1.5rem);border-top:var(--modal-footer-border-width, 1px) solid var(--modal-border-color, #e5e7eb);background:var(--modal-footer-background, #f9fafb);&:empty{display:none}}[slot=trigger]{cursor:pointer}[slot=footer]{display:flex;gap:.75rem;justify-content:flex-end;align-items:center}}:where(.uix-popover-controller,uix-popover-controller){position:fixed;z-index:10000;display:none;&[data-open]{display:flex;flex-direction:column}}:where(.uix-dropdown,uix-dropdown){&[data-open]{display:flex;flex-direction:column;min-width:var(--dropdown-min-width, 200px);max-width:var(--dropdown-max-width, 400px);background:var(--color-surface-darker, #282828);color:var(--text-color, default);padding:var(--spacing-xs, .25rem);gap:2px}&[variant=elevated][data-open]{background:var(--color-surface-light, #3c3836)}&[variant=primary][data-open]{background:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&[variant=card][data-open]{background:var(--color-surface-dark, #32302f)}&[rounded][data-open]{border-radius:var(--radius-md, .375rem)}&[bordered][data-open]{border:1px solid var(--color-surface, #504945)}&[shadow][data-open]{box-shadow:0 8px 16px #0000004d,0 2px 4px #0003}>*{padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);color:inherit;text-decoration:none;display:block;border-radius:var(--radius-sm, .25rem);transition:background-color .15s ease,color .15s ease;cursor:pointer;white-space:nowrap;font-size:var(--text-sm, .875rem);line-height:1.5;&:hover{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) )}&:focus{background-color:var( --color-surface-dark, rgba(255, 255, 255, .1) );outline:2px solid var(--color-primary, #fabd2f);outline-offset:-2px}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-surface-darker, #282828)}&:disabled,&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}uix-icon{margin-right:var(--spacing-xs, .25rem);vertical-align:middle}>*{pointer-events:none}}>hr{border:none;border-top:1px solid var(--color-surface-dark, rgba(80, 73, 69, .5));margin:var(--spacing-xs, .25rem) 0;padding:0}>.dropdown-header,>[role=heading]{padding:var(--spacing-xs, .25rem) var(--spacing-md, .75rem);font-size:var(--text-xs, .75rem);font-weight:600;color:var(--text-muted, #a89984);text-transform:uppercase;letter-spacing:.05em;cursor:default;&:hover{background-color:transparent}}}:where(.uix-table,uix-table){display:block;width:100%;table{width:100%;border-collapse:separate;border-spacing:0;border:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb);border-radius:var(--table-border-radius, .5rem);box-shadow:var(--table-shadow, none);overflow:hidden}thead{background-color:var(--table-header-background, #f9fafb)}th{padding:var(--table-cell-padding, 1rem);text-align:left;font-weight:var(--table-header-font-weight, 600);font-size:var(--table-header-font-size, .75rem);text-transform:var(--table-header-text-transform, uppercase);color:var(--table-header-color, #374151);letter-spacing:.05em;border-bottom:var(--table-border-width, 1px) solid var(--table-border-color, #e5e7eb)}tbody tr{background-color:var(--table-row-background, #ffffff);transition:background-color .15s ease}tbody tr:hover{background-color:var(--table-row-hover-background, #f3f4f6)}tbody tr.clickable{cursor:pointer}td{padding:var(--table-cell-padding, 1rem);font-size:var(--table-cell-font-size, .875rem);color:var(--table-cell-color, #4b5563);border-bottom:1px solid var(--table-border-color, #e5e7eb)}tbody tr:last-child td{border-bottom:none}}:where(.uix-pagination,uix-pagination){display:block;.pagination{display:flex;justify-content:center;padding:var(--pagination-padding, .75rem 0)}.pagination-list{display:flex;align-items:center;gap:var(--pagination-gap, .25rem);list-style:none;margin:0;padding:0}.pagination-button{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);padding:var(--pagination-button-padding, .5rem);border:var(--pagination-border-width, 1px) solid var(--pagination-border-color, var(--color-primary, #fabd2f));border-radius:var(--pagination-border-radius, .5rem);background-color:var(--pagination-background, #ffffff);color:var(--pagination-color, var(--color-primary, #1a1a1a));font-size:var(--pagination-font-size, .875rem);font-weight:var(--pagination-font-weight, 500);box-shadow:var(--pagination-shadow, none);cursor:pointer;transition:all .15s ease;&:hover:not(:disabled):not(.active){background-color:var(--pagination-hover-background, #f5f5f5);border-color:var(--pagination-hover-border-color, var(--color-primary, #fabd2f));box-shadow:var(--pagination-hover-shadow, none);transform:var(--pagination-hover-transform, none)}&.active{background-color:var(--pagination-active-background, var(--color-primary, #fabd2f));border-color:var(--pagination-active-border-color, #000000);color:var(--pagination-active-color, #000000);box-shadow:var(--pagination-active-shadow, none)}&:disabled{opacity:.5;cursor:not-allowed}&.prev,&.next{font-weight:var(--pagination-nav-font-weight, 700)}}.pagination-ellipsis{display:flex;align-items:center;justify-content:center;min-width:var(--pagination-button-size, 2.5rem);height:var(--pagination-button-size, 2.5rem);color:var(--pagination-ellipsis-color, #6b7280);font-size:var(--pagination-font-size, .875rem)}&[size=sm]{--pagination-button-size: 2rem;--pagination-font-size: .75rem;--pagination-button-padding: .375rem;--pagination-gap: .125rem}&[size=lg]{--pagination-button-size: 3rem;--pagination-font-size: 1rem;--pagination-button-padding: .625rem;--pagination-gap: .375rem}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--breadcrumbs-font-size: .875rem;--breadcrumbs-font-weight: 700;--breadcrumbs-current-font-weight: 900;--breadcrumbs-text-transform: uppercase;--breadcrumbs-letter-spacing: .05em;--breadcrumbs-link-color: #6b7280;--breadcrumbs-link-hover-color: #1a1a1a;--breadcrumbs-current-color: #1a1a1a;--breadcrumbs-separator-color: #9ca3af;--breadcrumbs-gap: .5rem;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
+`,mimeType:"application/javascript"},"/node/events.mjs":{content:'function oe(e){return new Error(`[unenv] ${e} is not implemented yet!`)}function A(e){return Object.assign(()=>{throw oe(e)},{__unenv__:!0})}import{AsyncResource as le}from"/node/async_hooks.mjs";var d=10,ue=Object.getPrototypeOf(Object.getPrototypeOf(async function*(){}).prototype),N=(e,t)=>e,y=Error,ae=Error,f=Error,w=Error,ce=Error,M=Symbol.for("nodejs.rejection"),h=Symbol.for("kCapture"),S=Symbol.for("events.errorMonitor"),E=Symbol.for("shapeMode"),b=Symbol.for("events.maxEventTargetListeners"),he=Symbol.for("kEnhanceStackBeforeInspector"),fe=Symbol.for("nodejs.watermarkData"),j=Symbol.for("kEventEmitter"),v=Symbol.for("kAsyncResource"),ve=Symbol.for("kFirstEventParam"),k=Symbol.for("kResistStopPropagation"),K=Symbol.for("events.maxEventTargetListenersWarned"),C=class _{_events=void 0;_eventsCount=0;_maxListeners=d;[h]=!1;[E]=!1;static captureRejectionSymbol=M;static errorMonitor=S;static kMaxEventTargetListeners=b;static kMaxEventTargetListenersWarned=K;static usingDomains=!1;static get on(){return z}static get once(){return B}static get getEventListeners(){return G}static get getMaxListeners(){return U}static get addAbortListener(){return P}static get EventEmitterAsyncResource(){return q}static get EventEmitter(){return _}static setMaxListeners(t=d,...n){if(n.length===0)d=t;else for(let r of n)if(Q(r))r[b]=t,r[K]=!1;else if(typeof r.setMaxListeners=="function")r.setMaxListeners(t);else throw new f("eventTargets",["EventEmitter","EventTarget"],r)}static listenerCount(t,n){if(typeof t.listenerCount=="function")return t.listenerCount(n);_.prototype.listenerCount.call(t,n)}static init(){throw new Error("EventEmitter.init() is not implemented.")}static get captureRejections(){return this[h]}static set captureRejections(t){this[h]=t}static get defaultMaxListeners(){return d}static set defaultMaxListeners(t){d=t}constructor(t){this._events===void 0||this._events===Object.getPrototypeOf(this)._events?(this._events={__proto__:null},this._eventsCount=0,this[E]=!1):this[E]=!0,this._maxListeners=this._maxListeners||void 0,t?.captureRejections?this[h]=!!t.captureRejections:this[h]=_.prototype[h]}setMaxListeners(t){return this._maxListeners=t,this}getMaxListeners(){return T(this)}emit(t,...n){let r=t==="error",i=this._events;if(i!==void 0)r&&i[S]!==void 0&&this.emit(S,...n),r=r&&i.error===void 0;else if(!r)return!1;if(r){let s;if(n.length>0&&(s=n[0]),s instanceof Error){try{let c={};Error.captureStackTrace?.(c,_.prototype.emit),Object.defineProperty(s,he,{__proto__:null,value:Function.prototype.bind(de,this,s,c),configurable:!0})}catch{}throw s}let u;try{u=N(s)}catch{u=s}let a=new ae(u);throw a.context=s,a}let o=i[t];if(o===void 0)return!1;if(typeof o=="function"){let s=o.apply(this,n);s!=null&&V(this,s,t,n)}else{let s=o.length,u=I(o);for(let a=0;a<s;++a){let c=u[a].apply(this,n);c!=null&&V(this,c,t,n)}}return!0}addListener(t,n){return Y(this,t,n,!1),this}on(t,n){return this.addListener(t,n)}prependListener(t,n){return Y(this,t,n,!0),this}once(t,n){return this.on(t,Z(this,t,n)),this}prependOnceListener(t,n){return this.prependListener(t,Z(this,t,n)),this}removeListener(t,n){let r=this._events;if(r===void 0)return this;let i=r[t];if(i===void 0)return this;if(i===n||i.listener===n)this._eventsCount-=1,this[E]?r[t]=void 0:this._eventsCount===0?this._events={__proto__:null}:(delete r[t],r.removeListener&&this.emit("removeListener",t,i.listener||n));else if(typeof i!="function"){let o=-1;for(let s=i.length-1;s>=0;s--)if(i[s]===n||i[s].listener===n){o=s;break}if(o<0)return this;o===0?i.shift():_e(i,o),i.length===1&&(r[t]=i[0]),r.removeListener!==void 0&&this.emit("removeListener",t,n)}return this}off(t,n){return this.removeListener(t,n)}removeAllListeners(t){let n=this._events;if(n===void 0)return this;if(n.removeListener===void 0)return arguments.length===0?(this._events={__proto__:null},this._eventsCount=0):n[t]!==void 0&&(--this._eventsCount===0?this._events={__proto__:null}:delete n[t]),this[E]=!1,this;if(arguments.length===0){for(let i of Reflect.ownKeys(n))i!=="removeListener"&&this.removeAllListeners(i);return this.removeAllListeners("removeListener"),this._events={__proto__:null},this._eventsCount=0,this[E]=!1,this}let r=n[t];if(typeof r=="function")this.removeListener(t,r);else if(r!==void 0)for(let i=r.length-1;i>=0;i--)this.removeListener(t,r[i]);return this}listeners(t){return ee(this,t,!0)}rawListeners(t){return ee(this,t,!1)}eventNames(){return this._eventsCount>0?Reflect.ownKeys(this._events):[]}listenerCount(t,n){let r=this._events;if(r!==void 0){let i=r[t];if(typeof i=="function")return n!=null?n===i||n===i.listener?1:0:1;if(i!==void 0){if(n!=null){let o=0;for(let s=0,u=i.length;s<u;s++)(i[s]===n||i[s].listener===n)&&o++;return o}return i.length}}return 0}},q=class extends C{constructor(e){let t;typeof e=="string"?(t=e,e=void 0):t=e?.name||new.target.name,super(e),this[v]=new me(this,t,e)}emit(e,...t){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");let{asyncResource:n}=this;return Array.prototype.unshift(t,super.emit,this,e),Reflect.apply(n.runInAsyncScope,n,t)}emitDestroy(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");this.asyncResource.emitDestroy()}get asyncId(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this.asyncResource.asyncId()}get triggerAsyncId(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this.asyncResource.triggerAsyncId()}get asyncResource(){if(this[v]===void 0)throw new y("EventEmitterAsyncResource");return this[v]}},me=class extends le{constructor(e,t,n){super(t,n),this[j]=e}get eventEmitter(){if(this[j]===void 0)throw new y("EventEmitterReferencingAsyncResource");return this[j]}},z=function(e,t,n={}){let r=n.signal;if(r?.aborted)throw new w(void 0,{cause:r?.reason});let i=n.highWaterMark??n.highWatermark??Number.MAX_SAFE_INTEGER,o=n.lowWaterMark??n.lowWatermark??1,s=new J,u=new J,a=!1,c=null,m=!1,p=0,te=Object.setPrototypeOf({next(){if(p){let l=s.shift();return p--,a&&p<o&&(e.resume?.(),a=!1),Promise.resolve(F(l,!1))}if(c){let l=Promise.reject(c);return c=null,l}return m?L():new Promise(function(l,se){u.push({resolve:l,reject:se})})},return(){return L()},throw(l){if(!l||!(l instanceof Error))throw new f("EventEmitter.AsyncIterator","Error",l);R(l)},[Symbol.asyncIterator](){return this},[fe]:{get size(){return p},get low(){return o},get high(){return i},get isPaused(){return a}}},ue),{addEventListener:x,removeAll:ne}=ge();x(e,t,n[ve]?D:function(...l){return D(l)}),t!=="error"&&typeof e.on=="function"&&x(e,"error",R);let $=n?.close;if($?.length)for(let l of $)x(e,l,L);let re=r?P(r,ie):null;return te;function ie(){R(new w(void 0,{cause:r?.reason}))}function D(l){u.isEmpty()?(p++,!a&&p>i&&(a=!0,e.pause?.()),s.push(l)):u.shift().resolve(F(l,!1))}function R(l){u.isEmpty()?c=l:u.shift().reject(l),L()}function L(){re?.[Symbol.dispose](),ne(),m=!0;let l=F(void 0,!0);for(;!u.isEmpty();)u.shift().resolve(l);return Promise.resolve(l)}},B=async function(e,t,n={}){let r=n?.signal;if(r?.aborted)throw new w(void 0,{cause:r?.reason});return new Promise((i,o)=>{let s=m=>{typeof e.removeListener=="function"&&e.removeListener(t,u),r!=null&&g(r,"abort",c),o(m)},u=(...m)=>{typeof e.removeListener=="function"&&e.removeListener("error",s),r!=null&&g(r,"abort",c),i(m)},a={__proto__:null,once:!0,[k]:!0};W(e,t,u,a),t!=="error"&&typeof e.once=="function"&&e.once("error",s);function c(){g(e,t,u),g(e,"error",s),o(new w(void 0,{cause:r?.reason}))}r!=null&&W(r,"abort",c,{__proto__:null,once:!0,[k]:!0})})},P=function(e,t){if(e===void 0)throw new f("signal","AbortSignal",e);let n;return e.aborted?queueMicrotask(()=>t()):(e.addEventListener("abort",t,{__proto__:null,once:!0,[k]:!0}),n=()=>{e.removeEventListener("abort",t)}),{__proto__:null,[Symbol.dispose](){n?.()}}},G=function(e,t){if(typeof e.listeners=="function")return e.listeners(t);if(Q(e)){let n=e[kEvents].get(t),r=[],i=n?.next;for(;i?.listener!==void 0;){let o=i.listener?.deref?i.listener.deref():i.listener;r.push(o),i=i.next}return r}throw new f("emitter",["EventEmitter","EventTarget"],e)},U=function(e){if(typeof e?.getMaxListeners=="function")return T(e);if(e?.[b])return e[b];throw new f("emitter",["EventEmitter","EventTarget"],e)},X=2048,O=X-1,H=class{bottom;top;list;next;constructor(){this.bottom=0,this.top=0,this.list=new Array(X),this.next=null}isEmpty(){return this.top===this.bottom}isFull(){return(this.top+1&O)===this.bottom}push(e){this.list[this.top]=e,this.top=this.top+1&O}shift(){let e=this.list[this.bottom];return e===void 0?null:(this.list[this.bottom]=void 0,this.bottom=this.bottom+1&O,e)}},J=class{head;tail;constructor(){this.head=this.tail=new H}isEmpty(){return this.head.isEmpty()}push(e){this.head.isFull()&&(this.head=this.head.next=new H),this.head.push(e)}shift(){let e=this.tail,t=e.shift();return e.isEmpty()&&e.next!==null&&(this.tail=e.next,e.next=null),t}};function Q(e){return typeof e?.addEventListener=="function"}function V(e,t,n,r){if(e[h])try{let i=t.then;typeof i=="function"&&i.call(t,void 0,function(o){setTimeout(pe,0,e,o,n,r)})}catch(i){e.emit("error",i)}}function pe(e,t,n,r){if(typeof e[M]=="function")e[M](t,n,...r);else{let i=e[h];try{e[h]=!1,e.emit("error",t)}finally{e[h]=i}}}function T(e){return e._maxListeners===void 0?d:e._maxListeners}function de(e,t){let n="";try{let{name:o}=this.constructor;o!=="EventEmitter"&&(n=` on ${o} instance`)}catch{}let r=`\nEmitted \'error\' event${n} at:\n`,i=(t.stack||"").split(`\n`).slice(1);return e.stack+r+i.join(`\n`)}function Y(e,t,n,r){let i,o,s;if(o=e._events,o===void 0?(o=e._events={__proto__:null},e._eventsCount=0):(o.newListener!==void 0&&(e.emit("newListener",t,n.listener??n),o=e._events),s=o[t]),s===void 0)o[t]=n,++e._eventsCount;else if(typeof s=="function"?s=o[t]=r?[n,s]:[s,n]:r?s.unshift(n):s.push(n),i=T(e),i>0&&s.length>i&&!s.warned){s.warned=!0;let u=new ce(`Possible EventEmitter memory leak detected. ${s.length} ${String(t)} listeners added to ${N(e,{depth:-1})}. MaxListeners is ${i}. Use emitter.setMaxListeners() to increase limit`,{name:"MaxListenersExceededWarning",emitter:e,type:t,count:s.length});console.warn(u)}return e}function ye(){if(!this.fired)return this.target.removeListener(this.type,this.wrapFn),this.fired=!0,arguments.length===0?this.listener.call(this.target):this.listener.apply(this.target,arguments)}function Z(e,t,n){let r={fired:!1,wrapFn:void 0,target:e,type:t,listener:n},i=ye.bind(r);return i.listener=n,r.wrapFn=i,i}function ee(e,t,n){let r=e._events;if(r===void 0)return[];let i=r[t];return i===void 0?[]:typeof i=="function"?n?[i.listener||i]:[i]:n?Ee(i):I(i)}function I(e){switch(e.length){case 2:return[e[0],e[1]];case 3:return[e[0],e[1],e[2]];case 4:return[e[0],e[1],e[2],e[3]];case 5:return[e[0],e[1],e[2],e[3],e[4]];case 6:return[e[0],e[1],e[2],e[3],e[4],e[5]]}return Array.prototype.slice.call(e)}function Ee(e){let t=I(e);for(let n=0;n<t.length;++n){let r=t[n].listener;typeof r=="function"&&(t[n]=r)}return t}function F(e,t){return{value:e,done:t}}function g(e,t,n,r){if(typeof e.removeListener=="function")e.removeListener(t,n);else if(typeof e.removeEventListener=="function")e.removeEventListener(t,n,r);else throw new f("emitter","EventEmitter",e)}function W(e,t,n,r){if(typeof e.on=="function")r?.once?e.once(t,n):e.on(t,n);else if(typeof e.addEventListener=="function")e.addEventListener(t,n,r);else throw new f("emitter","EventEmitter",e)}function ge(){let e=[];return{addEventListener(t,n,r,i){W(t,n,r,i),Array.prototype.push(e,[t,n,r,i])},removeAll(){for(;e.length>0;)Reflect.apply(g,void 0,e.pop())}}}function _e(e,t){for(;t+1<e.length;t++)e[t]=e[t+1];e.pop()}var Le=!1,we=Symbol.for("nodejs.rejection"),be=!1,xe=Symbol.for("events.errorMonitor"),Re=10,Ae=A("node:events.setMaxListeners"),Me=A("node:events.listenerCount"),Se=A("node:events.init"),je=C;export{C as EventEmitter,q as EventEmitterAsyncResource,P as addAbortListener,we as captureRejectionSymbol,be as captureRejections,je as default,Re as defaultMaxListeners,xe as errorMonitor,G as getEventListeners,U as getMaxListeners,Se as init,Me as listenerCount,z as on,B as once,Ae as setMaxListeners,Le as usingDomains};\n',mimeType:"application/javascript"},"/node/async_hooks.mjs":{content:'var A=class{__unenv__=!0;_currentStore;_enterStore;_enabled=!0;getStore(){return this._currentStore??this._enterStore}disable(){this._enabled=!1}enable(){this._enabled=!0}enterWith(e){this._enterStore=e}run(e,t,...r){this._currentStore=e;let n=t(...r);return this._currentStore=void 0,n}exit(e,...t){let r=this._currentStore;this._currentStore=void 0;let n=e(...t);return this._currentStore=r,n}static snapshot(){throw new Error("[unenv] `AsyncLocalStorage.snapshot` is not implemented!")}},c=globalThis.AsyncLocalStorage||A,i=Symbol("init"),T=Symbol("before"),P=Symbol("after"),u=Symbol("destroy"),I=Symbol("promiseResolve"),l=class{__unenv__=!0;_enabled=!1;_callbacks={};constructor(e={}){this._callbacks=e}enable(){return this._enabled=!0,this}disable(){return this._enabled=!1,this}get[i](){return this._callbacks.init}get[T](){return this._callbacks.before}get[P](){return this._callbacks.after}get[u](){return this._callbacks.destroy}get[I](){return this._callbacks.promiseResolve}},S=function(e){return new l(e)},s=function(){return 0},R=function(){return Object.create(null)},o=function(){return 0},a=Object.assign(Object.create(null),{NONE:0,DIRHANDLE:1,DNSCHANNEL:2,ELDHISTOGRAM:3,FILEHANDLE:4,FILEHANDLECLOSEREQ:5,BLOBREADER:6,FSEVENTWRAP:7,FSREQCALLBACK:8,FSREQPROMISE:9,GETADDRINFOREQWRAP:10,GETNAMEINFOREQWRAP:11,HEAPSNAPSHOT:12,HTTP2SESSION:13,HTTP2STREAM:14,HTTP2PING:15,HTTP2SETTINGS:16,HTTPINCOMINGMESSAGE:17,HTTPCLIENTREQUEST:18,JSSTREAM:19,JSUDPWRAP:20,MESSAGEPORT:21,PIPECONNECTWRAP:22,PIPESERVERWRAP:23,PIPEWRAP:24,PROCESSWRAP:25,PROMISE:26,QUERYWRAP:27,QUIC_ENDPOINT:28,QUIC_LOGSTREAM:29,QUIC_PACKET:30,QUIC_SESSION:31,QUIC_STREAM:32,QUIC_UDP:33,SHUTDOWNWRAP:34,SIGNALWRAP:35,STATWATCHER:36,STREAMPIPE:37,TCPCONNECTWRAP:38,TCPSERVERWRAP:39,TCPWRAP:40,TTYWRAP:41,UDPSENDWRAP:42,UDPWRAP:43,SIGINTWATCHDOG:44,WORKER:45,WORKERHEAPSNAPSHOT:46,WRITEWRAP:47,ZLIB:48,CHECKPRIMEREQUEST:49,PBKDF2REQUEST:50,KEYPAIRGENREQUEST:51,KEYGENREQUEST:52,KEYEXPORTREQUEST:53,CIPHERREQUEST:54,DERIVEBITSREQUEST:55,HASHREQUEST:56,RANDOMBYTESREQUEST:57,RANDOMPRIMEREQUEST:58,SCRYPTREQUEST:59,SIGNREQUEST:60,TLSWRAP:61,VERIFYREQUEST:62}),_=100,y=class{__unenv__=!0;type;_asyncId;_triggerAsyncId;constructor(e,t=s()){this.type=e,this._asyncId=-1*_++,this._triggerAsyncId=typeof t=="number"?t:t?.triggerAsyncId}static bind(e,t,r){return new E(t??"anonymous").bind(e)}bind(e,t){let r=(...n)=>this.runInAsyncScope(e,t,...n);return r.asyncResource=this,r}runInAsyncScope(e,t,...r){return e.apply(t,r)}emitDestroy(){return this}asyncId(){return this._asyncId}triggerAsyncId(){return this._triggerAsyncId}},E=globalThis.AsyncResource||y,N={asyncWrapProviders:a,AsyncLocalStorage:c,AsyncResource:E,createHook:S,executionAsyncId:s,executionAsyncResource:R,triggerAsyncId:o};export{c as AsyncLocalStorage,E as AsyncResource,a as asyncWrapProviders,S as createHook,N as default,s as executionAsyncId,R as executionAsyncResource,o as triggerAsyncId};\n',mimeType:"application/javascript"},"/style.css":{content:`@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--un-bg-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial}}@property --un-bg-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}@property --un-translate-x{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-y{syntax:"*";inherits:false;initial-value:0;}@property --un-translate-z{syntax:"*";inherits:false;initial-value:0;}:root,:host{--spacing: .25rem;--font-icon-family: lucide;--font-family: Manrope;--icon-family: lucide;--color-primary: hsl(179 85% 53%);--color-secondary: hsl(6 90% 64%);--color-accent: hsl(6 90% 64%);--color-surface: hsl(100 35% 80%);--color-text: hsl(183 80% 34%);--color-danger: hsl(0 90% 65%);--color-border: #000000;--color-border-subtle: #5c5050;--colors-black: #000;--colors-white: #fff;--colors-slate-50: oklch(98.4% .003 247.858);--colors-slate-100: oklch(96.8% .007 247.896);--colors-slate-200: oklch(92.9% .013 255.508);--colors-slate-300: oklch(86.9% .022 252.894);--colors-slate-400: oklch(70.4% .04 256.788);--colors-slate-500: oklch(55.4% .046 257.417);--colors-slate-600: oklch(44.6% .043 257.281);--colors-slate-700: oklch(37.2% .044 257.287);--colors-slate-800: oklch(27.9% .041 260.031);--colors-slate-900: oklch(20.8% .042 265.755);--colors-slate-950: oklch(12.9% .042 264.695);--colors-slate-DEFAULT: oklch(70.4% .04 256.788);--colors-gray-50: oklch(98.5% .002 247.839);--colors-gray-100: oklch(96.7% .003 264.542);--colors-gray-200: oklch(92.8% .006 264.531);--colors-gray-300: oklch(87.2% .01 258.338);--colors-gray-400: oklch(70.7% .022 261.325);--colors-gray-500: oklch(55.1% .027 264.364);--colors-gray-600: oklch(44.6% .03 256.802);--colors-gray-700: oklch(37.3% .034 259.733);--colors-gray-800: oklch(27.8% .033 256.848);--colors-gray-900: oklch(21% .034 264.665);--colors-gray-950: oklch(13% .028 261.692);--colors-gray-DEFAULT: oklch(70.7% .022 261.325);--colors-zinc-50: oklch(98.5% 0 0);--colors-zinc-100: oklch(96.7% .001 286.375);--colors-zinc-200: oklch(92% .004 286.32);--colors-zinc-300: oklch(87.1% .006 286.286);--colors-zinc-400: oklch(70.5% .015 286.067);--colors-zinc-500: oklch(55.2% .016 285.938);--colors-zinc-600: oklch(44.2% .017 285.786);--colors-zinc-700: oklch(37% .013 285.805);--colors-zinc-800: oklch(27.4% .006 286.033);--colors-zinc-900: oklch(21% .006 285.885);--colors-zinc-950: oklch(14.1% .005 285.823);--colors-zinc-DEFAULT: oklch(70.5% .015 286.067);--colors-neutral-50: oklch(98.5% 0 0);--colors-neutral-100: oklch(97% 0 0);--colors-neutral-200: oklch(92.2% 0 0);--colors-neutral-300: oklch(87% 0 0);--colors-neutral-400: oklch(70.8% 0 0);--colors-neutral-500: oklch(55.6% 0 0);--colors-neutral-600: oklch(43.9% 0 0);--colors-neutral-700: oklch(37.1% 0 0);--colors-neutral-800: oklch(26.9% 0 0);--colors-neutral-900: oklch(20.5% 0 0);--colors-neutral-950: oklch(14.5% 0 0);--colors-neutral-DEFAULT: oklch(70.8% 0 0);--colors-stone-50: oklch(98.5% .001 106.423);--colors-stone-100: oklch(97% .001 106.424);--colors-stone-200: oklch(92.3% .003 48.717);--colors-stone-300: oklch(86.9% .005 56.366);--colors-stone-400: oklch(70.9% .01 56.259);--colors-stone-500: oklch(55.3% .013 58.071);--colors-stone-600: oklch(44.4% .011 73.639);--colors-stone-700: oklch(37.4% .01 67.558);--colors-stone-800: oklch(26.8% .007 34.298);--colors-stone-900: oklch(21.6% .006 56.043);--colors-stone-950: oklch(14.7% .004 49.25);--colors-stone-DEFAULT: oklch(70.9% .01 56.259);--colors-red-50: oklch(97.1% .013 17.38);--colors-red-100: oklch(93.6% .032 17.717);--colors-red-200: oklch(88.5% .062 18.334);--colors-red-300: oklch(80.8% .114 19.571);--colors-red-400: oklch(70.4% .191 22.216);--colors-red-500: oklch(63.7% .237 25.331);--colors-red-600: oklch(57.7% .245 27.325);--colors-red-700: oklch(50.5% .213 27.518);--colors-red-800: oklch(44.4% .177 26.899);--colors-red-900: oklch(39.6% .141 25.723);--colors-red-950: oklch(25.8% .092 26.042);--colors-red-DEFAULT: oklch(70.4% .191 22.216);--colors-orange-50: oklch(98% .016 73.684);--colors-orange-100: oklch(95.4% .038 75.164);--colors-orange-200: oklch(90.1% .076 70.697);--colors-orange-300: oklch(83.7% .128 66.29);--colors-orange-400: oklch(75% .183 55.934);--colors-orange-500: oklch(70.5% .213 47.604);--colors-orange-600: oklch(64.6% .222 41.116);--colors-orange-700: oklch(55.3% .195 38.402);--colors-orange-800: oklch(47% .157 37.304);--colors-orange-900: oklch(40.8% .123 38.172);--colors-orange-950: oklch(26.6% .079 36.259);--colors-orange-DEFAULT: oklch(75% .183 55.934);--colors-amber-50: oklch(98.7% .022 95.277);--colors-amber-100: oklch(96.2% .059 95.617);--colors-amber-200: oklch(92.4% .12 95.746);--colors-amber-300: oklch(87.9% .169 91.605);--colors-amber-400: oklch(82.8% .189 84.429);--colors-amber-500: oklch(76.9% .188 70.08);--colors-amber-600: oklch(66.6% .179 58.318);--colors-amber-700: oklch(55.5% .163 48.998);--colors-amber-800: oklch(47.3% .137 46.201);--colors-amber-900: oklch(41.4% .112 45.904);--colors-amber-950: oklch(27.9% .077 45.635);--colors-amber-DEFAULT: oklch(82.8% .189 84.429);--colors-yellow-50: oklch(98.7% .026 102.212);--colors-yellow-100: oklch(97.3% .071 103.193);--colors-yellow-200: oklch(94.5% .129 101.54);--colors-yellow-300: oklch(90.5% .182 98.111);--colors-yellow-400: oklch(85.2% .199 91.936);--colors-yellow-500: oklch(79.5% .184 86.047);--colors-yellow-600: oklch(68.1% .162 75.834);--colors-yellow-700: oklch(55.4% .135 66.442);--colors-yellow-800: oklch(47.6% .114 61.907);--colors-yellow-900: oklch(42.1% .095 57.708);--colors-yellow-950: oklch(28.6% .066 53.813);--colors-yellow-DEFAULT: oklch(85.2% .199 91.936);--colors-lime-50: oklch(98.6% .031 120.757);--colors-lime-100: oklch(96.7% .067 122.328);--colors-lime-200: oklch(93.8% .127 124.321);--colors-lime-300: oklch(89.7% .196 126.665);--colors-lime-400: oklch(84.1% .238 128.85);--colors-lime-500: oklch(76.8% .233 130.85);--colors-lime-600: oklch(64.8% .2 131.684);--colors-lime-700: oklch(53.2% .157 131.589);--colors-lime-800: oklch(45.3% .124 130.933);--colors-lime-900: oklch(40.5% .101 131.063);--colors-lime-950: oklch(27.4% .072 132.109);--colors-lime-DEFAULT: oklch(84.1% .238 128.85);--colors-green-50: oklch(98.2% .018 155.826);--colors-green-100: oklch(96.2% .044 156.743);--colors-green-200: oklch(92.5% .084 155.995);--colors-green-300: oklch(87.1% .15 154.449);--colors-green-400: oklch(79.2% .209 151.711);--colors-green-500: oklch(72.3% .219 149.579);--colors-green-600: oklch(62.7% .194 149.214);--colors-green-700: oklch(52.7% .154 150.069);--colors-green-800: oklch(44.8% .119 151.328);--colors-green-900: oklch(39.3% .095 152.535);--colors-green-950: oklch(26.6% .065 152.934);--colors-green-DEFAULT: oklch(79.2% .209 151.711);--colors-emerald-50: oklch(97.9% .021 166.113);--colors-emerald-100: oklch(95% .052 163.051);--colors-emerald-200: oklch(90.5% .093 164.15);--colors-emerald-300: oklch(84.5% .143 164.978);--colors-emerald-400: oklch(76.5% .177 163.223);--colors-emerald-500: oklch(69.6% .17 162.48);--colors-emerald-600: oklch(59.6% .145 163.225);--colors-emerald-700: oklch(50.8% .118 165.612);--colors-emerald-800: oklch(43.2% .095 166.913);--colors-emerald-900: oklch(37.8% .077 168.94);--colors-emerald-950: oklch(26.2% .051 172.552);--colors-emerald-DEFAULT: oklch(76.5% .177 163.223);--colors-teal-50: oklch(98.4% .014 180.72);--colors-teal-100: oklch(95.3% .051 180.801);--colors-teal-200: oklch(91% .096 180.426);--colors-teal-300: oklch(85.5% .138 181.071);--colors-teal-400: oklch(77.7% .152 181.912);--colors-teal-500: oklch(70.4% .14 182.503);--colors-teal-600: oklch(60% .118 184.704);--colors-teal-700: oklch(51.1% .096 186.391);--colors-teal-800: oklch(43.7% .078 188.216);--colors-teal-900: oklch(38.6% .063 188.416);--colors-teal-950: oklch(27.7% .046 192.524);--colors-teal-DEFAULT: oklch(77.7% .152 181.912);--colors-cyan-50: oklch(98.4% .019 200.873);--colors-cyan-100: oklch(95.6% .045 203.388);--colors-cyan-200: oklch(91.7% .08 205.041);--colors-cyan-300: oklch(86.5% .127 207.078);--colors-cyan-400: oklch(78.9% .154 211.53);--colors-cyan-500: oklch(71.5% .143 215.221);--colors-cyan-600: oklch(60.9% .126 221.723);--colors-cyan-700: oklch(52% .105 223.128);--colors-cyan-800: oklch(45% .085 224.283);--colors-cyan-900: oklch(39.8% .07 227.392);--colors-cyan-950: oklch(30.2% .056 229.695);--colors-cyan-DEFAULT: oklch(78.9% .154 211.53);--colors-sky-50: oklch(97.7% .013 236.62);--colors-sky-100: oklch(95.1% .026 236.824);--colors-sky-200: oklch(90.1% .058 230.902);--colors-sky-300: oklch(82.8% .111 230.318);--colors-sky-400: oklch(74.6% .16 232.661);--colors-sky-500: oklch(68.5% .169 237.323);--colors-sky-600: oklch(58.8% .158 241.966);--colors-sky-700: oklch(50% .134 242.749);--colors-sky-800: oklch(44.3% .11 240.79);--colors-sky-900: oklch(39.1% .09 240.876);--colors-sky-950: oklch(29.3% .066 243.157);--colors-sky-DEFAULT: oklch(74.6% .16 232.661);--colors-blue-50: oklch(97% .014 254.604);--colors-blue-100: oklch(93.2% .032 255.585);--colors-blue-200: oklch(88.2% .059 254.128);--colors-blue-300: oklch(80.9% .105 251.813);--colors-blue-400: oklch(70.7% .165 254.624);--colors-blue-500: oklch(62.3% .214 259.815);--colors-blue-600: oklch(54.6% .245 262.881);--colors-blue-700: oklch(48.8% .243 264.376);--colors-blue-800: oklch(42.4% .199 265.638);--colors-blue-900: oklch(37.9% .146 265.522);--colors-blue-950: oklch(28.2% .091 267.935);--colors-blue-DEFAULT: oklch(70.7% .165 254.624);--colors-indigo-50: oklch(96.2% .018 272.314);--colors-indigo-100: oklch(93% .034 272.788);--colors-indigo-200: oklch(87% .065 274.039);--colors-indigo-300: oklch(78.5% .115 274.713);--colors-indigo-400: oklch(67.3% .182 276.935);--colors-indigo-500: oklch(58.5% .233 277.117);--colors-indigo-600: oklch(51.1% .262 276.966);--colors-indigo-700: oklch(45.7% .24 277.023);--colors-indigo-800: oklch(39.8% .195 277.366);--colors-indigo-900: oklch(35.9% .144 278.697);--colors-indigo-950: oklch(25.7% .09 281.288);--colors-indigo-DEFAULT: oklch(67.3% .182 276.935);--colors-violet-50: oklch(96.9% .016 293.756);--colors-violet-100: oklch(94.3% .029 294.588);--colors-violet-200: oklch(89.4% .057 293.283);--colors-violet-300: oklch(81.1% .111 293.571);--colors-violet-400: oklch(70.2% .183 293.541);--colors-violet-500: oklch(60.6% .25 292.717);--colors-violet-600: oklch(54.1% .281 293.009);--colors-violet-700: oklch(49.1% .27 292.581);--colors-violet-800: oklch(43.2% .232 292.759);--colors-violet-900: oklch(38% .189 293.745);--colors-violet-950: oklch(28.3% .141 291.089);--colors-violet-DEFAULT: oklch(70.2% .183 293.541);--colors-purple-50: oklch(97.7% .014 308.299);--colors-purple-100: oklch(94.6% .033 307.174);--colors-purple-200: oklch(90.2% .063 306.703);--colors-purple-300: oklch(82.7% .119 306.383);--colors-purple-400: oklch(71.4% .203 305.504);--colors-purple-500: oklch(62.7% .265 303.9);--colors-purple-600: oklch(55.8% .288 302.321);--colors-purple-700: oklch(49.6% .265 301.924);--colors-purple-800: oklch(43.8% .218 303.724);--colors-purple-900: oklch(38.1% .176 304.987);--colors-purple-950: oklch(29.1% .149 302.717);--colors-purple-DEFAULT: oklch(71.4% .203 305.504);--colors-fuchsia-50: oklch(97.7% .017 320.058);--colors-fuchsia-100: oklch(95.2% .037 318.852);--colors-fuchsia-200: oklch(90.3% .076 319.62);--colors-fuchsia-300: oklch(83.3% .145 321.434);--colors-fuchsia-400: oklch(74% .238 322.16);--colors-fuchsia-500: oklch(66.7% .295 322.15);--colors-fuchsia-600: oklch(59.1% .293 322.896);--colors-fuchsia-700: oklch(51.8% .253 323.949);--colors-fuchsia-800: oklch(45.2% .211 324.591);--colors-fuchsia-900: oklch(40.1% .17 325.612);--colors-fuchsia-950: oklch(29.3% .136 325.661);--colors-fuchsia-DEFAULT: oklch(74% .238 322.16);--colors-pink-50: oklch(97.1% .014 343.198);--colors-pink-100: oklch(94.8% .028 342.258);--colors-pink-200: oklch(89.9% .061 343.231);--colors-pink-300: oklch(82.3% .12 346.018);--colors-pink-400: oklch(71.8% .202 349.761);--colors-pink-500: oklch(65.6% .241 354.308);--colors-pink-600: oklch(59.2% .249 .584);--colors-pink-700: oklch(52.5% .223 3.958);--colors-pink-800: oklch(45.9% .187 3.815);--colors-pink-900: oklch(40.8% .153 2.432);--colors-pink-950: oklch(28.4% .109 3.907);--colors-pink-DEFAULT: oklch(71.8% .202 349.761);--colors-rose-50: oklch(96.9% .015 12.422);--colors-rose-100: oklch(94.1% .03 12.58);--colors-rose-200: oklch(89.2% .058 10.001);--colors-rose-300: oklch(81% .117 11.638);--colors-rose-400: oklch(71.2% .194 13.428);--colors-rose-500: oklch(64.5% .246 16.439);--colors-rose-600: oklch(58.6% .253 17.585);--colors-rose-700: oklch(51.4% .222 16.935);--colors-rose-800: oklch(45.5% .188 13.697);--colors-rose-900: oklch(41% .159 10.272);--colors-rose-950: oklch(27.1% .105 12.094);--colors-rose-DEFAULT: oklch(71.2% .194 13.428);--colors-light-50: oklch(99.4% 0 0);--colors-light-100: oklch(99.11% 0 0);--colors-light-200: oklch(98.51% 0 0);--colors-light-300: oklch(98.16% .0017 247.84);--colors-light-400: oklch(97.31% 0 0);--colors-light-500: oklch(96.12% 0 0);--colors-light-600: oklch(96.32% .0034 247.86);--colors-light-700: oklch(94.17% .0052 247.88);--colors-light-800: oklch(91.09% .007 247.9);--colors-light-900: oklch(90.72% .0051 228.82);--colors-light-950: oklch(89.23% .006 239.83);--colors-light-DEFAULT: oklch(97.31% 0 0);--colors-dark-50: oklch(40.91% 0 0);--colors-dark-100: oklch(35.62% 0 0);--colors-dark-200: oklch(31.71% 0 0);--colors-dark-300: oklch(29.72% 0 0);--colors-dark-400: oklch(25.2% 0 0);--colors-dark-500: oklch(23.93% 0 0);--colors-dark-600: oklch(22.73% .0038 286.09);--colors-dark-700: oklch(22.21% 0 0);--colors-dark-800: oklch(20.9% 0 0);--colors-dark-900: oklch(16.84% 0 0);--colors-dark-950: oklch(13.44% 0 0);--colors-dark-DEFAULT: oklch(25.2% 0 0);--colors-default: var(--text-color);--colors-muted: var(--text-muted);--colors-inverted: var(--color-inverse);--colors-surface-DEFAULT: var(--color-surface);--colors-surface-lighter: var(--color-surface-lighter);--colors-surface-light: var(--color-surface-light);--colors-surface-dark: var(--color-surface-dark);--colors-surface-darker: var(--color-surface-darker);--colors-accent-DEFAULT: var(--color-accent);--colors-accent-lighter: var(--color-accent-lighter);--colors-accent-light: var(--color-accent-light);--colors-accent-dark: var(--color-accent-dark);--colors-accent-darker: var(--color-accent-darker);--colors-inverse-DEFAULT: var(--color-inverse);--colors-inverse-lighter: var(--color-inverse-lighter);--colors-inverse-light: var(--color-inverse-light);--colors-inverse-dark: var(--color-inverse-dark);--colors-inverse-darker: var(--color-inverse-darker);--colors-primary-DEFAULT: var(--color-primary);--colors-primary-lighter: var(--color-primary-lighter);--colors-primary-light: var(--color-primary-light);--colors-primary-dark: var(--color-primary-dark);--colors-primary-darker: var(--color-primary-darker);--colors-secondary-DEFAULT: var(--color-secondary);--colors-secondary-lighter: var(--color-secondary-lighter);--colors-secondary-light: var(--color-secondary-light);--colors-secondary-dark: var(--color-secondary-dark);--colors-secondary-darker: var(--color-secondary-darker);--colors-success-DEFAULT: var(--color-success);--colors-success-lighter: var(--color-success-lighter);--colors-success-light: var(--color-success-light);--colors-success-dark: var(--color-success-dark);--colors-success-darker: var(--color-success-darker);--colors-danger-DEFAULT: var(--color-danger);--colors-danger-lighter: var(--color-danger-lighter);--colors-danger-light: var(--color-danger-light);--colors-danger-dark: var(--color-danger-dark);--colors-danger-darker: var(--color-danger-darker);--colors-warning-DEFAULT: var(--color-warning);--colors-warning-lighter: var(--color-warning-lighter);--colors-warning-light: var(--color-warning-light);--colors-warning-dark: var(--color-warning-dark);--colors-warning-darker: var(--color-warning-darker);--colors-info-DEFAULT: var(--color-info);--colors-info-lighter: var(--color-info-lighter);--colors-info-light: var(--color-info-light);--colors-info-dark: var(--color-info-dark);--colors-info-darker: var(--color-info-darker);--colors-hover: var(--color-hover);--colors-focus: var(--color-focus);--text-xs-fontSize: .75rem;--text-xs-lineHeight: 1rem;--text-sm-fontSize: .875rem;--text-sm-lineHeight: 1.25rem;--text-base-fontSize: 1rem;--text-base-lineHeight: 1.5rem;--text-lg-fontSize: 1.125rem;--text-lg-lineHeight: 1.75rem;--text-xl-fontSize: 1.25rem;--text-xl-lineHeight: 1.75rem;--text-2xl-fontSize: 1.5rem;--text-2xl-lineHeight: 2rem;--text-3xl-fontSize: 1.875rem;--text-3xl-lineHeight: 2.25rem;--text-4xl-fontSize: 2.25rem;--text-4xl-lineHeight: 2.5rem;--text-5xl-fontSize: 3rem;--text-5xl-lineHeight: 1;--text-6xl-fontSize: 3.75rem;--text-6xl-lineHeight: 1;--text-7xl-fontSize: 4.5rem;--text-7xl-lineHeight: 1;--text-8xl-fontSize: 6rem;--text-8xl-lineHeight: 1;--text-9xl-fontSize: 8rem;--text-9xl-lineHeight: 1;--fontWeight-thin: 100;--fontWeight-extralight: 200;--fontWeight-light: 300;--fontWeight-normal: 400;--fontWeight-medium: 500;--fontWeight-semibold: 600;--fontWeight-bold: 700;--fontWeight-extrabold: 800;--fontWeight-black: 900;--tracking-tighter: -.05em;--tracking-tight: -.025em;--tracking-normal: 0em;--tracking-wide: .025em;--tracking-wider: .05em;--tracking-widest: .1em;--leading-none: 1;--leading-tight: 1.25;--leading-snug: 1.375;--leading-normal: 1.5;--leading-relaxed: 1.625;--leading-loose: 2;--textStrokeWidth-DEFAULT: 1.5rem;--textStrokeWidth-none: 0;--textStrokeWidth-sm: thin;--textStrokeWidth-md: medium;--textStrokeWidth-lg: thick;--radius-DEFAULT: .25rem;--radius-none: 0;--radius-xs: .125rem;--radius-sm: .25rem;--radius-md: .375rem;--radius-lg: .5rem;--radius-xl: .75rem;--radius-2xl: 1rem;--radius-3xl: 1.5rem;--radius-4xl: 2rem;--ease-linear: linear;--ease-in: cubic-bezier(.4, 0, 1, 1);--ease-out: cubic-bezier(0, 0, .2, 1);--ease-in-out: cubic-bezier(.4, 0, .2, 1);--ease-DEFAULT: cubic-bezier(.4, 0, .2, 1);--blur-DEFAULT: 8px;--blur-xs: 4px;--blur-sm: 8px;--blur-md: 12px;--blur-lg: 16px;--blur-xl: 24px;--blur-2xl: 40px;--blur-3xl: 64px;--perspective-dramatic: 100px;--perspective-near: 300px;--perspective-normal: 500px;--perspective-midrange: 800px;--perspective-distant: 1200px;--default-transition-duration: .15s;--default-transition-timingFunction: cubic-bezier(.4, 0, .2, 1);--default-font-family: var(--font-sans);--default-font-featureSettings: var(--font-sans--font-feature-settings);--default-font-variationSettings: var(--font-sans--font-variation-settings);--default-monoFont-family: var(--font-mono);--default-monoFont-featureSettings: var(--font-mono--font-feature-settings);--default-monoFont-variationSettings: var(--font-mono--font-variation-settings);--container-3xs: 16rem;--container-2xs: 18rem;--container-xs: 20rem;--container-sm: 24rem;--container-md: 28rem;--container-lg: 32rem;--container-xl: 36rem;--container-2xl: 42rem;--container-3xl: 48rem;--container-4xl: 56rem;--container-5xl: 64rem;--container-6xl: 72rem;--container-7xl: 80rem;--container-prose: 65ch;--textColor-DEFAULT: var(--text-color);--backgroundColor-DEFAULT: var(--background-color)}*,:after,:before,::backdrop,::file-selector-button{box-sizing:border-box;margin:0;padding:0;border:0 solid}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:var( --default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" );font-feature-settings:var(--default-font-featureSettings, normal);font-variation-settings:var(--default-font-variationSettings, normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var( --default-monoFont-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace );font-feature-settings:var(--default-monoFont-featureSettings, normal);font-variation-settings:var(--default-monoFont-variationSettings, normal);font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea,::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;border-radius:0;background-color:transparent;opacity:1}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit,::-webkit-datetime-edit-year-field,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute-field,::-webkit-datetime-edit-second-field,::-webkit-datetime-edit-millisecond-field,::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]),::file-selector-button{appearance:button}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}.container{width:100%}@media (min-width: 40rem){.container{max-width:40rem}}@media (min-width: 48rem){.container{max-width:48rem}}@media (min-width: 64rem){.container{max-width:64rem}}@media (min-width: 80rem){.container{max-width:80rem}}@media (min-width: 96rem){.container{max-width:96rem}}.text-sm{font-size:var(--text-sm-fontSize);line-height:var(--un-leading, var(--text-sm-lineHeight))}.tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4}.m15{margin:calc(var(--spacing) * 15)}.m15\\.5{margin:calc(var(--spacing) * 15.5)}.m3\\.3{margin:calc(var(--spacing) * 3.3)}.m6{margin:calc(var(--spacing) * 6)}.m7\\.5{margin:calc(var(--spacing) * 7.5)}.m9{margin:calc(var(--spacing) * 9)}.ml-auto{margin-left:auto}.mr-3{margin-right:calc(var(--spacing) * 3)}.p-1{padding:calc(var(--spacing) * 1)}.p-2{padding:calc(var(--spacing) * 2)}.text-left{text-align:left}.rounded{border-radius:var(--radius-DEFAULT)}.rounded-full{border-radius:calc(infinity * 1px)}.rounded-md{border-radius:var(--radius-md)}.bg-red-700{background-color:color-mix(in srgb,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in srgb,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in srgb,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in srgb,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}.flex{display:flex}.shrink-0{flex-shrink:0}.flex-grow{flex-grow:1}.gap-2{gap:calc(var(--spacing) * 2)}.h-4{height:calc(var(--spacing) * 4)}.h-5{height:calc(var(--spacing) * 5)}.min-h-screen{min-height:100vh}.w-10{width:calc(var(--spacing) * 10)}.w-4{width:calc(var(--spacing) * 4)}.w-5{width:calc(var(--spacing) * 5)}.w-full{width:100%}.inline{display:inline}.cursor-pointer{cursor:pointer}.translate-x-4{--un-translate-x:calc(var(--spacing) * 4);translate:var(--un-translate-x) var(--un-translate-y)}.transform{transform:var(--un-rotate-x) var(--un-rotate-y) var(--un-rotate-z) var(--un-skew-x) var(--un-skew-y)}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,--un-gradient-from,--un-gradient-via,--un-gradient-to;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--un-ease, var(--default-transition-timingFunction));transition-duration:var(--un-duration, var(--default-transition-duration))}.items-center{align-items:center}@supports (color: color-mix(in lab,red,red)){.bg-red-700{background-color:color-mix(in oklab,var(--colors-red-700) var(--un-bg-opacity),transparent)}.bg-white{background-color:color-mix(in oklab,var(--colors-white) var(--un-bg-opacity),transparent)}.bg-yellow-50{background-color:color-mix(in oklab,var(--colors-yellow-50) var(--un-bg-opacity),transparent)}.hover\\:bg-surface-lighter:hover{background-color:color-mix(in oklab,var(--colors-surface-lighter) var(--un-bg-opacity),transparent)}}admin-layout{display:block;width:100%;height:100vh;overflow:hidden}.admin-wrapper{display:flex;width:100%;height:100%;--admin-header-height: 4rem;--sidebar-header-min-height: var(--admin-header-height);--sidebar-header-padding: 0 1rem;--navbar-height: var(--admin-header-height);--admin-header-border: 3px;--sidebar-header-border-width: var(--admin-header-border);--navbar-border-color: var(--color-border, #e5e7eb);--sidebar-header-background: var(--color-surface-dark, #f3f4f6);--navbar-background: var(--color-surface-dark, #f3f4f6)}.admin-main uix-navbar::part(container){border-bottom-width:var(--admin-header-border)}.admin-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--color-background, #f9fafb)}.admin-content{flex:1;overflow-y:auto;padding:1.5rem}.topbar-right{display:flex;align-items:center;gap:.5rem}.sidebar-brand{display:flex;align-items:center;gap:.75rem}.sidebar-title{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}uix-sidebar[collapsed] .sidebar-title{display:none}@media (max-width: 768px){.admin-content{padding:1rem}}uix-sidebar{display:flex;flex-direction:column;width:var(--sidebar-width, 256px);height:100%;background-color:var(--sidebar-background, var(--color-surface, #ffffff));border-right-width:var(--sidebar-border-width, 1px);border-right-style:solid;border-right-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));box-shadow:var(--sidebar-shadow, none);overflow:hidden;transition:width .3s ease;&[position=right]{border-right:none;border-left-width:var(--sidebar-border-width, 1px);border-left-style:solid;border-left-color:var(--sidebar-border-color, var(--color-border, #e5e7eb))}&[collapsed]{width:var(--sidebar-collapsed-width, 80px)}@media (max-width: 768px){position:fixed;top:0;bottom:0;z-index:1000;transform:translate(-100%);&[position=left]{left:0}&[position=right]{right:0;transform:translate(100%)}&[open]{transform:translate(0)}}@media (min-width: 769px){position:relative;transform:none}}uix-sidebar::part(header){display:flex;align-items:center;justify-content:space-between;padding:var(--sidebar-header-padding, 1rem);background:var(--sidebar-header-background, transparent);border-bottom-width:var(--sidebar-header-border-width, var(--sidebar-border-width, 1px));border-bottom-style:solid;border-bottom-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));min-height:var(--sidebar-header-min-height, auto);flex-shrink:0}uix-sidebar::part(toggle){display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:none;background:var(--sidebar-toggle-background, transparent);color:var(--sidebar-toggle-color, var(--text-muted, #6b7280));cursor:pointer;border-radius:var(--sidebar-toggle-border-radius, .5rem);transition:background-color .2s ease,color .2s ease;flex-shrink:0}uix-sidebar::part(toggle):hover{background-color:var(--sidebar-toggle-hover-background, var(--color-hover, #f5f5f5));color:var(--sidebar-toggle-hover-color, var(--text-color, #1a1a1a))}uix-sidebar::part(content){flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sidebar-content-padding, .5rem 0)}uix-sidebar::part(footer){padding:var(--sidebar-footer-padding, 1rem);background:var(--sidebar-footer-background, transparent);border-top-width:var(--sidebar-footer-border-width, var(--sidebar-border-width, 1px));border-top-style:solid;border-top-color:var(--sidebar-border-color, var(--color-border, #e5e7eb));flex-shrink:0}uix-sidebar::part(footer):empty{display:none}uix-sidebar[collapsed]::part(header){justify-content:center;padding:var(--sidebar-header-padding, 1rem) .5rem}uix-sidebar{&[collapsed]{.sidebar-label,.sidebar-title,.sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap}[slot=header] span:not(.icon),[slot=footer] span:not(.icon){opacity:0;width:0;overflow:hidden}}.sidebar-nav{display:flex;flex-direction:column;gap:var(--sidebar-nav-gap, .25rem);padding:var(--sidebar-nav-padding, 0 .75rem)}.sidebar-nav-item,.sidebar-item{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);text-decoration:none;cursor:pointer;background:transparent;border:none;width:100%;text-align:left;font-size:inherit;font-family:inherit;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}.sidebar-section{padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb))}.sidebar-section-title{padding:var(--sidebar-section-title-padding, .5rem 1rem);font-size:var(--text-xs, .75rem);font-weight:var(--sidebar-section-title-font-weight, 600);text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted, #6b7280)}.sidebar-nested{padding-left:var(--sidebar-nested-indent, 1rem)}.sidebar-nested-item{padding:var(--sidebar-nested-item-padding, .5rem 1rem);font-size:var(--sidebar-nested-item-font-size, .875rem)}}:where(.uix-menu,uix-menu){display:flex;flex-direction:column;list-style:none;margin:0;padding:.25rem 0;box-shadow:var(--menu-shadow, 0 2px 8px rgba(0, 0, 0, .1));&[size=sm]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .375rem .75rem;--menu-item-gap: .5rem}&[size=md]{--menu-item-font-size: var(--text-sm, .875rem);--menu-item-padding: .5rem .75rem;--menu-item-gap: .75rem}&[size=lg]{--menu-item-font-size: var(--text-base, 1rem);--menu-item-padding: .625rem 1rem;--menu-item-gap: 1rem}>li[role=menuitem]{list-style:none;margin:0;padding:0;>a,>button{display:block;width:100%;padding:var(--menu-item-padding, .5rem .75rem);font-size:var(--menu-item-font-size, var(--text-sm, .875rem));color:var(--dropdown-color, var(--text-color, default));text-decoration:none;background-color:transparent;border:none;cursor:pointer;transition:background-color .15s ease,color .15s ease;text-align:left;white-space:nowrap;&:hover{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}&:active{background-color:var(--color-primary, #fabd2f);color:var(--color-inverse, #282828)}}}>li[role=separator]{height:1px;background-color:var(--panel-border, var(--dropdown-separator, #504945));margin:.25rem 0;padding:0}&[variant=bordered]::part(container){border-width:2px}&[variant=compact]{--menu-item-padding: .375rem .5rem}&:not([rounded])::part(container){border-radius:0}&:not([bordered])::part(container){border:none}&[variant=sidebar]{box-shadow:none;background:transparent;padding:var(--sidebar-nav-padding, 0);gap:var(--sidebar-nav-gap, .25rem);>li{list-style:none;margin:0;padding:0;>a,>uix-link,>button{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);width:100%;padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);font-size:var(--menu-item-font-size, inherit);text-decoration:none;background:transparent;border:none;cursor:pointer;text-align:left;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-active-background, #000000);color:var(--sidebar-item-active-color, #ffffff);font-weight:var(--sidebar-item-active-font-weight, 600)}}}>li.divider,>li[role=separator]{height:0;padding-top:var(--sidebar-section-padding, 1rem);margin-top:var(--sidebar-section-margin, .5rem);border-top:1px solid var(--sidebar-border-color, var(--color-border, #e5e7eb));background:none}details{summary{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-item-padding, .75rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-weight:var(--sidebar-item-font-weight, 500);cursor:pointer;list-style:none;transition:background-color .2s ease,color .2s ease;&::-webkit-details-marker{display:none}&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}uix-icon:last-child{margin-left:auto;transition:transform .2s ease}}&[open] summary uix-icon:last-child{transform:rotate(90deg)}>ul{list-style:none;margin:0;padding:0;padding-inline:var(--sidebar-item-padding, .25rem);display:flex;flex-direction:column;gap:var(--sidebar-item-gap, .75rem);>li{>a,>uix-link{display:flex;align-items:center;gap:var(--sidebar-item-gap, .75rem);padding:var(--sidebar-nested-item-padding, .5rem 1rem);border-radius:var(--sidebar-item-border-radius, .5rem);color:var(--sidebar-item-color, var(--text-muted, #6b7280));font-size:var(--sidebar-nested-item-font-size, .875rem);text-decoration:none;transition:background-color .2s ease,color .2s ease;&:hover{background-color:var(--sidebar-item-hover-background, #f5f5f5);color:var(--sidebar-item-hover-color, var(--text-color, #1a1a1a))}&.active,&[aria-current=page]{background-color:var(--sidebar-item-hover-background, #e5e5e5);color:var(--sidebar-item-hover-color, #000000);font-weight:600}}}}}}}:where(.uix-navbar,uix-navbar){display:flex;&::part(container){display:flex;flex-grow:1;background-color:var(--navbar-background, var(--color-surface));border-bottom:1px solid var(--navbar-border-color, var(--color-primary));box-shadow:var(--navbar-shadow, none)}&::part(inner){display:flex;align-items:center;justify-content:space-between;flex:1;min-height:var(--navbar-height, auto);padding:var( --navbar-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );max-width:var(--navbar-max-width, 100%);margin:0 auto;box-sizing:border-box}&::part(brand){display:flex;align-items:center;gap:var(--navbar-brand-gap, .75rem);font-size:var(--navbar-brand-font-size, var(--text-xl, 1.25rem));font-weight:var(--navbar-brand-font-weight, var(--font-bold, 700));color:var(--navbar-brand-color, var(--color-primary))}&::part(toggle){display:none;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;padding:0;border:none;background:none;color:var(--navbar-toggle-color, var(--color-primary));cursor:pointer;border-radius:var(--radius-md);transition:background-color .2s ease;&:hover{background-color:var( --navbar-toggle-hover-background, var(--color-hover) )}}&::part(menu){display:flex;align-items:center;flex:1;gap:var(--navbar-menu-gap, 2rem);flex-direction:var(--flex-direction)}&::part(start),&::part(center),&::part(end){display:flex;align-items:center;gap:var(--navbar-items-gap, 1.5rem)}&::part(center){flex:1;justify-content:center}&::part(end){justify-content:flex-end}&[fixed=top]::part(container){position:fixed;top:0;left:0;right:0;z-index:1000}&[fixed=bottom]::part(container){position:fixed;bottom:0;left:0;right:0;z-index:1000}&[variant=bordered]::part(container){border-bottom-width:2px}&[variant=floating]::part(container){margin:var(--spacing-md, .75rem);border-radius:var(--radius-lg);border:1px solid var(--color-primary);box-shadow:0 2px 8px #0000001a}&[transparent]::part(container){background-color:transparent;border-bottom-color:transparent;box-shadow:none}&[direction=horizontal]::part(start){margin-left:var(--navbar-start-margin, 2rem)}&[direction=vertical]::part(inner){flex-direction:column}@media (max-width: 768px){&::part(toggle){display:flex}&::part(menu){position:fixed;top:calc(var(--navbar-height, 4rem));left:0;right:0;flex-direction:var(--flex-direction);align-items:stretch;background-color:var(--navbar-background, var(--color-surface));border-top:1px solid var(--navbar-border-color, var(--color-primary));padding:var(--spacing-md, .75rem);gap:0;max-height:0;overflow:hidden;transition:max-height .3s ease;&.active{max-height:calc(100vh - var(--navbar-height, 4rem))}}&::part(start),&::part(center),&::part(end){flex-direction:var(--flex-direction);align-items:stretch;gap:.5rem;margin:0}&::part(start){padding-bottom:var(--spacing-md, .75rem);border-bottom:1px solid var(--color-primary)}&::part(center){padding:var(--spacing-md, .75rem) 0;border-bottom:1px solid var(--color-primary)}&::part(end){padding-top:var(--spacing-md, .75rem)}}}:where(.uix-breadcrumbs,uix-breadcrumbs){display:block;.breadcrumbs{padding:0}.breadcrumbs-list{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);list-style:none;margin:0;padding:0;flex-wrap:wrap}.breadcrumbs-item{display:flex;align-items:center;gap:var(--breadcrumbs-gap, .5rem);uix-link{color:var(--breadcrumbs-link-color, var(--text-muted, #6b7280));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-font-weight, var(--font-medium, 500));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal);&:hover{color:var(--breadcrumbs-link-hover-color, var(--color-primary))}}.current{color:var(--breadcrumbs-current-color, var(--text-color));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem));font-weight:var(--breadcrumbs-current-font-weight, var(--font-bold, 700));text-transform:var(--breadcrumbs-text-transform, none);letter-spacing:var(--breadcrumbs-letter-spacing, normal)}.separator{color:var(--breadcrumbs-separator-color, var(--text-muted, #9ca3af));font-size:var(--breadcrumbs-font-size, var(--text-sm, .875rem))}}&[size=sm]{--breadcrumbs-font-size: var(--text-xs, .75rem);--breadcrumbs-gap: .375rem}&[size=md]{--breadcrumbs-font-size: var(--text-sm, .875rem);--breadcrumbs-gap: .5rem}&[size=lg]{--breadcrumbs-font-size: var(--text-base, 1rem);--breadcrumbs-gap: .625rem}}:where(.uix-avatar,uix-avatar){--avatar-size: 2.5rem;--avatar-bg: var(--color-surface-dark, #e5e7eb);--avatar-color: var(--text-muted, #6b7280);--avatar-radius: 50%;--status-size: .75rem;position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--avatar-size);height:var(--avatar-size);border-radius:var(--avatar-radius);background-color:var(--avatar-bg);color:var(--avatar-color);overflow:hidden;flex-shrink:0;&[size=xs]{--avatar-size: 1.5rem;--status-size: .5rem}&[size=sm]{--avatar-size: 2rem;--status-size: .625rem}&[size=md]{--avatar-size: 2.5rem;--status-size: .75rem}&[size=lg]{--avatar-size: 3.5rem;--status-size: 1rem}&[size=xl]{--avatar-size: 5rem;--status-size: 1.25rem}&[shape=circle]{--avatar-radius: 50%}&[shape=square]{--avatar-radius: 0}&[shape=rounded]{--avatar-radius: var(--radius-md, .375rem)}img{width:100%;height:100%;object-fit:cover}.initials{font-size:calc(var(--avatar-size) / 2.5);font-weight:600;line-height:1;text-transform:uppercase;user-select:none}uix-icon{font-size:calc(var(--avatar-size) / 1.8)}.status{position:absolute;bottom:0;right:0;width:var(--status-size);height:var(--status-size);border-radius:50%;border:2px solid var(--color-surface, #fff);box-sizing:border-box}.status--online{background-color:var(--color-success, #22c55e)}.status--offline{background-color:var(--color-muted, #9ca3af)}.status--busy{background-color:var(--color-danger, #ef4444)}.status--away{background-color:var(--color-warning, #f59e0b)}}:where(.uix-link,uix-link){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, center);width:var(--link-width, auto);flex-direction:var(--link-direction, row);gap:var(--link-gap, var(--spacing-xs, .25rem));box-sizing:border-box;font-family:inherit;font-size:var(--link-font-size, var(--text-sm, .875rem));font-weight:var(--link-font-weight, 600);line-height:var(--link-line-height, 1.5);text-decoration:var(--link-text-decoration, none);color:var(--link-color, var(--text-color, inherit));cursor:pointer;&[vertical]::part(anchor){display:flex;flex-direction:column}&::part(anchor){display:inline-flex;align-items:center;justify-content:var(--link-justify-content, left);width:100%;height:100%;gap:var(--link-gap, var(--spacing-xs, .25rem));flex-direction:var(--link-direction, row);padding:var(--link-padding-y, var(--spacing-sm, .5rem)) var(--link-padding-x, var(--spacing-md, .75rem));font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;text-decoration:var(--link-text-decoration, none);color:inherit;cursor:pointer;transition:var( --link-transition, color .2s ease, opacity .2s ease, transform .1s ease );&:hover{color:var(--link-hover-color, var(--link-color));text-decoration:var( --link-hover-text-decoration, var(--link-text-decoration, none) );opacity:var(--link-hover-opacity, .9)}&:active{color:var(--link-active-color, var(--link-color));transform:var(--link-active-transform, scale(.98))}&:focus-visible{outline:2px solid var(--color-primary-dark, #d79921);outline-offset:2px}&:visited{color:var(--link-visited-color, var(--link-color))}&[disabled],&[aria-disabled=true]{opacity:var(--link-disabled-opacity, .5);cursor:not-allowed;pointer-events:none}}&::part(icon){display:inline-flex;align-items:center;justify-content:center;width:var(--link-icon-size, 1.25rem);height:var(--link-icon-size, 1.25rem);color:var(--link-icon-color, currentColor);flex-shrink:0}&[underline]{--link-text-decoration: underline}&[underline=hover]{--link-text-decoration: none;--link-hover-text-decoration: underline}&[variant=primary]{--link-color: var(--color-primary);--link-hover-color: var(--color-primary-dark);--link-active-color: var(--color-primary-darker)}&[variant=secondary]{--link-color: var(--color-secondary);--link-hover-color: var(--color-secondary-dark);--link-active-color: var(--color-secondary-darker)}&[variant=muted]{--link-color: var(--text-muted);--link-hover-color: var(--text-color)}&[size=xs]{--link-font-size: var(--text-xs, .75rem);--link-padding-y: .2rem;--link-padding-x: .4rem;--link-gap: .125rem;--link-icon-size: .75em}&[size=sm]{--link-font-size: var(--text-sm, .875rem);--link-padding-y: .25rem;--link-padding-x: .5rem;--link-gap: .25rem;--link-icon-size: .875em}&[size=md]{--link-font-size: var(--text-base, 1rem);--link-padding-y: .5rem;--link-padding-x: .75rem;--link-gap: .375rem;--link-icon-size: 1em}&[size=lg]{--link-font-size: var(--text-lg, 1.125rem);--link-padding-y: .75rem;--link-padding-x: 1rem;--link-gap: .5rem;--link-icon-size: 1.125em}&[size=xl]{--link-font-size: var(--text-xl, 1.25rem);--link-padding-y: 1rem;--link-padding-x: 1.25rem;--link-gap: .625rem;--link-icon-size: 1.25em}&[compact]{--link-padding-x: 0;--link-padding-y: 0}&[w-full],&[wfull]{width:100%;display:flex}}.bundler-ui{display:flex;flex-direction:column;gap:1.5rem;padding:1.5rem;min-height:100%}.bundler-page-title{font-size:2rem;font-weight:800;color:var(--text-color, #111);margin:0}.bundler-tab-content{display:flex;flex-direction:column;gap:1.5rem}.bundler-deploy-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-deploy-content{grid-template-columns:1fr}}.bundler-credentials-content{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}@media (max-width: 1024px){.bundler-credentials-content{grid-template-columns:1fr}}.bundler-dashboard{display:flex;flex-direction:column;gap:1.5rem}.bundler-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}@media (max-width: 1024px){.bundler-stats-grid{grid-template-columns:repeat(2,1fr)}}@media (max-width: 640px){.bundler-stats-grid{grid-template-columns:1fr}}.bundler-quick-actions{display:flex;gap:1rem;flex-wrap:wrap}.bundler-form{display:flex;flex-direction:column;gap:1rem}.bundler-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media (max-width: 640px){.bundler-form-grid{grid-template-columns:1fr}}.bundler-full-width{grid-column:span 2}@media (max-width: 640px){.bundler-full-width{grid-column:span 1}}.bundler-deploy-row{display:flex;align-items:flex-end;gap:1rem;margin-top:1rem}.bundler-deploy-row uix-select{flex:1}.bundler-help-text{font-size:.875rem;color:var(--text-muted, #6b7280);margin:.5rem 0 0}.bundler-loading{text-align:center;padding:1rem;color:var(--text-muted, #6b7280)}.bundler-empty{text-align:center;padding:1rem;color:var(--text-muted, #6b7280);margin:0}.bundler-releases{display:flex;flex-direction:column;gap:.75rem}.bundler-release{padding:.75rem;border-radius:var(--radius-md, .375rem)}.bundler-release-success{background:var(--color-success-lighter, #d1fae5)}.bundler-release-failed{background:var(--color-danger-lighter, #fee2e2)}.bundler-release-pending{background:var(--color-warning-lighter, #fef3c7)}.bundler-release-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.bundler-release-version{font-weight:600;color:var(--text-color, #111)}.bundler-release-status{font-size:.875rem}.bundler-release-type{font-size:.75rem;font-family:monospace;padding:.125rem .5rem;background:var(--color-surface, #fff);border-radius:var(--radius-sm, .25rem);color:var(--text-muted, #6b7280)}.bundler-release-date{font-size:.875rem;color:var(--text-muted, #6b7280);margin-left:auto}.bundler-release-notes{font-size:.875rem;color:var(--text-color, #374151);margin:.5rem 0 0}:where(.uix-icon,uix-icon){display:inline-block;vertical-align:middle;--icon-size: calc(var(--spacing, .25rem) * 4);width:var(--icon-size);height:var(--icon-size);svg{height:inherit;width:inherit}&[solid]{stroke:currentColor;fill:currentColor}&[color=primary]{color:var(--color-primary)}&[color=secondary]{color:var(--color-secondary)}&[color=success]{color:var(--color-success)}&[color=danger]{color:var(--color-danger)}&[color=warning]{color:var(--color-warning)}&[color=info]{color:var(--color-info)}&[color=inverse]{color:var(--color-inverse)}&[size=xs]{--icon-size: calc(var(--spacing, .25rem) * 3)}&[size=sm]{--icon-size: calc(var(--spacing, .25rem) * 4)}&[size=md]{--icon-size: calc(var(--spacing, .25rem) * 6)}&[size=lg]{--icon-size: calc(var(--spacing, .25rem) * 8)}&[size=xl]{--icon-size: calc(var(--spacing, .25rem) * 10)}&[size="2xl"]{--icon-size: calc(var(--spacing, .25rem) * 14)}&[size="3xl"]{--icon-size: calc(var(--spacing, .25rem) * 20)}&[size="4xl"]{--icon-size: calc(var(--spacing, .25rem) * 30)}}:where(.uix-tabs,uix-tabs){display:flex;flex-direction:column;width:100%;border:var(--tabs-border-width, 0) solid var(--tabs-border-color, transparent);border-radius:var(--tabs-border-radius, 0);box-shadow:var(--tabs-shadow, none);background:var(--tabs-background, transparent);overflow:hidden;&::part(tab-list){display:flex;flex-direction:row;background:var(--tabs-list-background, transparent);border-bottom:1px solid var(--tabs-list-border-color, var(--color-surface-dark));overflow-x:auto;scrollbar-width:none;flex-shrink:0}[slot=tab]{flex:1;display:flex;align-items:center;justify-content:center;white-space:nowrap;cursor:pointer;position:relative;gap:var(--tabs-tab-gap, var(--spacing-xs, .25rem));padding:var(--tabs-tab-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem));font-family:inherit;font-size:var(--tabs-tab-font-size, var(--text-sm, .875rem));font-weight:var(--tabs-tab-font-weight, var(--font-medium, 500));text-transform:var(--tabs-tab-text-transform, none);letter-spacing:var(--tabs-tab-letter-spacing, normal);color:var(--tabs-tab-color, var(--text-muted));background:var(--tabs-tab-background, transparent);border:none;border-bottom:var(--tabs-tab-border-width, 2px) solid transparent;outline:none;transition:color .2s ease,background-color .2s ease,border-color .2s ease;&:hover{color:var(--tabs-tab-color-hover, var(--color-primary-light));background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&:focus-visible{background:var(--tabs-tab-background-hover, var(--color-surface-dark))}&[active]{color:var(--tabs-tab-color-active, var(--text-color));background:var(--tabs-tab-background-active, transparent);border-bottom-color:var(--tabs-tab-border-active, var(--color-primary))}&[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}}&::part(tab-panel){display:flex;width:100%;min-height:0;overflow-y:auto;background:var(--tabs-panel-background, transparent)}[slot=panel]{min-height:0;overflow-y:auto;padding:var(--tabs-panel-padding, var(--spacing-lg, 1rem));flex-grow:1;animation:fadeIn .2s ease-in-out;&[hide]{display:none}}&[vertical]{flex-direction:row;height:100%;&::part(tab-list){flex-direction:column;border-bottom:none;border-right:1px solid var(--tabs-list-border-color, var(--color-surface-dark));min-width:150px}[slot=tab]{justify-content:flex-start;border-bottom:none;border-right:var(--tabs-tab-border-width, 2px) solid transparent;&[active]{border-color:transparent;border-right-color:var(--tabs-tab-border-active, var(--color-primary))}}}}@keyframes fadeIn{0%{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}:where(.uix-button,uix-button){display:inline-flex;align-items:center;justify-content:center;width:var(--button-width, fit-content);white-space:nowrap;box-sizing:border-box;&::part(anchor){border:0;background:transparent;color:var(--button-color, var(--text-color, inherit));text-decoration:none;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:inherit;font-size:inherit;line-height:inherit;padding:var(--button-padding-y, .5rem) var(--button-padding-x, 1rem)}font-family:inherit;font-weight:var(--button-font-weight, 700);font-size:var(--button-font-size, .875rem);line-height:var(--button-line-height, 1.5);text-align:center;gap:var(--button-gap, .5rem);border-radius:var(--button-border-radius, var(--radius-md, .375rem));border:var(--button-border-size, 0) solid var(--button-border-color, transparent);box-shadow:var(--button-shadow, none);text-decoration:none;padding:var(--spacing-sm, .5rem) var(--spacing-md, .75rem);cursor:pointer;text-transform:var(--button-text-transform, none);transition:var( --button-transition, transform .1s ease-in-out, background-color .2s ease-in-out, border-color .2s ease-in-out, box-shadow .15s ease-in-out, color .2s ease-in-out );background:transparent;user-select:none;background-color:var(--button-background, #000);color:var(--button-color, #fff);&:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:2px}&:not([disabled]):not([aria-disabled=true]):hover{background-color:var(--button-hover-background, var(--color-primary-dark));border-color:var( --button-hover-border-color, var(--button-border-color, transparent) );color:var(--button-hover-color, var(--button-color));box-shadow:var(--button-hover-shadow, var(--button-shadow, none));transform:translate(var(--button-hover-translate-x, 0),var(--button-hover-translate-y, 0))}&:not([disabled]):not([aria-disabled=true]):active{background-color:var( --button-active-background, var(--color-primary-darker) );box-shadow:var(--button-active-shadow, var(--button-shadow, none));transform:translate(var(--button-active-translate-x, 0),var(--button-active-translate-y, 0)) scale(.97)}&:not([variant],[primary],[secondary],[danger],[success],[warning]){--button-color: #fff;--button-background: #000;--button-border-color: #000;--button-hover-background: #222;--button-active-background: #222}&[primary],&[variant=primary]{--button-background: var(--color-primary);--button-border-color: var(--color-primary);--button-hover-background: var(--color-primary-dark);--button-active-background: var(--color-primary-darker)}&[secondary],&[variant=secondary]{--button-background: var(--color-secondary);--button-border-color: var(--color-secondary);--button-hover-background: var(--color-secondary-dark);--button-active-background: var(--color-secondary-darker)}&[danger],&[variant=danger]{--button-background: var(--color-danger);--button-border-color: var(--color-danger);--button-hover-background: var(--color-danger-dark);--button-active-background: var(--color-danger-darker)}&[success],&[variant=success]{--button-background: var(--color-success);--button-border-color: var(--color-success);--button-hover-background: var(--color-success-dark);--button-active-background: var(--color-success-darker)}&[warning],&[variant=warning]{--button-background: var(--color-warning);--button-border-color: var(--color-warning);--button-hover-background: var(--color-warning-dark);--button-active-background: var(--color-warning-darker)}&[bordered]{--button-border-size: 1px}&[outline]{--button-background: transparent;--button-border-size: 1px;--button-color: var(--text-color);--button-hover-color: var(--color-surface-lighter);&[primary]{--button-border-color: var(--color-primary-dark);--button-hover-background: var(--color-primary);--button-hover-border-color: var(--color-primary)}&[secondary]{--button-border-color: var(--color-secondary-dark);--button-hover-background: var(--color-secondary);--button-hover-border-color: var(--color-secondary)}&[danger]{--button-border-color: var(--color-danger-dark);--button-hover-background: var(--color-danger);--button-hover-border-color: var(--color-danger)}&[success]{--button-border-color: var(--color-success-dark);--button-hover-background: var(--color-success);--button-hover-border-color: var(--color-success)}}&[ghost]{--button-background: transparent;--button-border-color: transparent;--button-color: var(--text-color);--button-hover-background: var(--color-surface-light);--button-hover-color: var(--text-color);&[primary]{--button-hover-background: color-mix( in srgb, var(--color-primary), transparent 85% );--button-hover-color: var(--color-primary-darker)}&[secondary]{--button-hover-background: color-mix( in srgb, var(--color-secondary), transparent 85% );--button-hover-color: var(--color-secondary-darker)}&[danger]{--button-hover-background: color-mix( in srgb, var(--color-danger), transparent 85% );--button-hover-color: var(--color-danger-darker)}&[success]{--button-hover-background: color-mix( in srgb, var(--color-success), transparent 85% );--button-hover-color: var(--color-success-darker)}}&[size=xs]{--button-padding-y: .2rem;--button-padding-x: .5rem;--button-font-size: .6rem;--button-line-height: 1rem;--button-gap: .25rem}&[size=sm]{--button-padding-y: .3rem;--button-padding-x: .8rem;--button-font-size: .8rem;--button-line-height: 1.25rem;--button-gap: .375rem}&[size=md]{--button-padding-y: .4rem;--button-padding-x: 1.25rem;--button-font-size: .9rem;--button-line-height: 1.5rem;--button-gap: .5rem}&[size=lg]{--button-padding-y: .5rem;--button-padding-x: 1.5rem;--button-font-size: 1.1rem;--button-line-height: 1.75rem;--button-gap: .625rem}&[size=xl]{--button-padding-y: .625rem;--button-padding-x: 2rem;--button-font-size: 1.25rem;--button-line-height: 2rem;--button-gap: .75rem}&[w-full],&[wfull]{width:100%;display:flex}}:where(.uix-stat,uix-stat){display:inline-flex;align-items:flex-start;gap:var(--spacing-md, .75rem);padding:var(--spacing-lg, 1rem);position:relative;&::part(figure){display:flex;align-items:center;justify-content:center;flex-shrink:0;order:1;&:empty{display:none}}&::part(body){display:flex;flex-direction:column;gap:var(--spacing-xs, .25rem);flex:1;min-width:0}&::part(title){font-size:var(--text-sm, .875rem);font-weight:var(--font-normal, 400);color:var(--text-color);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}&::part(value){font-size:var(--text-3xl, 1.875rem);font-weight:var(--font-extrabold, 800);color:var(--text-color);line-height:var(--leading-tight, 1.2);white-space:nowrap}&::part(desc){font-size:var(--text-sm, .875rem);color:var(--text-color);opacity:.6;&:empty{display:none}}&[size=sm]{&::part(value){font-size:var(--text-xl, 1.25rem)}&::part(title),&::part(desc){font-size:var(--text-xs, .75rem)}}&[size=lg]{&::part(value){font-size:var(--text-5xl, 3rem)}&::part(title),&::part(desc){font-size:var(--text-base, 1rem)}}&[variant=primary]::part(value){color:var(--color-primary)}&[variant=secondary]::part(value){color:var(--color-secondary)}&[variant=success]::part(value){color:var(--color-success)}&[variant=danger]::part(value){color:var(--color-danger)}&[variant=warning]::part(value){color:var(--color-warning)}&[variant=info]::part(value){color:var(--color-info)}&[centered]{flex-direction:column;align-items:center;text-align:center;justify-content:center;&::part(figure){order:0;margin-bottom:var(--spacing-sm, .5rem)}&::part(body){align-items:center}::slotted([slot="figure"]){width:2.5rem;height:2.5rem}}}:where(.uix-join){>uix-stat{flex:1;position:relative;border-radius:0}&:not([orientation=vertical])>uix-stat+uix-stat:before{content:"";position:absolute;left:0;top:15%;height:70%;border-left:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}&[orientation=vertical]>uix-stat+uix-stat:before{content:"";position:absolute;top:0;left:15%;width:70%;border-top:1px solid var(--color-surface-dark, rgba(255, 255, 255, .1))}>uix-stat+uix-stat{margin-left:0;margin-top:0}}:where(.uix-input,uix-input){display:inline-block;width:var(--input-width, auto);box-sizing:border-box;.input-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.input-required{color:var(--color-danger, #ef4444);margin-left:.25rem}input{width:100%;height:var(--input-height, 3rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--input-line-height, 1.5rem);font-family:inherit;color:var(--input-color, var(--text-color, inherit));box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);outline:none;transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );&::placeholder{color:var(--input-placeholder-color, var(--text-muted, #9ca3af));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-height: 1.5rem;--input-padding-y: .2rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--input-line-height: 1rem;--input-icon-size: .75rem}&[size=sm]{--input-height: 2rem;--input-padding-y: .3rem;--input-padding-x: .6rem;--input-font-size: var(--text-sm, .875rem);--input-line-height: 1.25rem;--input-icon-size: .875rem}&[size=md]{--input-height: 2.5rem;--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--input-line-height: 1.5rem;--input-icon-size: 1rem}&[size=lg]{--input-height: 3rem;--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--input-line-height: 1.75rem;--input-icon-size: 1.25rem}&[size=xl]{--input-height: 3.5rem;--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--input-line-height: 2rem;--input-icon-size: 1.5rem}&[required] input{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}&:has(.uix-icon){position:relative;.uix-icon{position:absolute;top:50%;transform:translateY(-50%);right:var(--input-icon-offset, .75rem);width:var(--input-icon-size, 1rem);height:var(--input-icon-size, 1rem);color:var(--input-icon-color, var(--text-muted));pointer-events:none}input{padding-right:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2)}}&:has(.uix-icon[left]){.uix-icon{left:var(--input-icon-offset, .75rem);right:auto}input{padding-left:calc(var(--input-icon-size, 1rem) + var(--input-icon-offset, .75rem) * 2);padding-right:var(--input-padding-x, .75rem)}}}:where(.uix-textarea,uix-textarea){display:inline-block;width:var(--textarea-width, 100%);box-sizing:border-box;.textarea-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.textarea-required{color:var(--color-danger, #ef4444);margin-left:.25rem}textarea{width:100%;min-height:var(--textarea-min-height, 6rem);padding:var(--input-padding-y, .5rem) var(--input-padding-x, .75rem);box-sizing:border-box;background:var(--input-background, var(--color-surface-light, #ffffff));border:var(--input-border-width, 1px) solid var(--input-border-color, var(--color-surface, #e5e7eb));border-radius:var(--input-border-radius, var(--radius-md, .375rem));box-shadow:var(--input-shadow, none);transition:var( --input-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease );font-size:var(--input-font-size, var(--text-sm, .9rem));font-weight:var(--input-font-weight, var(--font-normal, 400));line-height:var(--textarea-line-height, var(--leading-normal, 1.5));font-family:inherit;color:var(--input-text, var(--input-color, var(--text-color, inherit)));outline:none;resize:var(--textarea-resize, vertical);&::placeholder{color:var(--input-placeholder, var(--input-placeholder-color, var(--text-muted, #9ca3af)));opacity:1}&:hover:not(:focus):not(:disabled){border-color:var(--input-hover-border-color, var(--color-primary-light))}&:focus{border-color:var(--input-focus-border-color, var(--color-primary));background:var(--input-focus-background, var(--input-background));box-shadow:var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1))}&:disabled{opacity:var(--input-disabled-opacity, .6);background:var(--input-disabled-background, var(--color-surface-dark));color:var(--input-disabled-color, var(--text-muted));cursor:not-allowed}&:read-only{background:var(--input-readonly-background, var(--color-surface-dark));cursor:default}}&[size=xs]{--input-padding-y: .25rem;--input-padding-x: .5rem;--input-font-size: var(--text-xs, .75rem);--textarea-min-height: 3rem}&[size=sm]{--input-padding-y: .375rem;--input-padding-x: .625rem;--input-font-size: var(--text-sm, .875rem);--textarea-min-height: 4.5rem}&[size=md]{--input-padding-y: .5rem;--input-padding-x: .75rem;--input-font-size: var(--text-base, 1rem);--textarea-min-height: 6rem}&[size=lg]{--input-padding-y: .625rem;--input-padding-x: 1rem;--input-font-size: var(--text-lg, 1.125rem);--textarea-min-height: 7.5rem}&[size=xl]{--input-padding-y: .75rem;--input-padding-x: 1.25rem;--input-font-size: var(--text-xl, 1.25rem);--textarea-min-height: 9rem}&[resize=none] textarea{resize:none}&[resize=both] textarea{resize:both}&[resize=horizontal] textarea{resize:horizontal}&[resize=vertical] textarea{resize:vertical}&[required] textarea{border-left:3px solid var(--input-required-color, var(--color-warning))}&[error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--input-border-color: var(--color-primary);--input-focus-border-color: var(--color-primary)}&[variant=secondary]{--input-border-color: var(--color-secondary);--input-focus-border-color: var(--color-secondary)}&[variant=success]{--input-border-color: var(--color-success);--input-focus-border-color: var(--color-success);--input-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--input-border-color: var(--color-warning);--input-focus-border-color: var(--color-warning);--input-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--input-border-color: var(--color-danger);--input-focus-border-color: var(--color-danger);--input-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-select,uix-select){display:inline-block;width:var(--select-width, auto);box-sizing:border-box;.select-label{display:block;font-size:var(--input-label-font-size, var(--text-sm, .875rem));font-weight:var(--input-label-font-weight, var(--font-semibold, 600));margin-bottom:var(--input-label-margin, .5rem);color:var(--input-label-color, var(--text-color, #1a1a1a));letter-spacing:var(--input-label-letter-spacing, 0);text-transform:var(--input-label-text-transform, none)}.select-required{color:var(--color-danger, #ef4444);margin-left:.25rem}.select-wrapper{position:relative;background:var(--select-background, var(--input-background, var(--color-surface-light, #ffffff)));border:var(--select-border-width, var(--input-border-width, 1px)) solid var(--select-border-color, var(--input-border-color, var(--color-surface, #e5e7eb)));border-radius:var(--select-border-radius, var(--input-border-radius, var(--radius-md, .375rem)));box-shadow:var(--select-shadow, var(--input-shadow, none));transition:var( --select-transition, border-color .2s ease, background-color .2s ease, box-shadow .15s ease, transform .15s ease );&:hover:not(:focus-within){border-color:var(--select-hover-border-color, var(--input-hover-border-color, var(--color-primary-light)))}&:focus-within{border-color:var(--select-focus-border-color, var(--input-focus-border-color, var(--color-primary)));box-shadow:var(--select-focus-shadow, var(--input-focus-shadow, 0 0 0 3px rgba(250, 189, 47, .1)))}}select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;height:var(--select-height, var(--input-height, 3rem));padding:var(--select-padding-y, var(--input-padding-y, .5rem)) var(--select-padding-x, var(--input-padding-x, .75rem));padding-right:calc(var(--select-padding-x, var(--input-padding-x, .75rem)) + var(--select-arrow-size, 1rem) + .5rem);font-size:var(--select-font-size, var(--input-font-size, var(--text-sm, .875rem)));font-weight:var(--select-font-weight, var(--input-font-weight, var(--font-normal, 400)));font-family:inherit;line-height:var(--select-line-height, 1.5);color:var(--select-color, var(--input-text, var(--text-color, inherit)));background:transparent;border:none;outline:none;cursor:pointer;box-sizing:border-box;transition:var(--select-transition, background-color .2s ease);option{background:var(--select-option-background, var(--color-surface-light));color:var(--select-option-color, var(--text-color));padding:var(--spacing-xs, .25rem);&:checked{background:var(--select-option-checked-background, var(--color-primary));color:var(--select-option-checked-color, var(--color-inverse))}}&::placeholder{color:var(--select-placeholder, var(--input-placeholder, var(--text-muted, #9ca3af)));opacity:1}&:focus{outline:none}}.select-wrapper .select-arrow{position:absolute;right:var(--select-padding-x, var(--input-padding-x, .75rem));top:50%;transform:translateY(-50%);width:var(--select-arrow-size, 1rem);height:var(--select-arrow-size, 1rem);color:var(--select-arrow-color, var(--input-icon, var(--text-muted)));pointer-events:none;opacity:.7;transition:opacity .2s ease,transform .2s ease}.select-wrapper:focus-within .select-arrow{opacity:1}&:has(select:disabled){.select-wrapper{opacity:var(--select-disabled-opacity, .6);cursor:not-allowed}select{background:var(--select-disabled-background, var(--input-disabled-background, var(--color-surface-dark)));color:var(--select-disabled-color, var(--text-muted));cursor:not-allowed}.select-wrapper .select-arrow{opacity:.4}}&[size=xs]{--select-height: 1.5rem;--select-padding-y: .2rem;--select-padding-x: .5rem;--select-font-size: var(--text-xs, .75rem);--select-arrow-size: .75rem}&[size=sm]{--select-height: 2rem;--select-padding-y: .3rem;--select-padding-x: .6rem;--select-font-size: var(--text-sm, .875rem);--select-arrow-size: .875rem}&[size=md]{--select-height: 2.5rem;--select-padding-y: .5rem;--select-padding-x: .75rem;--select-font-size: var(--text-base, 1rem);--select-arrow-size: 1rem}&[size=lg]{--select-height: 3rem;--select-padding-y: .625rem;--select-padding-x: 1rem;--select-font-size: var(--text-lg, 1.125rem);--select-arrow-size: 1.25rem}&[size=xl]{--select-height: 3.5rem;--select-padding-y: .75rem;--select-padding-x: 1.25rem;--select-font-size: var(--text-xl, 1.25rem);--select-arrow-size: 1.5rem}&[required] .select-wrapper{border-left:3px solid var(--select-required-color, var(--color-warning))}&[error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=primary]{--select-border-color: var(--color-primary);--select-focus-border-color: var(--color-primary)}&[variant=secondary]{--select-border-color: var(--color-secondary);--select-focus-border-color: var(--color-secondary)}&[variant=success]{--select-border-color: var(--color-success);--select-focus-border-color: var(--color-success);--select-focus-shadow: 0 0 0 3px rgba(34, 197, 94, .1)}&[variant=warning]{--select-border-color: var(--color-warning);--select-focus-border-color: var(--color-warning);--select-focus-shadow: 0 0 0 3px rgba(249, 115, 22, .1)}&[variant=error]{--select-border-color: var(--input-border-error, var(--color-danger));--select-focus-border-color: var(--input-border-error, var(--color-danger));--select-focus-shadow: 0 0 0 3px rgba(251, 73, 52, .1)}&[w-full],&[wfull]{width:100%;display:block}}:where(.uix-checkbox,uix-checkbox){display:inline-flex;align-items:center;gap:var(--checkbox-gap, .5rem);&:has(.checkbox:disabled){cursor:not-allowed;opacity:.6}.checkbox{appearance:none;width:var(--checkbox-size, 1.5rem);height:var(--checkbox-size, 1.5rem);border:var(--checkbox-border-width, 2px) solid var(--checkbox-border-color, var(--color-primary));border-radius:var(--checkbox-border-radius, var(--radius-md, .375rem));background-color:var(--checkbox-background-color, var(--color-surface));box-shadow:var(--checkbox-shadow, none);cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .1s ease;position:relative;flex-shrink:0;&:hover:not(:disabled){border-color:var(--checkbox-hover-border-color, var(--color-primary))}&:checked{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:30%;top:10%;width:30%;height:60%;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}}&:indeterminate{background-color:var(--checkbox-checked-background-color, var(--color-primary));border-color:var(--checkbox-checked-border-color, var(--color-primary));&:after{content:"";position:absolute;left:20%;top:45%;width:60%;height:2px;background-color:#fff}}&:focus-visible{outline:2px solid var(--checkbox-focus-outline-color, var(--color-primary));outline-offset:2px}&:disabled{cursor:not-allowed;background-color:var(--checkbox-disabled-background-color, var(--color-subtle))}}.checkbox-label{color:var(--checkbox-label-color, var(--text-color));font-size:var(--checkbox-label-font-size, var(--text-base, 1rem));font-weight:var(--checkbox-label-font-weight, var(--font-medium, 500));line-height:var(--leading-normal, 1.5);cursor:pointer;user-select:none}.checkbox-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[size=xs]{--checkbox-size: 1rem;--checkbox-label-font-size: var(--text-xs, .75rem);--checkbox-gap: .375rem}&[size=sm]{--checkbox-size: 1.25rem;--checkbox-label-font-size: var(--text-sm, .875rem);--checkbox-gap: .5rem}&[size=md]{--checkbox-size: 1.5rem;--checkbox-label-font-size: var(--text-base, 1rem);--checkbox-gap: .5rem}&[size=lg]{--checkbox-size: 1.75rem;--checkbox-label-font-size: var(--text-lg, 1.125rem);--checkbox-gap: .625rem}&[size=xl]{--checkbox-size: 2rem;--checkbox-label-font-size: var(--text-xl, 1.25rem);--checkbox-gap: .75rem}&[variant=primary] .checkbox:checked,&[variant=primary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-primary);--checkbox-checked-border-color: var(--color-primary)}&[variant=secondary] .checkbox:checked,&[variant=secondary] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-secondary);--checkbox-checked-border-color: var(--color-secondary)}&[variant=success] .checkbox:checked,&[variant=success] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-success);--checkbox-checked-border-color: var(--color-success)}&[variant=warning] .checkbox:checked,&[variant=warning] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-warning);--checkbox-checked-border-color: var(--color-warning)}&[variant=error] .checkbox:checked,&[variant=error] .checkbox:indeterminate{--checkbox-checked-background-color: var(--color-danger);--checkbox-checked-border-color: var(--color-danger)}}:where(.uix-container,uix-container){display:block;box-sizing:border-box;background:var(--container-background, var(--color-surface-lighter));border:1px solid var(--container-border-color, var(--color-surface-dark));border-radius:var(--container-border-radius, var(--radius-md, .375rem));overflow:var(--container-overflow, visible);&[padding=none]{padding:0}&[padding=sm]{padding:var(--spacing-sm, .5rem)}&[padding=md]{padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]{padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[overflow=visible]{--container-overflow: visible}&[overflow=hidden]{--container-overflow: hidden}&[overflow=auto]{--container-overflow: auto}&[overflow=scroll]{--container-overflow: scroll}&[variant=default]{--container-background: inherit;--container-border-color: var(--color-surface-dark)}&[variant=filled]{--container-background: var(--color-surface-light);--container-border-color: var(--color-surface)}&[variant=outlined]{--container-background: transparent;--container-border-color: var(--color-surface)}&[variant=elevated]{--container-background: var(--color-surface-lighter);--container-border-color: var(--color-surface-dark);box-shadow:0 1px 3px #0000001f,0 1px 2px #0000003d;&:hover{box-shadow:0 3px 6px #00000029,0 3px 6px #0000003b;transition:box-shadow .3s ease}}}:where(.uix-card,uix-card){display:flex;flex-direction:column;overflow:hidden;&::part(body){display:flex;flex-direction:column;flex:1;background:var(--card-background, inherit)}>[slot=header]{margin:0;display:flex;padding:var( --card-header-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-bottom-width:var(--card-header-border-width, 0);border-bottom-style:solid;border-bottom-color:var( --card-header-border-color, var(--card-border-primary, #504945) );background:var(--card-header-background-color, inherit)}>[slot=footer]{display:flex;padding:var( --card-footer-padding, var(--spacing-md, .75rem) var(--spacing-lg, 1rem) );border-top-width:var(--card-footer-border-width, 0);border-top-style:var(--card-footer-border-style, solid);border-top-color:var( --card-footer-border-color, var(--color-surface, #504945) );background:var(--card-footer-background-color, inherit);flex-direction:row;gap:var(--spacing-sm, .5rem);align-items:center;justify-content:flex-end}&[style*=--card-gradient-from]::part(body){background:linear-gradient(135deg,var(--card-gradient-from),var(--card-gradient-to, var(--card-gradient-from)))}&[padding=none]::part(body){padding:0}&[padding=sm]::part(body){padding:var(--spacing-sm, .5rem)}&[padding=md]::part(body){padding:var(--spacing-md, .75rem) var(--spacing-lg, 1rem)}&[padding=lg]::part(body){padding:var(--spacing-lg, 1rem) var(--spacing-xl, 1.5rem)}&[borderWidth=none]{border-width:0}&[borderWidth="1"]{border-width:1px}&[borderWidth="2"]{border-width:2px}&[borderWidth="3"]{border-width:3px}&[borderStyle=solid]{border-style:solid}&[borderStyle=dashed]{border-style:dashed}&[borderStyle=dotted]{border-style:dotted}&[gap=none]::part(body){gap:0}&[gap=xs]::part(body){gap:var(--spacing-xs, .25rem)}&[gap=sm]::part(body){gap:var(--spacing-sm, .5rem)}&[gap=md]::part(body){gap:var(--spacing-md, .75rem)}&[gap=lg]::part(body){gap:var(--spacing-lg, 1rem)}&[gap=xl]::part(body){gap:var(--spacing-xl, 1.5rem)}&[shadow=sm]{box-shadow:var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, .05))}&[shadow=md]{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=lg]{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[hover]{transition:all .2s ease;cursor:pointer;&:hover{border-color:var(--card-border-hover, #83a598)}&[shadow=sm]:hover{box-shadow:var( --shadow-md, 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06) )}&[shadow=md]:hover{box-shadow:var( --shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -2px rgba(0, 0, 0, .05) )}&[shadow=lg]:hover{box-shadow:var( --shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04) )}}}:where(.uix-label,uix-label){display:block;.label{display:block;font-size:var(--label-font-size, var(--text-sm, .875rem));font-weight:var(--label-font-weight, var(--font-semibold, 600));margin-bottom:var(--label-margin, .5rem);color:var(--label-color, var(--text-color, #1a1a1a));letter-spacing:var(--label-letter-spacing, 0);text-transform:var(--label-text-transform, none);line-height:var(--label-line-height, 1.4);cursor:pointer}.label-required{color:var(--color-danger, #ef4444);margin-left:.25rem}&[inline]{display:inline;.label{display:inline;margin-bottom:0}}&[size=xs]{--label-font-size: var(--text-xs, .75rem)}&[size=sm]{--label-font-size: var(--text-sm, .875rem)}&[size=md]{--label-font-size: var(--text-base, 1rem)}&[size=lg]{--label-font-size: var(--text-lg, 1.125rem)}&[size=xl]{--label-font-size: var(--text-xl, 1.25rem)}}:root{--font-family: Manrope;--font-icon-family: lucide;--font-normal: 400;--font-medium: 500;--font-semibold: 600;--font-bold: 700;--font-black: 900;--link-color: var(--text-color);--text-color: #1a1a1a;--text-muted: #6b7280;--text-xs: .75rem;--text-sm: .875rem;--text-base: 1rem;--text-lg: 1.125rem;--text-xl: 1.25rem;--text-2xl: 1.5rem;--text-3xl: 1.875rem;--background-color: #faf5f0;--color-primary: #fabd2f;--color-primary-lighter: #fde8a3;--color-primary-light: #fcd875;--color-primary-dark: #d79921;--color-primary-darker: #b57614;--color-secondary: #ec4899;--color-secondary-lighter: #fbcfe8;--color-secondary-light: #f9a8d4;--color-secondary-dark: #db2777;--color-secondary-darker: #be185d;--color-success: #22c55e;--color-success-lighter: #bbf7d0;--color-success-light: #86efac;--color-success-dark: #16a34a;--color-success-darker: #15803d;--color-danger: #ef4444;--color-danger-lighter: #fecaca;--color-danger-light: #fca5a5;--color-danger-dark: #dc2626;--color-danger-darker: #b91c1c;--color-warning: #f97316;--color-warning-lighter: #fed7aa;--color-warning-light: #fdba74;--color-warning-dark: #ea580c;--color-warning-darker: #c2410c;--color-info: #3b82f6;--color-info-lighter: #bfdbfe;--color-info-light: #93c5fd;--color-info-dark: #2563eb;--color-info-darker: #1d4ed8;--color-surface: #ffffff;--color-surface-light: #faf5f0;--color-surface-lighter: #ffffff;--color-surface-dark: #f5f0eb;--color-surface-darker: #ebe5df;--color-hover: #d79921;--color-hover-lighter: hsl(40 73% 69%);--color-hover-light: hsl(40 73% 59%);--color-hover-dark: hsl(40 73% 39%);--color-hover-darker: hsl(40 73% 29%);--color-focus: #fabd2f;--color-focus-lighter: hsl(42 95% 78%);--color-focus-light: hsl(42 95% 68%);--color-focus-dark: hsl(42 95% 48%);--color-focus-darker: hsl(42 95% 38%);--color-inverse: #1a1a1a;--color-inverse-lighter: #525252;--color-inverse-light: #404040;--color-inverse-dark: #0a0a0a;--color-inverse-darker: #000000;--spacing-xs: .25rem;--spacing-sm: .5rem;--spacing-md: .75rem;--spacing-lg: 1rem;--spacing-xl: 1.5rem;--spacing-2xl: 2rem;--spacing-3xl: 3rem;--spacing-4xl: 5rem;--leading-tight: 1.2;--leading-normal: 1.5;--leading-relaxed: 1.75;--radius-none: 0;--radius-sm: .5rem;--radius-md: .75rem;--radius-lg: 1rem;--radius-xl: 1.5rem;--radius-full: 9999px;--shadow-none: none;--shadow-sm: 2px 2px 0px 0px rgba(0,0,0,1);--shadow-md: 4px 4px 0px 0px rgba(0,0,0,1);--shadow-lg: 6px 6px 0px 0px rgba(0,0,0,1);--shadow-xl: 8px 8px 0px 0px rgba(0,0,0,1);--shadow-2xl: 12px 12px 0px 0px rgba(0,0,0,1);--button-border-size: 3px;--button-border-color: black;--button-border-radius: .75rem;--button-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--button-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--button-active-shadow: none;--button-hover-translate-x: -2px;--button-hover-translate-y: -2px;--button-active-translate-x: 2px;--button-active-translate-y: 2px;--button-font-weight: 900;--button-text-transform: uppercase;--input-background: #ffffff;--input-background-focus: #ffffff;--input-background-disabled: #f5f5f5;--input-border-color: #000000;--input-border-width: 3px;--input-border-radius: .75rem;--input-border-focus: #000000;--input-border-error: #ef4444;--input-text: #1a1a1a;--input-placeholder: #9ca3af;--input-icon: #6b7280;--input-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--input-focus-shadow: 6px 6px 0px 0px rgba(0,0,0,1);--checkbox-border-width: 3px;--checkbox-border-color: #000000;--checkbox-border-radius: .375rem;--checkbox-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--checkbox-hover-border-color: #000000;--checkbox-checked-background-color: #fabd2f;--checkbox-checked-border-color: #000000;--checkbox-label-font-weight: 600;--label-font-size: 1rem;--label-font-weight: 700;--label-color: #1a1a1a;--label-letter-spacing: .05em;--label-text-transform: uppercase;--label-margin: .5rem;--tabs-background: #ffffff;--tabs-border-color: #000000;--tabs-border-width: 3px;--tabs-border-radius: .75rem;--tabs-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--tabs-list-background: #f5f5f5;--tabs-list-border-color: #000000;--tabs-tab-padding: 1rem 1.5rem;--tabs-tab-gap: .5rem;--tabs-tab-font-size: .875rem;--tabs-tab-font-weight: 900;--tabs-tab-text-transform: uppercase;--tabs-tab-letter-spacing: .05em;--tabs-tab-color: #6b7280;--tabs-tab-color-hover: #1a1a1a;--tabs-tab-color-active: #1a1a1a;--tabs-tab-background: transparent;--tabs-tab-background-hover: #e5e5e5;--tabs-tab-background-active: #ffffff;--tabs-tab-border-width: 3px;--tabs-tab-border-active: #000000;--card-background: #ffffff;--card-border: #000000;--card-border-width: 3px;--card-border-hover: #000000;--card-text: #1a1a1a;--card-text-muted: #6b7280;--card-header-background: transparent;--card-header-border: #000000;--card-header-padding: .75rem 1rem;--card-footer-background: transparent;--card-footer-border: #000000;--card-footer-border-style: solid;--card-footer-padding: .75rem 1rem;--card-icon-background: #f5f5f5;--card-icon-size: 3rem;--card-icon-border-radius: .75rem;--card-tag-background: #fabd2f;--card-tag-text: #1a1a1a;--card-tag-padding: .25rem .5rem;--card-tag-border-radius: .5rem;--modal-background: #ffffff;--modal-border-width: 3px;--modal-border-color: #000000;--modal-border-radius: 1rem;--modal-shadow: 8px 8px 0px 0px rgba(0,0,0,1);--modal-color: #1a1a1a;--modal-overlay: rgba(0, 0, 0, .5);--modal-header-padding: 1.25rem 1.5rem;--modal-header-border-width: 3px;--modal-header-background: #ffffff;--modal-header-font-size: 1.25rem;--modal-header-font-weight: 900;--modal-header-color: #1a1a1a;--modal-body-padding: 1.5rem;--modal-body-color: #4b5563;--modal-footer-padding: 1rem 1.5rem;--modal-footer-border-width: 3px;--modal-footer-background: #f9fafb;--panel-background: #ffffff;--panel-background-hover: #f5f5f5;--panel-border: #000000;--panel-header-background: transparent;--panel-header-text: #1a1a1a;--panel-header-border: #000000;--dropdown-background: #ffffff;--dropdown-background-hover: #f5f5f5;--dropdown-background-active: #e5e5e5;--dropdown-border: #000000;--dropdown-text: #1a1a1a;--dropdown-text-muted: #6b7280;--dropdown-separator: #e5e5e5;--dropdown-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--badge-default-background: #f5f5f5;--badge-default-text: #1a1a1a;--badge-default-border: #000000;--badge-success-background: #22c55e;--badge-success-text: #ffffff;--badge-success-border: #000000;--badge-danger-background: #ef4444;--badge-danger-text: #ffffff;--badge-danger-border: #000000;--badge-warning-background: #f97316;--badge-warning-text: #ffffff;--badge-warning-border: #000000;--badge-info-background: #3b82f6;--badge-info-text: #ffffff;--badge-info-border: #000000;--list-background: transparent;--list-background-hover: #f5f5f5;--list-background-active: #e5e5e5;--list-background-selected: #fabd2f;--list-border: #000000;--list-border-hover: #000000;--list-text: #1a1a1a;--list-text-muted: #6b7280;--tree-background: transparent;--tree-background-hover: #f5f5f5;--tree-background-selected: #fabd2f;--tree-border: #000000;--tree-indent: 1rem;--tree-icon: #6b7280;--tree-icon-hover: #1a1a1a;--table-border-width: 3px;--table-border-color: #000000;--table-border-radius: 1rem;--table-shadow: 4px 4px 0px 0px rgba(0,0,0,1);--table-header-background: #ffffff;--table-header-color: #1a1a1a;--table-header-font-weight: 900;--table-header-font-size: .75rem;--table-header-text-transform: uppercase;--table-row-background: #ffffff;--table-row-hover-background: #fef3c7;--table-cell-padding: 1rem 1.25rem;--table-cell-font-size: .875rem;--table-cell-color: #4b5563;--pagination-border-width: 3px;--pagination-border-color: #000000;--pagination-border-radius: .75rem;--pagination-background: #ffffff;--pagination-color: #1a1a1a;--pagination-font-weight: 700;--pagination-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-hover-background: #f5f5f5;--pagination-hover-border-color: #000000;--pagination-hover-shadow: 2px 2px 0px 0px rgba(0,0,0,1);--pagination-hover-transform: translate(-1px, -1px);--pagination-active-background: #fabd2f;--pagination-active-border-color: #000000;--pagination-active-color: #000000;--pagination-active-shadow: 3px 3px 0px 0px rgba(0,0,0,1);--pagination-nav-font-weight: 900;--breadcrumbs-font-size: .875rem;--breadcrumbs-font-weight: 700;--breadcrumbs-current-font-weight: 900;--breadcrumbs-text-transform: uppercase;--breadcrumbs-letter-spacing: .05em;--breadcrumbs-link-color: #6b7280;--breadcrumbs-link-hover-color: #1a1a1a;--breadcrumbs-current-color: #1a1a1a;--breadcrumbs-separator-color: #9ca3af;--breadcrumbs-gap: .5rem;--sidebar-background: #ffffff;--sidebar-border-width: 3px;--sidebar-border-color: #000000;--sidebar-border-radius: 0;--sidebar-shadow: none;--sidebar-width: 256px;--sidebar-collapsed-width: 80px;--sidebar-header-padding: 1rem;--sidebar-header-background: #ffffff;--sidebar-header-border-width: 3px;--sidebar-header-font-weight: 900;--sidebar-content-padding: .75rem;--sidebar-footer-padding: .75rem;--sidebar-footer-background: #ffffff;--sidebar-footer-border-width: 3px;--sidebar-toggle-background: transparent;--sidebar-toggle-hover-background: #f5f5f5;--sidebar-toggle-border-radius: .5rem;--sidebar-item-padding: .75rem 1rem;--sidebar-item-border-radius: .75rem;--sidebar-item-font-weight: 500;--sidebar-item-color: #4b5563;--sidebar-item-hover-background: #f5f5f5;--sidebar-item-hover-color: #1a1a1a;--sidebar-item-active-background: #000000;--sidebar-item-active-color: #ffffff;--sidebar-item-active-font-weight: 600}:root{--font-family-base: "Manrope", sans-serif}body{font-family:var(--font-family-base)}
 `,mimeType:"text/css"}};self.addEventListener("install",e=>{console.log("SW: Installing new version...")}),self.addEventListener("activate",e=>{console.log("SW: Activated"),e.waitUntil(self.clients.claim())}),self.addEventListener("message",e=>{e.data?.type==="SKIP_WAITING"&&(console.log("SW: Skip waiting requested, activating..."),self.skipWaiting())}),self.addEventListener("fetch",e=>{let t=new URL(e.request.url).pathname;t.startsWith("/npm/")&&(t="/"+t.slice(5));const n=FILE_BUNDLE[t];n&&e.respondWith(new Response(n.content,{headers:{"Content-Type":n.mimeType||"application/javascript"}}))});
