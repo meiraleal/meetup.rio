@@ -1,6 +1,6 @@
 
 /* layer: properties */
-@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*, ::before, ::after, ::backdrop{--un-bg-opacity:100%;--un-ring-opacity:100%;--un-border-opacity:100%;--un-text-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial;--un-space-y-reverse:initial;--un-divide-x-reverse:initial;--un-border-style:solid;--un-divide-opacity:100%;--un-leading:initial;--un-from-opacity:100%;--un-to-opacity:100%;}}
+@supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))){*, ::before, ::after, ::backdrop{--un-bg-opacity:100%;--un-ring-opacity:100%;--un-border-opacity:100%;--un-text-opacity:100%;--un-translate-x:initial;--un-translate-y:initial;--un-translate-z:initial;--un-leading:initial;--un-space-y-reverse:initial;--un-divide-x-reverse:initial;--un-border-style:solid;--un-divide-opacity:100%;--un-from-opacity:100%;--un-to-opacity:100%;}}
 @property --un-text-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}
 @property --un-leading{syntax:"*";inherits:false;}
 @property --un-border-opacity{syntax:"<percentage>";inherits:false;initial-value:100%;}
@@ -1208,6 +1208,26 @@ app-item-modal .uix-modal::part(body) {
     opacity: 1;
   }
 }
+.meetup-card-compact.uix-card {
+  cursor: pointer;
+  height: 100%;
+  background: white;
+  border-color: var(--card-border-color, black);
+  border-radius: 1rem;
+}
+
+.meetup-card-compact.uix-card > [slot="header"] {
+  border-bottom: 3px solid var(--card-border-color, black);
+  padding: 0;
+}
+
+.meetup-card-compact.uix-card > [slot="footer"] {
+  justify-content: stretch;
+}
+
+.meetup-card-compact.uix-card > [slot="footer"] > button {
+  width: 100%;
+}
 /* Override modal styles for neubrutalism */
 uix-modal::part(dialog) {
   border: 4px solid black;
@@ -1609,26 +1629,6 @@ uix-modal::part(body) {
       color: #9ca3af;
     }
   }
-}
-.meetup-card-compact.uix-card {
-  cursor: pointer;
-  height: 100%;
-  background: white;
-  border-color: var(--card-border-color, black);
-  border-radius: 1rem;
-}
-
-.meetup-card-compact.uix-card > [slot="header"] {
-  border-bottom: 3px solid var(--card-border-color, black);
-  padding: 0;
-}
-
-.meetup-card-compact.uix-card > [slot="footer"] {
-  justify-content: stretch;
-}
-
-.meetup-card-compact.uix-card > [slot="footer"] > button {
-  width: 100%;
 }
 /**
  * UIX Container Component Styles
